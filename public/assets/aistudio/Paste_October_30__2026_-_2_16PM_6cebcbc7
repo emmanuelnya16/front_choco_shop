@@ -1,0 +1,401 @@
+# PROMPT — MODULE M5 « SUIVI, PHOTO DU COLIS ET PROFIL » — PWA DR CHOCO L'INCOMPRIS
+
+> À coller dans ton agent de code, **dans le projet existant** (après M0 à M4).
+> Langue de travail : français. Code et identifiants : anglais. Textes visibles : français.
+
+---
+
+## 0. TON RÔLE ET L'OBJECTIF
+
+Tu es un développeur front-end senior et un designer d'interface exigeant, spécialisé en applications mobiles de suivi de commande, en React et en animation (Motion + GSAP).
+
+Après M4, le client a payé et envoyé sa preuve. **Ce module couvre tout ce qui se passe ensuite, jusqu'à la remise du colis, et l'espace personnel du client** :
+
+1. **Mes réservations** : liste en cours et terminées, statuts, actions rapides, tirer pour actualiser, mises à jour en direct.
+2. **Détail d'une réservation** : bloc d'action selon le statut, **frise de suivi animée**, détails, annulation, contact WhatsApp, « Réserver à nouveau ».
+3. **Photo du colis prêt** (demande du client) : quand la boutique a emballé la commande, le client voit la photo de son colis, avec un dévoilement animé la première fois.
+4. **Profil** : informations, adresses enregistrées, favoris, notifications, installation, aide, déconnexion.
+5. **Repères de nouveauté** : point rouge sur l'onglet Réservations quand une réservation demande une action ou a changé.
+6. **Simulateur boutique enrichi** dans `/_dev` pour faire avancer une réservation étape par étape.
+
+Le but : le client ne se demande **jamais** où en est sa commande. Chaque étape est claire, datée, et lui dit ce qu'il doit faire (ou qu'il n'a rien à faire). C'est ce sentiment de contrôle qui le fait revenir.
+
+---
+
+## 1. AVANT DE CODER : LIS LE PROJET
+
+Lis et **réutilise tout ce qui existe** :
+
+1. `RAPPORT_M0.md` à `RAPPORT_M4.md`, `README.md`.
+2. `src/styles/*`, `src/motion/*`, `src/lib/gsap.ts` et les skills GreenSock installés.
+3. `src/components/ui/*`, la coquille (barre basse avec l'onglet Réservations), la visionneuse plein écran de M2, les champs d'adresse et le sélecteur de ville de M3, `HoldCountdown`, le bandeau de réservation en attente, `AuthSheet` / `useRequireAuth`, `pushService`, le message WhatsApp de M4.
+4. `src/types/reservationStatus.ts` (`STATUS_META`, `TIMELINE_ORDER`, `isFinalStatus`), `src/types/domain.ts` (`PackagePhoto`, `hasPackagePhotos`), `src/stores/*` (dont `reservationStore`), `src/mocks/*` (dont `RES-000102` avec 2 photos de colis et le simulateur boutique de M4).
+5. Les pages provisoires `/reservations`, `/reservations/:ref`, `/profil`, `/favoris`.
+
+Adapte-toi au code existant si quelque chose diffère de ce prompt, et note les écarts dans le rapport.
+
+**Contraintes inchangées :** port 3000 et `DISABLE_HMR` ; dépendances AI Studio conservées ; aucune couleur en dur hors `src/styles/index.css` et mocks ; `transform` et `opacity` pour animer (exception tolérée : tracés SVG) ; un seul animateur par élément ; `useGSAP` + `scope` + `contextSafe` ; animations réduites respectées ; rien sous `/admin` ; lint, typecheck, tests et build verts. **Aucune nouvelle dépendance** sans justification écrite.
+
+---
+
+## 2. WORKFLOW OBLIGATOIRE
+
+| Phase | Contenu | Sections |
+| --- | --- | --- |
+| P1 | Lecture du projet, plan écrit, captures de l'état actuel | 1 |
+| P2 | Données : contrat d'API, mocks, simulateur enrichi, suivi des nouveautés | 3 |
+| P3 | Mes réservations | 4 |
+| P4 | Détail : bloc d'action, frise animée, détails, actions | 5 |
+| P5 | Photo du colis prêt | 6 |
+| P6 | Profil, adresses, informations | 7 |
+| P7 | Mises à jour en direct, repères de nouveauté, cas d'erreur | 8 |
+| P8 | Recette, tests, `RAPPORT_M5.md` | 9, 10 |
+
+À la fin de **chaque** phase : lint + typecheck + build, commit (Conventional Commits), résumé de 3 à 5 lignes, captures à 390 et 1440 px.
+
+Règles : mobile d'abord (390 px, vérifié à 360 px) ; textes en français correct ; messages humains et utiles ; chaque hypothèse marquée `// HYPOTHÈSE:` et listée dans le rapport.
+
+---
+
+## 3. DONNÉES
+
+### 3.1 Contrat d'API (hypothèse à faire valider par le back-end)
+
+| Méthode | Chemin | Détail |
+| --- | --- | --- |
+| GET | `/reservations?scope=active\|done&page=` | Liste paginée (10 par page). `active` : tous les statuts non finaux ; `done` : livrée, retirée, expirée, annulée. Chaque élément : `ref`, `status`, `createdAt`, `updatedAt`, `expiresAt?`, `amount.total`, `itemsCount`, `itemsPreview` (3 miniatures max), `packagePhotoThumb?`, `receptionMode`, `city`. |
+| GET | `/reservations/:ref` | Détail complet (déjà défini en M4) + `timeline: [{ status, at, note? }]` + `packagePhotos: PackagePhoto[]` + `packageReadyAt` + `cancellable: boolean` + `cancelDeadline?`. |
+| POST | `/reservations/:ref/cancel` | `{ reason? }` → réservation mise à jour ; 422 si l'annulation n'est plus possible. |
+| GET | `/reservations/summary` | `{ needsAction: number, lastUpdatedAt }` pour le repère de l'onglet. |
+| GET / PATCH | `/me` | Prénom, nom, téléphone (lecture seule), ville. |
+| GET / POST / PATCH / DELETE | `/me/addresses`, `/me/addresses/:id` | Adresses ; `PATCH` avec `isDefault: true` retire le défaut des autres. |
+
+Les **photos du colis** sont des URL **signées et temporaires** fournies par l'API (dossier privé par réservation). Si une photo renvoie une erreur 403 (lien expiré), recharge la réservation pour obtenir des liens neufs, une seule fois.
+
+### 3.2 Règles d'annulation par le client
+
+`// HYPOTHÈSE:` en attente des règles du client (cahier des charges, point 3) :
+
+| Statut | Annulation par le client |
+| --- | --- |
+| `reserved`, `payment_rejected` | Oui, immédiate, stock libéré. |
+| `pending_validation`, `confirmed` | Oui tant que `cancellable` est vrai (avant la préparation). Message : « Vous avez déjà payé : la boutique vous contactera pour le remboursement selon la politique d'annulation. » + lien vers la page légale. |
+| À partir de `preparing` | Non. Bouton remplacé par « Contacter la boutique ». |
+
+Le front **suit toujours** `cancellable` renvoyé par l'API ; le tableau ne sert qu'aux textes.
+
+### 3.3 Mocks
+
+- **8 réservations** pour le client `690000001`, couvrant tous les cas : `reserved` (expire dans 5 h), `pending_validation`, `payment_rejected` (motif « Montant incorrect »), `confirmed`, `preparing`, `ready_for_pickup` (= `RES-000102`, retrait, 2 photos de colis), `in_delivery` (agence à Yaoundé, 3 photos de colis), `delivered`, plus 3 terminées (`picked_up`, `expired`, `cancelled`), soit 11 au total pour tester la pagination.
+- Chaque réservation a une `timeline` cohérente et datée (dont une avec rejet puis nouvelle preuve), des articles réels du catalogue, et un mode de réception varié.
+- Photos de colis : SVG soignés dans `public/mock/` (`colis-1.svg` à `colis-4.svg` : carton kraft avec ruban adhésif noir, étiquette « DR CHOCO », vue de dessus et de trois-quarts, format 4:3 et 4:5).
+- **Simulateur boutique de `/_dev`** (enrichi) : pour la référence choisie, boutons « Étape suivante » (avance selon `TIMELINE_ORDER` et le mode de réception), « Colis prêt + photos » (ajoute 1 à 3 photos et passe à `handed_to_agency` ou `ready_for_pickup`), « Marquer livrée / retirée », « Rejeter le paiement », « Annuler côté boutique ». Chaque action met à jour `updatedAt` et ajoute une entrée datée à la `timeline`.
+
+### 3.4 Suivi des nouveautés
+
+`src/features/tracking/seenStore.ts` (Zustand, persistant via `safeStorage`) : pour chaque référence, le **dernier statut vu** et si les photos du colis ont déjà été dévoilées. Sert à :
+
+- afficher un point « Nouveau » sur les cartes modifiées depuis la dernière visite ;
+- n'animer **que la partie nouvelle** de la frise (5.3) ;
+- jouer le dévoilement de la photo **une seule fois** (6.3).
+
+### 3.5 Hooks
+
+`useReservationsInfinite(scope)`, `useReservation(ref, { live })` (déjà existant, à compléter), `useReservationsSummary()`, `useCancelReservation(ref)`, `useMe()`, `useUpdateMe()`, `useAddresses()`, `useSaveAddress()`, `useDeleteAddress()`, `useSetDefaultAddress()`.
+
+---
+
+## 4. MES RÉSERVATIONS (`/reservations`)
+
+Page réservée aux clients connectés (sinon : écran d'invitation avec `Button primary` « Me connecter » qui ouvre `AuthSheet`, et le texte « Connectez-vous avec votre numéro pour suivre vos réservations. »).
+
+### 4.1 Structure mobile
+
+1. Titre `text-h1` « Mes réservations ».
+2. **Onglets** « En cours (3) » / « Terminées (4) », indicateur qui glisse (`layoutId`). Le contenu change en glissant légèrement dans le sens de l'onglet choisi (24 px + fondu).
+3. **Liste de cartes** (une par réservation, écart 12 px). Voir 4.2.
+4. **Chargement progressif** au défilement (10 par page), squelettes au gabarit exact des cartes.
+
+### 4.2 Carte de réservation
+
+```
+┌──────────────────────────────────────────┐
+│ RES-000124              ● Nouveau        │  ← référence (16 px 700) + point rouge si changement non vu
+│ 30 oct. 2026 · 3 articles                │  ← text-small text-2
+│ [mini][mini][mini]          63 000 FCFA  │  ← 3 miniatures 48×60 (ou la photo du colis) + total
+│ ━━━━━━━━━━━━━━━━━━━━━━░░░░░░░░░░         │  ← barre d'avancement (étapes franchies / total)
+│ ⏳ En attente de validation               │  ← badge STATUS_META
+│ ─────────────────────────────────────── │
+│ [ Action contextuelle            →  ]    │  ← selon le statut (tableau ci-dessous)
+└──────────────────────────────────────────┘
+```
+
+| Statut | Action contextuelle sur la carte |
+| --- | --- |
+| `reserved` | `Button primary sm` « Payer · 05:12 » (compte à rebours compact) → écran de paiement |
+| `payment_rejected` | `Button primary sm` « Renvoyer ma preuve » → page de preuve |
+| `pending_validation` | Texte « Vérification en cours » (pas de bouton) |
+| `confirmed`, `preparing` | Texte « Paiement validé · préparation en cours » |
+| `handed_to_agency`, `ready_for_pickup` | **Miniature de la photo du colis** à la place des articles + `Button dark sm` « Voir mon colis » |
+| `in_delivery` | Texte « En route vers Yaoundé » |
+| `delivered`, `picked_up` | `Button outline sm` « Réserver à nouveau » |
+| `expired`, `cancelled` | Texte `text-2` + `Button outline sm` « Réserver à nouveau » |
+
+- Toute la carte mène au détail (sauf le bouton d'action) avec une transition de vue : la référence de la carte devient le titre du détail (`viewTransitionName: res-<ref>`, posé seulement sur la carte touchée, comme en M2).
+- Appui : échelle 0,98.
+- **Barre d'avancement** : nombre d'étapes franchies sur le total de `TIMELINE_ORDER(mode)` ; remplie en `success` pour les statuts finaux réussis, en `red` pour expirée et annulée (au point atteint).
+
+### 4.3 Tirer pour actualiser
+
+- Sur mobile, tirer la liste vers le bas depuis le haut affiche un indicateur rond qui descend et tourne proportionnellement (`y` et `rotate`) ; au-delà de 72 px, relâcher lance le rechargement, `haptic('light')`, l'indicateur tourne en continu jusqu'à la fin, puis remonte.
+- Implémentation légère avec les évènements `pointer`/`touch` et `transform` uniquement ; `overscroll-behavior-y: contain` sur la page pour éviter le rechargement natif du navigateur.
+- Sur ordinateur : bouton « Actualiser » (icône `RefreshCw`) à droite du titre.
+
+### 4.4 États
+
+- **En cours vide** : illustration en traits (colis), « Aucune réservation en cours », `Button dark` « Découvrir la collection ».
+- **Terminées vide** : « Vos réservations terminées apparaîtront ici. »
+- **Erreur** : message + « Réessayer » ; les données déjà chargées restent visibles.
+- **Hors connexion** : dernière liste connue (cache), bandeau « Hors connexion : statuts affichés depuis votre dernière visite ».
+
+### 4.5 Ordinateur
+
+Liste centrée (largeur max 840 px) ou grille de 2 colonnes au-delà de 1280 px ; même carte.
+
+---
+
+## 5. DÉTAIL D'UNE RÉSERVATION (`/reservations/:ref`)
+
+### 5.1 Structure mobile (de haut en bas)
+
+1. **En-tête** : flèche retour, référence en `text-h2` (appui = copie), date de création, badge de statut.
+2. **Bloc d'action** selon le statut (5.2).
+3. **Photo du colis** (section 6), si disponible.
+4. **Frise de suivi** (5.3).
+5. **Articles** : lignes avec miniature, nom (lien vers la fiche), couleur, taille, quantité, prix.
+6. **Réception** : mode, ville, quartier et point de repère, ou agence (nom, adresse, horaires, téléphone avec lien `tel:`), destinataire si différent, remarques.
+7. **Paiement** : opérateur, montant (sous-total, livraison, total), miniature de la **preuve envoyée par le client** (appui = visionneuse), date d'envoi.
+8. **Aide** : `Button outline` « Contacter la boutique sur WhatsApp » (message prérempli : « Bonjour DR Choco, j'ai une question sur ma réservation RES-000124. »), et « Annuler la réservation » si `cancellable` (5.4).
+
+Ordinateur : 2 colonnes. À gauche (60 %), bloc d'action, photo du colis et frise ; à droite (40 %, collante), articles, réception, paiement et aide.
+
+### 5.2 Bloc d'action selon le statut
+
+Grand bloc en haut de page, toujours le premier élément visible. Il dit **ce qui se passe et ce que le client doit faire**.
+
+| Statut | Fond | Contenu |
+| --- | --- | --- |
+| `reserved` | `ink` | « Paiement attendu » · `HoldCountdown ring` · montant · `Button primary` « Payer maintenant » |
+| `payment_rejected` | blanc, bordure `red` 2 px | « Paiement non validé » · motif · temps restant · `Button primary` « Envoyer une nouvelle preuve » |
+| `pending_validation` | `surface` | « Nous vérifions votre paiement » · `validationDelayText` · petite animation de sablier (rotation lente, absente en mode réduit) |
+| `confirmed` | `surface` | « Paiement validé ✓ » · « Nous préparons votre commande. Vous recevrez la photo de votre colis avant l'envoi. » |
+| `preparing` | `surface` | « En préparation » · même texte |
+| `handed_to_agency` | `ink` | « Votre colis est parti » · agence, ville, téléphone de l'agence · « Présentez-vous avec votre pièce d'identité et la référence RES-000124. » |
+| `ready_for_pickup` | `ink` | « Votre colis est prêt » · adresse et horaires de la boutique · lien Google Maps · **code de retrait** : la référence en très grand (48 px 800, largeur 75 %) à montrer au comptoir |
+| `in_delivery` | `ink` | « En route » · ville · « Le livreur vous appellera au 6XX XX XX XX. » |
+| `delivered`, `picked_up` | `surface` | « Livrée le 2 nov. » / « Retirée le 2 nov. » · « Merci pour votre confiance ! » · `Button dark` « Réserver à nouveau » |
+| `expired` | `surface` | « Réservation expirée » · « Le délai de 24 h est dépassé. » · « Réserver à nouveau » |
+| `cancelled` | `surface` | « Réservation annulée » · par qui et quand (d'après la frise) · « Réserver à nouveau » |
+
+« **Réserver à nouveau** » : vérifie la disponibilité (`/cart/validate`), ajoute au panier les articles encore disponibles, toast « 2 articles ajoutés · 1 n'est plus disponible », puis ouvre `/panier`. `// HYPOTHÈSE:` fonctionnalité listée parmi les additions de fidélisation ; facile à retirer si le client ne la valide pas.
+
+### 5.3 Frise de suivi animée
+
+- Étapes verticales issues de `TIMELINE_ORDER(receptionMode)` :
+  - **Livraison** : Réservée → Paiement envoyé → Confirmée → En préparation → Remise à l'agence (ou Colis prêt pour la livraison locale) → En cours de livraison → Livrée.
+  - **Retrait** : Réservée → Paiement envoyé → Confirmée → En préparation → Prête pour retrait → Retirée.
+- Chaque étape : pastille de 24 px (franchie : disque `ink` avec coche blanche ; en cours : disque `red` avec halo qui pulse doucement ; à venir : cercle `silver`), titre `text-h3` (à venir : `text-2`), date et heure (« 30 oct. · 14 h 05 ») pour les étapes franchies, note éventuelle.
+- **Rejet** : une étape intercalée en `red` (« Paiement rejeté · Montant incorrect »), suivie de « Nouvelle preuve envoyée ».
+- **Expirée ou annulée** : la frise s'arrête au point atteint et se termine par une étape `red` « Expirée » ou « Annulée ».
+- **Miniature de la photo du colis** (48 × 48 px, rayon 6) à droite de l'étape « Remise à l'agence » / « Prête pour retrait » ; appui = visionneuse.
+- **Animation (GSAP)** :
+  - Première ouverture de la réservation : la ligne se remplit de haut en bas jusqu'à l'étape en cours (`scaleY` 0 → 1, `transformOrigin: top`, environ 0,15 s par étape, `power2.inOut`) ; chaque pastille passe à l'état franchi quand la ligne l'atteint (petit rebond d'échelle 0,6 → 1), puis l'étape en cours s'allume.
+  - Ouvertures suivantes : la frise s'affiche directement, **sauf si le statut a changé depuis la dernière visite** (`seenStore`) : seule la portion nouvelle se remplit, avec un toast « Nouvelle étape : En préparation ».
+  - Animations réduites : affichage direct de l'état final.
+
+### 5.4 Annulation
+
+- Lien `text-2` souligné « Annuler la réservation » (pas un gros bouton rouge).
+- Feuille de confirmation : titre « Annuler RES-000124 ? », texte adapté au statut (3.2), choix facultatif du motif en chips (« J'ai changé d'avis », « Erreur de taille », « Délai trop long », « Autre »), `Button` `danger` (fond `red`, texte blanc) « Oui, annuler » et `Button outline` « Garder ma réservation ».
+- Après l'annulation : statut mis à jour avec animation, toast, `haptic('success')` ; la réservation passe dans « Terminées ».
+- 422 (annulation plus possible) : message « Votre commande est déjà en préparation et ne peut plus être annulée ici. » + bouton WhatsApp.
+
+### 5.5 États
+
+- **Chargement** : si la réservation est dans le cache de la liste, affichage immédiat des données partielles ; squelettes pour le reste.
+- **Introuvable ou pas à ce client** : « Réservation introuvable » + lien « Mes réservations ».
+- **Non connecté** : `AuthSheet` ouverte par-dessus, puis affichage.
+
+---
+
+## 6. PHOTO DU COLIS PRÊT
+
+C'est la fonctionnalité demandée par le client : elle rassure et évite les litiges.
+
+### 6.1 Où elle apparaît
+
+| Endroit | Forme |
+| --- | --- |
+| Détail de la réservation | Bloc « Votre colis est prêt » sous le bloc d'action (6.2) |
+| Frise | Miniature sur l'étape concernée |
+| Carte dans « Mes réservations » | Miniature à la place des articles + « Voir mon colis » |
+| Toast à l'ouverture de l'app | « Votre colis RES-000124 est prêt · Voir » si les photos n'ont pas encore été vues (une fois) |
+
+### 6.2 Bloc « Votre colis est prêt »
+
+- Titre `text-h3` « Votre colis est prêt » avec une icône `Camera` rouge, sous-titre « Emballé le 1ᵉʳ nov. à 16 h 20 ».
+- **1 photo** : pleine largeur, ratio d'origine (maximum 4:5), rayon 8. **2 ou 3 photos** : grande photo + miniatures dessous (ou défilement horizontal avec arrêt net et points de pagination).
+- Appui : **visionneuse plein écran de M2** (glisser entre les photos, double appui pour zoomer, glisser vers le bas pour fermer).
+- Bouton discret « Enregistrer la photo » dans la visionneuse (téléchargement du fichier ; sur mobile, partage natif d'un fichier si `navigator.canShare({ files })` est disponible).
+- Texte sous les photos : « Vérifiez votre colis à la réception : il doit correspondre à cette photo. »
+- Photos avec `SmartImage` : squelette pendant le chargement, image de remplacement en cas d'échec avec « Photo indisponible · Réessayer ».
+
+### 6.3 Dévoilement animé (première fois seulement)
+
+À la première ouverture du détail après l'arrivée des photos (`seenStore`) :
+
+| Temps | Mouvement |
+| --- | --- |
+| 0 s | Le bloc apparaît en fondu ; la photo est cachée par un masque. |
+| 0,1 s | La photo se **dévoile de bas en haut** (`clipPath: inset(100% 0 0 0)` → `inset(0)`, 0,8 s, `power3.out`), avec une légère échelle de 1,08 à 1. |
+| 0,7 s | Un badge « Colis prêt » (fond `red`, texte blanc) apparaît en haut à gauche de la photo avec un rebond (ressort `bounce`). |
+| 0,9 s | Le texte et les miniatures apparaissent en cascade. |
+| à la fin | `haptic('success')` ; marquer comme vu dans `seenStore`. |
+
+Les fois suivantes : affichage direct. Animations réduites : affichage direct, sans badge animé.
+
+### 6.4 Confidentialité
+
+- Ces photos ne sont **jamais** écrites dans `localStorage` ni dans le cache du service worker (rappel pour M6) ; seules leurs URL signées passent par le cache mémoire de TanStack Query.
+- Elles ne sont visibles qu'après connexion, et uniquement pour le client propriétaire de la réservation.
+- Lien expiré (403) : rechargement unique de la réservation pour obtenir des liens neufs.
+
+---
+
+## 7. PROFIL (`/profil`)
+
+### 7.1 Non connecté
+
+Écran sobre : logo, titre « Votre espace », texte « Suivez vos réservations, retrouvez vos adresses et vos favoris. », `Button primary lg` « Me connecter avec mon numéro » (→ `AuthSheet`), puis les liens publics : Mes favoris (stockés sur le téléphone), Comment réserver, Aide WhatsApp, Pages légales.
+
+### 7.2 Connecté (structure mobile)
+
+1. **En-tête** (fond `ink`, texte blanc, padding 24 px, `pt-safe`) : avatar rond de 56 px (initiale du prénom en blanc sur `ink-2`), prénom et nom en `text-h2`, téléphone « +237 6XX XX XX XX » en `silver`, lien « Modifier » (7.4).
+2. **Raccourcis** (2 tuiles côte à côte, fond `surface`) : « Mes réservations » (nombre en cours + point rouge si action requise) et « Mes favoris » (nombre).
+3. **Listes de réglages** (lignes de 56 px avec icône à gauche, chevron à droite, séparateurs `silver` à 60 %), regroupées sous des intertitres `text-label` :
+   - **Mon compte** : Mes informations · Mes adresses (nombre) ·
+   - **Application** : Notifications (état : « Activées », « Désactivées », « Bloquées dans le navigateur ») · Installer l'application (masqué si déjà installée, détectée avec `matchMedia('(display-mode: standalone)')`) ·
+   - **Aide** : Contacter la boutique sur WhatsApp · Comment réserver · Livraison et retrait ·
+   - **Légal** : Conditions générales · Politique d'annulation et de retour · Confidentialité.
+4. **Déconnexion** : ligne `red` « Se déconnecter », feuille de confirmation (« Votre panier sera conservé sur ce téléphone. »).
+5. Pied : « DR Choco L'Incompris · version 0.x » en `text-small` `text-2`.
+
+Animation d'arrivée : en-tête puis groupes en cascade rapide (0,04 s).
+
+Ordinateur : colonne de navigation à gauche (Informations, Adresses, Notifications, Aide) et contenu à droite ; même composants.
+
+### 7.3 Mes adresses (`/profil/adresses`, route à ajouter)
+
+- Liste de cartes : libellé (« Maison » avec étiquette « Par défaut »), ville, quartier, repère (ou agence et destinataire), menu « ⋯ » : Modifier · Définir par défaut · Supprimer.
+- `Button dark` « Ajouter une adresse » → feuille avec **les mêmes champs et règles qu'au formulaire de réservation de M3** (ville, quartier + repère, ou agence + destinataire, libellé) : réutilise les composants, ne les duplique pas.
+- Suppression : feuille de confirmation, carte qui s'efface et liste qui se resserre (`layout`), toast avec « Annuler » pendant 5 s.
+- Définir par défaut : l'étiquette « Par défaut » **glisse** vers la nouvelle carte (`layoutId`).
+- État vide : « Aucune adresse enregistrée. Elles seront proposées à votre prochaine réservation. »
+
+### 7.4 Mes informations (`/profil/informations`, route à ajouter)
+
+- Prénom, Nom (modifiables, `react-hook-form` + `zod`), Ville (sélecteur de M3), Téléphone en lecture seule avec le texte « Pour changer de numéro, déconnectez-vous et connectez-vous avec le nouveau. ».
+- `Button primary` « Enregistrer » ; succès : toast + retour au profil ; l'en-tête du profil se met à jour.
+
+### 7.5 Notifications
+
+- Ligne qui ouvre une feuille : explication (« Paiement validé, colis prêt, colis en route »), état actuel, `Button primary` « Activer » (→ `pushService.requestPermission()`, abonnement réel au module M6).
+- **Bloquées dans le navigateur** : explication pour les réactiver (Chrome Android : icône cadenas à gauche de l'adresse → Autorisations → Notifications).
+- iPhone sans app installée : « Installez d'abord l'application sur votre écran d'accueil. »
+
+---
+
+## 8. MISES À JOUR EN DIRECT ET REPÈRES
+
+### 8.1 Mises à jour en direct
+
+- `useReservationsInfinite` et `useReservation(ref, { live: true })` se rechargent **toutes les 30 s quand la page est visible** et immédiatement au retour sur l'app (`refetchOnWindowFocus` pour ces requêtes uniquement). `// HYPOTHÈSE:` en attendant les notifications push (M6).
+- **Changement de statut détecté pendant que l'écran est ouvert** :
+  - badge : l'ancien sort vers le haut, le nouveau entre par le bas, puis une pulsation (`scale` 1 → 1,06 → 1) ;
+  - bloc d'action : fondu croisé vers le nouveau contenu ;
+  - frise : remplissage de la portion nouvelle (5.3) ;
+  - toast « Nouvelle étape : … », `haptic('success')`.
+- Dans la liste, une carte modifiée remonte en tête de son onglet (`layout`) et affiche le point « Nouveau ».
+
+### 8.2 Repère sur l'onglet Réservations
+
+- Point rouge de 8 px sur l'icône Réservations de la barre basse (et sur « Mes réservations » de l'en-tête ordinateur) quand `useReservationsSummary().needsAction > 0` **ou** qu'une réservation a changé depuis la dernière visite (`seenStore`).
+- Apparition du point : échelle 0 → 1 avec le ressort `bounce`.
+- Le point disparaît quand le client a ouvert les réservations concernées.
+
+---
+
+## 9. RECETTE
+
+### 9.1 Parcours à vérifier sur téléphone (390 px et 360 px)
+
+1. Client `690000001` → onglet Réservations (point rouge visible) → « En cours » : 8 cartes avec les bonnes actions → « Terminées » : 3 cartes → pagination.
+2. Carte `reserved` → « Payer » → écran de paiement de M4 ; carte `payment_rejected` → « Renvoyer ma preuve ».
+3. Carte `ready_for_pickup` (`RES-000102`) → détail → dévoilement de la photo (première fois) → visionneuse → « Enregistrer la photo » → retour et réouverture : pas de nouvelle animation.
+4. Frise : première ouverture animée ; simulateur « Étape suivante » pendant que le détail est ouvert → la nouvelle portion se remplit en moins de 30 s, toast.
+5. Simulateur « Colis prêt + photos » sur une réservation `preparing` → la carte affiche la miniature, le point rouge apparaît, le toast « Votre colis est prêt » s'affiche à l'ouverture de l'app.
+6. Annulation d'une réservation `reserved` (immédiate) et d'une `confirmed` (message de remboursement) ; tentative sur `preparing` (bouton remplacé par WhatsApp).
+7. « Réserver à nouveau » sur une réservation livrée avec un article devenu épuisé.
+8. Tirer pour actualiser.
+9. Profil : modifier le prénom ; ajouter, modifier, définir par défaut et supprimer une adresse (avec annulation) ; ouvrir les notifications ; se déconnecter (panier conservé).
+10. Mode avion : liste et détail consultables depuis le cache (photos du colis non garanties, message propre).
+11. Animations réduites : tout fonctionne sans animation automatique.
+
+### 9.2 Performance et accessibilité
+
+- Lighthouse mobile sur `/reservations` et un détail : Performance ≥ 85, Accessibilité ≥ 95, Bonnes pratiques ≥ 95.
+- JavaScript initial toujours < 180 kB gzip ; GSAP chargé seulement avec le détail.
+- Frise lisible par les lecteurs d'écran comme une liste ordonnée (« Étape 3 sur 7, Confirmée, le 30 octobre à 14 h 05, terminée »), étape en cours marquée `aria-current="step"`.
+- Changements de statut annoncés (`aria-live="polite"`) ; photos du colis avec un texte alternatif (« Photo de votre colis emballé, 1 sur 2 »).
+- Clavier : onglets, cartes, actions, feuilles, visionneuse.
+- Contrastes conformes ; cibles tactiles de 44 px minimum.
+
+### 9.3 Tests automatiques
+
+- Action contextuelle de la carte pour chaque statut ; calcul de la barre d'avancement selon le mode de réception.
+- Bloc d'action du détail pour chaque statut.
+- Frise : ordre selon le mode, étape de rejet intercalée, arrêt sur expirée ou annulée, portion à animer selon `seenStore`.
+- Photo du colis : dévoilement une seule fois, rechargement unique sur 403.
+- Annulation : textes selon le statut, respect de `cancellable`, gestion du 422.
+- « Réserver à nouveau » : seulement les articles disponibles.
+- Adresses : défaut unique, suppression avec annulation.
+- Repère de l'onglet : apparition et disparition.
+
+---
+
+## 10. CRITÈRES D'ACCEPTATION ET RAPPORT
+
+### 10.1 Le module est terminé quand
+
+- [ ] « Mes réservations » affiche les deux onglets, les cartes avec la bonne action pour chaque statut, la pagination, le tirer pour actualiser et les états vides.
+- [ ] Le détail affiche le bloc d'action adapté à chacun des 12 statuts, la frise animée (première fois, puis seulement la portion nouvelle), les détails, l'annulation et le contact WhatsApp.
+- [ ] La photo du colis apparaît dans le détail, la frise et la carte, avec le dévoilement animé une seule fois, la visionneuse et l'enregistrement.
+- [ ] Le profil est complet : informations, adresses (ajout, modification, défaut, suppression), notifications, aide, déconnexion.
+- [ ] Les changements faits avec le simulateur boutique apparaissent en direct, avec le repère rouge sur l'onglet.
+- [ ] Les 11 parcours de la section 9.1 passent sur un vrai Android.
+- [ ] Lint, typecheck, tests et build sont verts ; objectifs Lighthouse atteints.
+
+### 10.2 `RAPPORT_M5.md`
+
+1. Ce qui est livré, avec captures à 390 et 1440 px (liste, carte de chaque famille de statut, détail `reserved`, `ready_for_pickup` avec photo, `in_delivery`, frise avec rejet, profil, adresses).
+2. Une courte vidéo ou un GIF du dévoilement de la photo et du remplissage de la frise, si ton environnement le permet.
+3. Scores Lighthouse et poids des morceaux JavaScript.
+4. **Pour le client** : règles d'annulation et de remboursement à confirmer, validation de « Réserver à nouveau », nombre maximum de photos de colis.
+5. **Pour l'équipe back-end** : contrat des listes et du résumé, URL signées des photos (durée de validité conseillée : 1 h), règle `cancellable`, entrées datées de la frise.
+6. **Pour l'espace d'administration** (construit plus tard sous `/admin`) : ce que la boutique doit pouvoir faire pour alimenter ces écrans (avancer les statuts, joindre 1 à 3 photos du colis, rejeter avec motif).
+7. Hypothèses et écarts par rapport à ce prompt.
+8. Points d'attention pour le module M6 (PWA, notifications push, hors connexion).
+
+---
+
+**Commence par la phase P1** : lis le projet, puis présente ton plan avant d'écrire le moindre composant.

@@ -1,0 +1,49 @@
+/* ============================================================================
+ * TRANSITIONS ENTRE PAGES — VIEW TRANSITIONS API (§4.1)
+ * ============================================================================ */
+
+/* Transition par défaut : fondu croisé + léger glissement vertical */
+::view-transition-old(root) {
+  animation: 180ms cubic-bezier(0.4, 0, 1, 1) both fade-out;
+}
+
+::view-transition-new(root) {
+  animation: 260ms cubic-bezier(0.22, 1, 0.36, 1) both fade-in-up;
+}
+
+@keyframes fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+/* L'image produit partagée voyage en douceur */
+::view-transition-group(*) {
+  animation-duration: 320ms;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* L'en-tête et la barre du bas restent immobiles pendant la transition */
+.site-header {
+  view-transition-name: site-header;
+}
+
+.bottom-nav {
+  view-transition-name: bottom-nav;
+}
+
+/* Respect strict de prefers-reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}

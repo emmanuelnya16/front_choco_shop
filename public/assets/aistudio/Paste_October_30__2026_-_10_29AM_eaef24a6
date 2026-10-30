@@ -1,0 +1,391 @@
+# PROMPT — MODULE M3 « PANIER, CONNEXION ET RÉSERVATION » — PWA DR CHOCO L'INCOMPRIS
+
+> À coller dans ton agent de code, **dans le projet existant** (après M0, M1 et M2).
+> Langue de travail : français. Code et identifiants : anglais. Textes visibles : français.
+
+---
+
+## 0. TON RÔLE ET L'OBJECTIF
+
+Tu es un développeur front-end senior et un designer d'interface exigeant, spécialisé en e-commerce mobile, en formulaires sans friction, en React et en animation (Motion + GSAP).
+
+Les modules précédents permettent de découvrir et de choisir les articles. **Ce module transforme un panier en réservation** :
+
+1. **Panier** : page complète sur mobile, tiroir latéral sur ordinateur, quantités, suppression avec annulation, vérification du stock et des prix.
+2. **Connexion par numéro de téléphone et code OTP**, dans une feuille, demandée **seulement au moment de réserver**.
+3. **Session longue** : le client reste connecté et ne reçoit pas de nouveau SMS à chaque visite.
+4. **Formulaire de réservation** : coordonnées, livraison ou retrait, ville, quartier et point de repère, ou agence de transport, adresses enregistrées, récapitulatif.
+5. **Création de la réservation** : le stock est bloqué, un numéro unique est attribué, le compte à rebours de 24 h démarre.
+6. **Moment signature** « Vos articles sont mis de côté », puis passage à l'écran de paiement (construit au module M4).
+7. **Bandeau de réservation en attente**, visible partout tant que le client n'a pas payé.
+
+L'objectif chiffré : un client déjà connecté avec une adresse enregistrée passe du panier à une réservation créée en **moins de 30 secondes et 4 appuis**. Un nouveau client y arrive en moins de 90 secondes, code SMS compris.
+
+C'est le module où l'on perd le plus de clients dans un e-commerce : **chaque champ, chaque message d'erreur et chaque attente compte**.
+
+---
+
+## 1. AVANT DE CODER : LIS LE PROJET
+
+Lis et **réutilise tout ce qui existe** :
+
+1. `RAPPORT_M0.md`, `RAPPORT_M1.md`, `RAPPORT_M2.md`, `README.md`.
+2. `src/styles/index.css`, `src/styles/transitions.css`, `src/motion/*`, `src/lib/gsap.ts` et les skills GreenSock installés.
+3. `src/components/ui/*` (dont `Button`, `IconButton`, `Chip`, `Sheet`, `Toast`, `SmartImage`, `Price`, `Skeleton`), la coquille (en-tête, barre basse, WhatsApp, pied de page), et l'ajout au panier animé de M2.
+4. `src/stores/*` (`cartStore`, `authStore`, `favoritesStore`, `uiStore`, `toastStore`), `src/lib/api/*` (client avec JWT et rafraîchissement sur 401), `src/lib/utils/phone.ts`, `price.ts`, `date.ts`, `haptics.ts`, `storage.ts`.
+5. `src/types/*`, `src/mocks/*`, `src/app/router.tsx`.
+
+Si quelque chose diffère de ce que décrit ce prompt, **adapte-toi au code existant**, complète sans casser et note l'écart dans le rapport.
+
+**Contraintes inchangées :**
+
+- Port 3000, logique `DISABLE_HMR`, dépendances AI Studio conservées.
+- Aucune couleur en dur hors de `src/styles/index.css` et des mocks.
+- `transform` et `opacity` pour animer (seule exception tolérée : le tracé SVG de l'anneau du compte à rebours, voir 7.3) ; un seul animateur par élément ; `useGSAP` + `scope` + `contextSafe` ; animations réduites respectées.
+- Rien sous `/admin` (réservé à l'espace d'administration, construit plus tard dans ce projet).
+- Lint, typecheck, tests et build restent verts.
+
+**Nouvelles dépendances autorisées** : `react-hook-form`, `zod` et `@hookform/resolvers` pour les formulaires. Aucune autre sans justification écrite dans le rapport.
+
+---
+
+## 2. WORKFLOW OBLIGATOIRE
+
+| Phase | Contenu | Sections |
+| --- | --- | --- |
+| P1 | Lecture du projet, plan écrit, captures de l'état actuel | 1 |
+| P2 | Données : contrat d'API, mocks, types, hooks | 3 |
+| P3 | Panier (page mobile, tiroir ordinateur, vérification du stock) | 4 |
+| P4 | Connexion OTP et session | 5 |
+| P5 | Formulaire de réservation | 6 |
+| P6 | Création de la réservation, moment signature, compte à rebours, bandeau en attente | 7 |
+| P7 | Garde des routes, brouillons, cas d'erreur, hors connexion | 8 |
+| P8 | Recette, tests, `RAPPORT_M3.md` | 9, 10 |
+
+À la fin de **chaque** phase : lint + typecheck + build, commit (Conventional Commits), résumé de 3 à 5 lignes, captures à 390 et 1440 px des écrans touchés.
+
+Règles :
+
+- **Mobile d'abord** (390 px, vérifié à 360 px), puis ordinateur.
+- Pas de faux sentiment d'urgence : le compte à rebours est le vrai délai de la réservation, rien d'autre.
+- Textes en français correct ; messages d'erreur **humains et utiles** (ce qui s'est passé + ce qu'il faut faire), jamais de code d'erreur brut.
+- Chaque hypothèse est marquée `// HYPOTHÈSE:` et listée dans le rapport.
+
+---
+
+## 3. DONNÉES
+
+### 3.1 Contrat d'API (hypothèse à faire valider par le back-end)
+
+| Méthode | Chemin | Corps / réponse |
+| --- | --- | --- |
+| POST | `/cart/validate` | `{ items: [{ variantId, quantity }] }` → `{ items: [{ variantId, status: 'ok' \| 'reduced' \| 'unavailable' \| 'price_changed', availableQuantity, unitPrice }], checkedAt }` |
+| POST | `/auth/otp/request` | `{ phone }` → `{ expiresIn: 300, resendIn: 60 }` ; 429 si trop de demandes (`retryAfter` en secondes) |
+| POST | `/auth/otp/verify` | `{ phone, code }` → `{ accessToken, user, isNewUser }` ; 422 code faux (`attemptsLeft`) ; 410 code expiré ; 429 trop d'essais |
+| POST | `/auth/refresh` | cookie `httpOnly` → `{ accessToken, user }` |
+| POST | `/auth/logout` | — |
+| GET / PATCH | `/me` | `{ id, phone, firstName, lastName, city }` |
+| GET / POST | `/me/addresses` | adresse : `{ id, label, city, district, landmark, receptionMode, agencyId?, recipientName?, recipientPhone?, isDefault }` |
+| GET | `/delivery/cities` | `[{ id, name, fee, isLocal, hasAgencies, estimatedDelay }]` |
+| GET | `/delivery/agencies?city=` | `[{ id, name, city, address, phone, openingHours }]` |
+| GET | `/settings/public` | déjà existant ; ajoute `shop: { address, city, openingHours, mapsUrl }`, `reservationHoldHours: 24`, `deliveryFeePayment: 'upfront' \| 'on_delivery'` |
+| POST | `/reservations` | en-tête `Idempotency-Key` ; corps : articles, mode de réception, ville, adresse ou agence, destinataire, remarques → `{ ref, status: 'reserved', expiresAt, serverTime, amount: { subtotal, deliveryFee, total }, items }` ; 409 en cas de conflit de stock (détail par article) |
+| GET | `/reservations?status=reserved` | réservations en attente de paiement du client connecté |
+
+### 3.2 Mocks (`src/mocks/`)
+
+- **OTP** : `123456` est valide ; `000000` renvoie « code expiré » (410) ; tout autre code renvoie 422 avec `attemptsLeft` qui décroît de 5 à 0, puis 429 pendant 10 minutes. Plus de 3 demandes de code en 10 minutes pour le même numéro → 429 avec `retryAfter`. Le numéro `690000001` est un client existant (prénom « Junior », 2 adresses enregistrées) ; tout autre numéro valide crée un nouveau client (`isNewUser: true`).
+- **Villes** (montants fictifs, `// HYPOTHÈSE:` boutique à Douala) : Douala (locale, 1 500 FCFA, « aujourd'hui ou demain »), puis Yaoundé, Bafoussam, Bamenda, Buea, Limbé, Kribi, Edéa, Nkongsamba, Dschang, Ngaoundéré, Garoua, Maroua, Bertoua, Ebolowa (par agence, entre 2 000 et 5 000 FCFA, « 1 à 3 jours »).
+- **Agences** : 2 à 3 agences **fictives** par ville (« Agence Express Centre », « Transports du Littoral »…). N'utilise **pas** de noms d'entreprises réelles.
+- **`/cart/validate`** : simule une baisse de stock sur 1 article sur 5 au hasard quand la variable de mock `VITE_MOCK_STOCK_CHAOS=true`, sinon tout est `ok`.
+- **`/reservations`** : vérifie la clé d'idempotence (même clé = même réponse, pas de doublon) ; 1 fois sur 10 (si `VITE_MOCK_STOCK_CHAOS=true`), renvoie 409 sur un article. `expiresAt` = maintenant + 24 h ; les numéros se suivent à partir de `RES-000124`.
+- Latence simulée de 300 à 900 ms (1 200 ms pour `/reservations`).
+
+### 3.3 Types et hooks
+
+- Types : `CartValidationResult`, `OtpRequestResult`, `AuthSession`, `Address`, `DeliveryCity`, `Agency`, `ReservationDraft`, `ReservationCreated`, `ReceptionMode`.
+- Hooks (`src/features/cart/api`, `src/features/auth/api`, `src/features/reservation/api`) : `useValidateCart()`, `useRequestOtp()`, `useVerifyOtp()`, `useMe()`, `useAddresses()`, `useSaveAddress()`, `useDeliveryCities()` (cache 1 h), `useAgencies(city)`, `useCreateReservation()`, `usePendingReservations()`.
+
+---
+
+## 4. PANIER
+
+### 4.1 Page `/panier` (mobile)
+
+De haut en bas :
+
+1. **Titre** `text-h1` « Mon panier » + nombre d'articles (« 3 articles »).
+2. **Bandeaux de vérification** (voir 4.4), s'il y a lieu.
+3. **Lignes d'articles**, chacune :
+   - miniature 80 × 100 px (4:5, rayon 8, lien vers la fiche) ;
+   - nom (`text-h3`, 2 lignes max), couleur et taille en `text-small` `text-2` (« Noir Charbon · L ») ;
+   - prix unitaire, et le total de la ligne s'il y a plus d'une pièce ;
+   - **sélecteur de quantité** : boutons « − » et « + » de 36 px (zone tactile 44 px) autour du nombre. « + » est désactivé au stock maximum, avec le texte « Maximum disponible » sous le sélecteur. « − » à 1 se transforme en icône corbeille ;
+   - bouton « Retirer » discret (icône corbeille) à droite.
+   - Le changement de quantité fait **défiler le chiffre** (ancien chiffre qui sort vers le haut, nouveau qui entre par le bas, 0,2 s).
+4. **Glisser une ligne vers la gauche** (Motion `drag="x"`, contraint vers la gauche) révèle un fond `red` avec l'icône corbeille blanche ; au-delà de 40 % de la largeur ou d'une vitesse de 500, la ligne part vers la gauche et se replie, les autres remontent (`layout`). Toast « Article retiré » avec « Annuler » pendant 5 s (l'annulation remet la ligne à sa place, avec la même quantité).
+5. **Bloc « Vos avantages »** discret (fond `surface`, rayon 8) : 3 lignes avec icônes : « Mis de côté 24 h dès la réservation » · « Paiement Orange Money ou MTN MoMo » · « Photo de votre colis avant l'envoi ».
+6. **Récapitulatif** :
+   - Sous-total ;
+   - Livraison : « Calculée à l'étape suivante » (`text-2`) ;
+   - **Total** en `text-price` 24 px.
+   - Les montants **défilent comme un compteur** quand ils changent.
+7. **« Vous aimerez aussi »** : carrousel de 6 `ProductCard` (produits de la catégorie la plus présente dans le panier, hors articles déjà au panier).
+
+**Barre d'action collée en bas** (à la place de la barre de navigation) : à gauche « Total » + montant, à droite `Button primary lg` « Réserver ». Avant d'agir, le bouton lance la vérification du stock (4.4).
+
+### 4.2 Panier vide
+
+Illustration en traits (sac vide, SVG inline `ink` et `silver`), titre « Votre panier est vide », texte « Parcourez la collection et ajoutez vos articles préférés. », `Button dark` « Découvrir la collection », puis une rangée « Les plus réservés ». **Animation** : l'illustration se dessine (DrawSVG, 1 s) à la première apparition ; affichage direct si les animations sont réduites.
+
+### 4.3 Ordinateur
+
+- **Page `/panier`** : 2 colonnes, lignes à gauche (64 %), récapitulatif **collant** à droite (36 %) avec le bouton « Réserver » pleine largeur et le bloc « Vos avantages » dessous.
+- **Tiroir latéral** : l'icône panier de l'en-tête ouvre un tiroir à droite (420 px, glissement depuis la droite avec le ressort `sheet`, fond assombri, Échap pour fermer, focus piégé) : lignes compactes, sous-total, `Button dark` « Voir le panier » et `Button primary` « Réserver ». Après un ajout au panier sur ordinateur, le tiroir **s'ouvre automatiquement** 2,5 s puis se referme, sauf si la souris est dessus.
+
+### 4.4 Vérification du stock et des prix
+
+- Déclenchée à l'ouverture du panier (si la dernière vérification date de plus de 2 min) et à l'appui sur « Réserver ».
+- Résultats :
+  - **`reduced`** : la quantité est ramenée au disponible, la ligne est entourée de `warning` et affiche « Il ne reste que 1 pièce : quantité ajustée. »
+  - **`unavailable`** : la ligne passe à 50 % d'opacité, mention « Épuisé entre-temps », bouton « Retirer » mis en avant ; « Réserver » est bloqué tant que la ligne est là, avec le message « Retirez les articles épuisés pour continuer. »
+  - **`price_changed`** : nouveau prix affiché, ancien prix barré, mention « Le prix a changé. »
+  - Un bandeau en haut résume : « 2 articles de votre panier ont changé. Vérifiez avant de réserver. »
+- Pendant la vérification au moment de réserver, le bouton affiche une roue + « Vérification… » (maximum 2 s grâce au délai d'attente ; si le réseau ne répond pas, on continue et la création de réservation fera la vérification finale).
+
+---
+
+## 5. CONNEXION OTP ET SESSION
+
+### 5.1 Quand la connexion est-elle demandée
+
+- **Jamais pour parcourir.** Seulement quand un client non connecté appuie sur « Réserver » (panier ou fiche), ou quand il ouvre « Mes réservations » ou le Profil.
+- La feuille de connexion s'ouvre **par-dessus l'écran actuel** (pas de changement de page) ; après la connexion, l'action interrompue reprend automatiquement (par exemple : ouverture du formulaire de réservation).
+- Mécanisme : `requireAuth(next: () => void)` dans `uiStore` ou un hook `useRequireAuth()`, et une feuille `AuthSheet` globale montée dans `RootLayout`.
+
+### 5.2 Étape 1 : le numéro
+
+- Titre `text-h2` « Réservez en 1 minute », texte « Entrez votre numéro : nous vous envoyons un code par SMS. Pas de mot de passe. »
+- **Champ téléphone** : préfixe fixe « 🇨🇲 +237 » (drapeau en emoji autorisé ici) non modifiable, à gauche du champ ; `type="tel"`, `inputMode="numeric"`, `autoComplete="tel-national"` ; mise en forme pendant la saisie `6XX XX XX XX` ; collage accepté sous toutes les formes (`+237 6…`, `00237…`, avec espaces ou tirets), normalisé avec `normalizeCmPhone()`.
+- **Repère d'opérateur** : dès 3 chiffres, une petite étiquette apparaît à droite du champ (« Orange » ou « MTN »), déduite du préfixe. Elle servira à présélectionner l'opérateur au paiement. `// HYPOTHÈSE:` table des préfixes dans `src/lib/utils/operator.ts`, simple indication, jamais bloquante.
+- Validation : 9 chiffres commençant par 6 ; message « Ce numéro semble incomplet » seulement **après** que le client a quitté le champ ou appuyé sur le bouton (jamais pendant la frappe).
+- `Button primary lg` pleine largeur « Recevoir mon code ».
+- En petit dessous : « En continuant, vous acceptez nos conditions générales et notre politique de confidentialité » (liens vers `/pages/…`).
+
+### 5.3 Étape 2 : le code
+
+- La feuille glisse de l'étape 1 vers l'étape 2 (le contenu sort vers la gauche, le nouveau entre par la droite, 0,3 s).
+- Titre « Entrez le code reçu », texte « Envoyé au 6XX XX XX XX » + lien « Modifier » (retour à l'étape 1).
+- **6 cases visuelles** (48 × 56 px, rayon 8, bordure `silver`, chiffre 24 px 700), alimentées par **un seul champ caché** (`inputMode="numeric"`, `autoComplete="one-time-code"`, `maxLength={6}`, `pattern="\d*"`) : c'est la méthode qui fonctionne le mieux avec le remplissage automatique d'Android et d'iPhone et avec le collage. La case active a une bordure `ink` et un curseur clignotant.
+- **Remplissage automatique Android** : utilise l'API WebOTP (`navigator.credentials.get({ otp: { transport: ['sms'] } })`) quand elle existe, avec annulation si la feuille se ferme. `// HYPOTHÈSE:` le SMS doit se terminer par la ligne `@<domaine du site> #123456` ; à transmettre à l'équipe back-end (voir rapport).
+- **Envoi automatique** dès le 6ᵉ chiffre (pas de bouton à appuyer).
+- **Renvoi** : « Renvoyer le code dans 0:59 » (compte à rebours), puis lien « Renvoyer le code ». Après un renvoi, « Nouveau code envoyé » s'affiche 3 s.
+- **États et animations** :
+  - **Vérification** : les cases pulsent légèrement l'une après l'autre.
+  - **Code faux** : les cases **tremblent** (`x` : 0, −8, 8, −6, 6, 0 en 0,4 s), passent en bordure `red`, `haptic('error')`, message « Code incorrect. Il vous reste 3 essais. », le champ se vide et garde le focus.
+  - **Code expiré** : « Ce code a expiré. » + bouton « Recevoir un nouveau code ».
+  - **Trop d'essais / de demandes** : « Trop de tentatives. Réessayez dans 9 min. » avec le temps qui décompte ; les cases sont désactivées.
+  - **Succès** : les cases se remplissent en `success` l'une après l'autre (cascade de 0,05 s) avec une coche qui se dessine au centre, `haptic('success')`, puis la feuille se ferme (ou passe à l'étape 3) et l'action reprend.
+
+### 5.4 Étape 3 : le prénom (nouveaux clients seulement)
+
+- Si `isNewUser`, une dernière étape : « Comment vous appelez-vous ? », champs Prénom et Nom (`autoComplete="given-name"` et `family-name`), bouton « Continuer ». Ces valeurs préremplissent le formulaire de réservation et sont enregistrées avec `PATCH /me`.
+- Lien « Plus tard » : le nom sera demandé dans le formulaire de réservation.
+
+### 5.5 Session
+
+- Le jeton d'accès reste en mémoire (`authStore`) ; le jeton de rafraîchissement est un cookie `httpOnly` de longue durée. `// HYPOTHÈSE:` 90 jours, à confirmer avec le client et le back-end.
+- **Au démarrage de l'app** : si un `user` est connu dans le stockage, tente un `POST /auth/refresh` silencieux, sans bloquer l'affichage. En cas d'échec, le client repasse en invité sans message alarmant.
+- **Déconnexion** (depuis le Profil provisoire) : `POST /auth/logout`, vidage de la session et des réservations en cache ; **le panier est conservé**.
+- **Favoris** : à la connexion, fusionne les favoris locaux avec ceux du compte (`GET/POST /favorites`), sans doublon.
+- Dans l'en-tête ordinateur, l'icône Compte affiche l'initiale du prénom dans un cercle `ink` une fois connecté.
+
+---
+
+## 6. FORMULAIRE DE RÉSERVATION (`/reservation`)
+
+### 6.1 Structure générale
+
+- **Indicateur d'étapes** en haut : `1 Réception` → `2 Paiement` → `3 Preuve`. L'étape courante est en `ink` et les suivantes en `silver`, reliées par une ligne. Il restera le même aux modules M4 (paiement, preuve).
+- Formulaire avec `react-hook-form` + schéma `zod`, en sections empilées, chacune dans un bloc à bordure `silver` 60 % et rayon 8, avec un titre `text-h3`.
+- **Barre d'action collée** : à gauche « Total » + montant (qui se met à jour en défilant), à droite `Button primary lg` « Confirmer la réservation ».
+- **Ordinateur** : 2 colonnes, formulaire à gauche (60 %), récapitulatif collant à droite (40 %) avec le bouton de confirmation.
+
+### 6.2 Section « Vos coordonnées »
+
+- Prénom et Nom, préremplis si connus.
+- Téléphone : affiché en lecture seule (« +237 6XX XX XX XX ») avec le lien « Ce n'est pas vous ? Changer de numéro » (déconnexion puis retour à la connexion, panier conservé).
+
+### 6.3 Section « Mode de réception »
+
+Deux grandes cartes côte à côte (empilées sous 360 px), groupe de boutons radio accessible :
+
+| Carte | Contenu |
+| --- | --- |
+| **Livraison** (icône `Truck`) | « Livraison dans votre ville ou envoi par agence » · « À partir de 1 500 FCFA » |
+| **Retrait en boutique** (icône `Store`) | « Gratuit · Douala » · horaires résumés |
+
+La carte choisie a une bordure `red` de 2 px, une coche dans un cercle rouge en haut à droite (qui apparaît avec un léger rebond) et un fond `surface`. Le contenu sous les cartes change en fondu croisé avec glissement de 8 px.
+
+### 6.4 Livraison
+
+1. **Adresses enregistrées** (si le client en a) : rangée de cartes défilantes, chacune avec son libellé (« Maison », « Bureau »), ville et quartier ; l'adresse par défaut est présélectionnée. Dernière carte : « + Nouvelle adresse ». Choisir une adresse remplit et replie les champs ; « Modifier » les rouvre.
+2. **Ville** : champ qui ouvre une feuille avec recherche (insensible aux accents), villes triées (ville locale en premier, puis ordre alphabétique), chacune avec ses frais et son délai (« Yaoundé · 3 000 FCFA · 1 à 3 jours »). Sur ordinateur, liste déroulante avec recherche.
+3. **Selon la ville** :
+   - **Ville locale** (livraison à domicile) :
+     - **Quartier** (obligatoire, ex. « Bonamoussadi ») ;
+     - **Point de repère** (obligatoire, ex. « Après la pharmacie du carrefour, portail noir ») : texte d'aide « Au Cameroun, les livreurs se repèrent surtout grâce aux repères connus. Soyez précis. » ;
+     - c'est **plus utile qu'une adresse postale** : pas de champs rue et code postal.
+   - **Autre ville** (envoi par agence) :
+     - **Agence de transport** : liste des agences de la ville (nom, adresse, horaires), choix par carte ;
+     - **Personne qui récupère le colis** : par défaut « Moi-même » ; option « Quelqu'un d'autre » qui ouvre Nom et Téléphone du destinataire.
+4. **Remarques** (facultatif, 200 caractères, compteur) : « Ex. : appeler avant de passer ».
+5. Case à cocher « Enregistrer cette adresse pour mes prochaines réservations » (cochée par défaut pour une nouvelle adresse), avec un champ « Nom de l'adresse » (Maison, Bureau, Autre) en chips.
+
+### 6.5 Retrait en boutique
+
+- Bloc d'information : adresse de la boutique, horaires, lien « Ouvrir dans Google Maps » (`shop.mapsUrl`), texte « Nous vous prévenons dès que votre commande est prête, avec la photo de votre colis. »
+- Frais de livraison : 0, affiché « Gratuit ».
+
+### 6.6 Récapitulatif
+
+- Mobile : bloc repliable « Récapitulatif (3 articles) · 63 000 FCFA » ; déplié, il montre les miniatures, noms, tailles et quantités, puis le détail des montants.
+- Montants : Sous-total · Livraison (« 3 000 FCFA » / « Gratuit » / « À choisir ») · **Total**.
+- **Si `deliveryFeePayment` vaut `on_delivery`** : la livraison s'affiche « À payer à la réception » et n'est pas comptée dans le total, avec une note claire. `// HYPOTHÈSE:` par défaut `upfront` (un seul paiement couvre articles et livraison, comme le cahier des charges), en attente de la réponse du client.
+- Mention sous le bouton : « En confirmant, vos articles sont mis de côté pendant 24 h. Vous paierez à l'étape suivante par Mobile Money. »
+
+### 6.7 Règles de validation
+
+- Messages affichés **sous le champ**, en `red` avec une icône, uniquement après sortie du champ ou tentative d'envoi.
+- À l'appui sur « Confirmer » avec des erreurs : défilement doux jusqu'à la **première** erreur, focus sur ce champ, tremblement léger de sa section, `haptic('error')`.
+- Le bouton n'est **jamais désactivé** silencieusement : il reste appuyable et explique ce qui manque.
+- Champs en 16 px minimum (pas de zoom sur iPhone), `autoComplete` appropriés, `enterKeyHint="next"` puis `done`.
+
+### 6.8 Brouillon
+
+Le contenu du formulaire est sauvegardé dans `sessionStorage` à chaque modification (avec un délai de 500 ms) et restauré si le client revient sur la page (par exemple après être reparti au panier). Il est effacé après la création de la réservation.
+
+---
+
+## 7. CRÉATION DE LA RÉSERVATION
+
+### 7.1 Envoi
+
+- Génère une **clé d'idempotence** (`crypto.randomUUID()`) à l'ouverture du formulaire et garde-la jusqu'au succès : un double appui ou un renvoi après une coupure réseau ne crée **jamais** deux réservations.
+- Pendant l'envoi : le bouton passe en état de chargement (roue + « Réservation… »), les champs sont verrouillés, un retour arrière affiche une confirmation (« Votre réservation est en cours de création. Quitter quand même ? »).
+- **Délai dépassé ou réseau coupé** : message « La connexion a été interrompue. Nous vérifions si votre réservation a été créée… » puis nouvelle tentative automatique avec la **même clé** (2 tentatives maximum), puis bouton « Réessayer ».
+- **Conflit de stock (409)** : retour au panier avec les lignes concernées mises en évidence (comme en 4.4) et le message « Un article n'est plus disponible dans la quantité demandée. Vérifiez votre panier. »
+- **Succès** : vide le panier, efface le brouillon, enregistre l'adresse si demandé, place la réservation dans le cache (`qk.reservation(ref)`) et dans `reservationStore` (réservation active), puis lance le moment signature.
+
+### 7.2 Moment signature « Vos articles sont mis de côté » (GSAP)
+
+Une timeline courte qui transforme le bouton en écran de confirmation :
+
+| Temps | Mouvement |
+| --- | --- |
+| 0 s | Le bouton « Confirmer » se fige ; un calque `ink` part exactement de sa forme et s'étend jusqu'à couvrir l'écran (`clipPath: inset(...)` calculé depuis la position du bouton jusqu'à `inset(0)`, 0,6 s, `power3.inOut`). |
+| 0,45 s | Au centre : un cercle `silver` à 20 % se dessine (DrawSVG, 0,6 s), puis une coche blanche se dessine dedans (0,35 s). |
+| 0,9 s | Le titre « ARTICLES MIS DE CÔTÉ » monte de derrière son masque (`text-h1`, blanc). |
+| 1,1 s | Le numéro **RES-000124** apparaît caractère par caractère (SplitText `chars`, décalage 0,03 s), en `text-display` réduit, blanc. |
+| 1,35 s | La phrase « Réservés pour vous pendant 24 h. Payez maintenant par Mobile Money. » apparaît en fondu. |
+| 2,2 s | Transition automatique vers `/reservation/:ref/paiement` (page provisoire jusqu'au module M4 ; affiche au moins la référence, le montant et le compte à rebours de 7.3). |
+
+- Un appui n'importe où **passe directement** à la page de paiement.
+- `haptic('success')` à l'apparition de la coche.
+- Animations réduites : écran de confirmation affiché directement, puis bouton « Payer maintenant » (pas de transition automatique).
+
+### 7.3 Composant `HoldCountdown` (compte à rebours)
+
+Réutilisable aux modules suivants (paiement, détail de réservation, bandeau) :
+
+- Props : `expiresAt`, `serverTime` (pour corriger un décalage d'horloge du téléphone : calcule l'écart une fois à la réception), `variant: 'ring' | 'inline' | 'compact'`.
+- `ring` : anneau SVG de 72 px qui se vide au fil du temps (tracé mis à jour une fois par minute, et toutes les secondes durant la dernière heure), temps au centre (« 23 h 58 »), texte dessous « Articles réservés pour vous ».
+- `inline` : « Réservé encore 23 h 58 min ».
+- `compact` : « 23:58 » pour le bandeau.
+- Couleur : `ink` au-delà de 2 h ; `warning` entre 2 h et 30 min ; `red` sous 30 min.
+- À 0 : émet `onExpire` et affiche « Réservation expirée ».
+- Mise en pause quand l'onglet est masqué, recalcul au retour (jamais de dérive).
+
+### 7.4 Bandeau « Réservation en attente de paiement »
+
+- Si le client connecté a une réservation au statut `reserved` (dans `reservationStore`, rafraîchi par `usePendingReservations()` au démarrage et au retour sur l'app), un **bandeau collant** apparaît sur toutes les pages client, sauf sur les écrans de paiement et de preuve :
+  - mobile : juste au-dessus de la barre de navigation basse ; ordinateur : sous l'en-tête ;
+  - fond `ink`, texte blanc : « RES-000124 en attente de paiement · ⏱ 23:58 » + bouton `primary sm` « Payer ».
+  - Entrée : glissement depuis le bas (mobile) ou le haut (ordinateur), ressort `sheet`.
+  - Bouton « × » pour le masquer pendant la session (il revient à la session suivante et quand il reste moins de 2 h).
+- C'est ce bandeau qui rattrape le client parti payer puis distrait : il est essentiel.
+
+---
+
+## 8. GARDE DES ROUTES, ERREURS ET HORS CONNEXION
+
+- **`/reservation`** : si le panier est vide → redirection vers `/panier` ; si le client n'est pas connecté → affichage de la page avec la feuille de connexion ouverte par-dessus (fermer la feuille ramène au panier).
+- **`/reservation/:ref/paiement`** : nécessite d'être connecté ; référence inconnue → page « Réservation introuvable » avec un lien vers « Mes réservations ».
+- **Hors connexion** :
+  - le panier fonctionne entièrement (il est stocké sur le téléphone) ;
+  - « Réserver » et « Recevoir mon code » sont désactivés avec le message « Vous êtes hors connexion. Reconnectez-vous pour réserver. » ;
+  - le formulaire de réservation reste remplissable (brouillon) et le bouton se réactive dès le retour du réseau, avec un toast « Connexion rétablie ».
+- **Session expirée pendant le formulaire** : la feuille de connexion s'ouvre, le formulaire est conservé, l'envoi reprend après la reconnexion.
+
+---
+
+## 9. RECETTE
+
+### 9.1 Parcours à vérifier sur téléphone (390 px et 360 px)
+
+1. **Nouveau client** : panier de 2 articles → « Réserver » → numéro → code `123456` → prénom → livraison à Douala (quartier + repère) → confirmer → moment signature → page de paiement provisoire avec le compte à rebours.
+2. **Client existant** (`690000001`) : connexion → adresse « Maison » présélectionnée → confirmer en moins de 4 appuis après la connexion.
+3. **Envoi par agence** : Yaoundé → choix d'une agence → destinataire « Quelqu'un d'autre » → confirmer.
+4. **Retrait en boutique** : frais à 0, total correct.
+5. **Erreurs OTP** : code faux 3 fois (messages et essais restants), `000000` (expiré), trop de demandes (compte à rebours de blocage).
+6. **Stock** (`VITE_MOCK_STOCK_CHAOS=true`) : article réduit ou épuisé à l'ouverture du panier, conflit 409 à la confirmation.
+7. **Réseau** : coupure pendant l'envoi de la réservation → reprise avec la même clé, pas de doublon.
+8. **Bandeau en attente** : visible sur l'accueil, le catalogue et la fiche après la réservation, et masqué sur l'écran de paiement.
+9. **Retour arrière** depuis le formulaire : brouillon conservé.
+10. **Animations réduites** : tout fonctionne, aucune animation automatique.
+
+### 9.2 Performance et accessibilité
+
+- Lighthouse mobile sur `/panier` et `/reservation` : Performance ≥ 85, Accessibilité ≥ 95, Bonnes pratiques ≥ 95 ; INP < 200 ms.
+- JavaScript initial toujours < 180 kB gzip ; `react-hook-form` et `zod` chargés seulement avec le formulaire et la feuille de connexion.
+- Clavier : tout le parcours se fait au clavier (feuilles, cartes radio, sélecteur de ville, cases du code).
+- Lecteurs d'écran : erreurs liées aux champs (`aria-describedby`, `aria-invalid`), essais restants et changements de total annoncés (`aria-live="polite"`), cases du code annoncées comme un seul champ « Code de vérification à 6 chiffres ».
+- Contrastes conformes, cibles tactiles de 44 px minimum.
+
+### 9.3 Tests automatiques
+
+- `cartStore` : quantité plafonnée, suppression et annulation, application des résultats de `/cart/validate`.
+- `normalizeCmPhone`, `formatCmPhone`, détection d'opérateur.
+- Feuille OTP : envoi automatique au 6ᵉ chiffre, collage d'un code, code faux (essais restants), code expiré, blocage 429, reprise de l'action après connexion.
+- Schéma `zod` du formulaire : ville locale (quartier et repère obligatoires), agence (agence obligatoire, destinataire si « Quelqu'un d'autre »), retrait.
+- Calcul des montants : livraison selon la ville, retrait gratuit, mode `on_delivery`.
+- Idempotence : deux envois avec la même clé donnent une seule réservation.
+- `HoldCountdown` : couleurs selon le temps restant, correction de l'heure serveur, expiration.
+
+---
+
+## 10. CRITÈRES D'ACCEPTATION ET RAPPORT
+
+### 10.1 Le module est terminé quand
+
+- [ ] Le panier fonctionne sur mobile (page) et sur ordinateur (page + tiroir), avec quantités, glisser pour retirer, annulation, vérification du stock et des prix.
+- [ ] La connexion OTP se fait dans une feuille, au moment de réserver, avec remplissage automatique du code, gestion de tous les cas d'erreur et reprise de l'action.
+- [ ] Le client reste connecté entre deux visites (rafraîchissement silencieux).
+- [ ] Le formulaire gère livraison locale (quartier + repère), envoi par agence (avec destinataire) et retrait, avec adresses enregistrées et brouillon.
+- [ ] Une réservation est créée sans doublon possible, le moment signature s'enchaîne, et la page de paiement provisoire affiche la référence, le montant et le compte à rebours.
+- [ ] Le bandeau de réservation en attente apparaît partout où il faut.
+- [ ] Les 10 parcours de la section 9.1 passent sur un vrai téléphone Android.
+- [ ] Lint, typecheck, tests et build sont verts ; objectifs Lighthouse atteints.
+
+### 10.2 `RAPPORT_M3.md`
+
+1. Ce qui est livré, avec captures à 390 et 1440 px (panier, tiroir, feuille de connexion aux 3 étapes, formulaire en livraison, agence et retrait, moment signature, bandeau).
+2. Scores Lighthouse et poids des morceaux JavaScript.
+3. **Pour l'équipe back-end** : contrat d'API attendu (section 3.1), format du SMS pour le remplissage automatique (`@domaine #code`), durée de session, idempotence de `POST /reservations`, réponse 409 détaillée.
+4. **Pour le client** : questions encore ouvertes (frais de livraison payés d'avance ou à la réception, liste des villes et tarifs, agences, ville de la boutique, durée de session).
+5. Hypothèses et écarts par rapport à ce prompt.
+6. Points d'attention pour le module M4 (paiement Mobile Money et envoi de la preuve).
+
+---
+
+**Commence par la phase P1** : lis le projet, puis présente ton plan avant d'écrire le moindre composant.

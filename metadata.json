@@ -1,0 +1,6 @@
+{
+  "name": "DR Choco L'Incompris",
+  "description": "Vêtements, chaussures et babouches pour hommes. Réservez en ligne, payez par Mobile Money.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

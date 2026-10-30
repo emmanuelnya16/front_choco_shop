@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600">
+  <rect width="800" height="600" fill="#F4F4F3" />
+  <rect x="160" y="110" width="480" height="380" rx="14" fill="#1A1A18" />
+  <line x1="160" y1="300" x2="640" y2="300" stroke="#E31E24" stroke-width="18" />
+  <line x1="400" y1="110" x2="400" y2="490" stroke="#2A2A27" stroke-width="8" stroke-dasharray="14 10" />
+  <rect x="230" y="160" width="190" height="95" rx="6" fill="#FFFFFF" />
+  <text x="250" y="195" fill="#1A1A18" font-family="sans-serif" font-weight="800" font-size="18">DR CHOCO · DOUALA</text>
+  <text x="250" y="222" fill="#6B6C6E" font-family="monospace" font-weight="700" font-size="15">COLIS #RES-000102</text>
+  <text x="250" y="242" fill="#17733F" font-family="sans-serif" font-weight="700" font-size="12">SCELLÉ &amp; VÉRIFIÉ · VUE 1/2</text>
+</svg>

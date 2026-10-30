@@ -1,0 +1,489 @@
+# PROMPT — MODULE M1 « VITRINE » — PWA DR CHOCO L'INCOMPRIS
+
+> À coller dans ton agent de code, **dans le projet existant** (celui livré au module M0).
+> Langue de travail : français. Code et identifiants : anglais. Textes visibles : français.
+> Joins aussi à ton message **l'image de la maquette Dribbble** (capture « Bralder ») : elle sert de référence visuelle.
+
+---
+
+## 0. TON RÔLE ET L'OBJECTIF
+
+Tu es un développeur front-end senior et un designer d'interface exigeant, spécialisé en e-commerce mobile, en React et en animation (Motion + GSAP).
+
+Le module M0 a posé le socle technique : jetons, police, Motion, GSAP, routes, API, mocks. Toutes les pages sont encore **provisoires**. **Ton objectif dans ce module : que l'application ait enfin l'allure de la maquette.** À la fin, quand on ouvre `/`, on doit voir une page d'accueil streetwear premium, fidèle à la maquette jointe et adaptée à DR Choco, parfaite sur téléphone **et** sur ordinateur, animée avec soin.
+
+Tu livres :
+
+1. Le **kit visuel** (composants de base) nécessaire à la vitrine.
+2. La **coquille** de l'application : en-tête ordinateur et mobile, méga-menu des catégories, barre de navigation basse mobile, bouton WhatsApp flottant, pied de page.
+3. La **page d'accueil complète** (11 sections).
+4. Les **animations** de la vitrine.
+5. Le **pipeline d'images** (photos réelles + images de remplacement élégantes).
+
+Le niveau attendu est celui d'un site primé : chaque espacement, chaque taille de texte, chaque animation doit être **intentionnel**. Une page « correcte mais générique » est un échec.
+
+---
+
+## 1. AVANT DE CODER : LIS LE PROJET
+
+Lis dans cet ordre et **réutilise tout ce qui existe**, sans le recréer :
+
+1. `RAPPORT_M0.md` et `README.md`.
+2. `src/styles/index.css` : jetons de couleur, rayons, ombres, z-index, utilitaires `text-display`, `text-h1`, `text-h2`, `text-h3`, `text-body`, `text-small`, `text-label`, `text-price`, `px-page`, `py-section`, `max-w-content`, zones de sécurité, `.mask-line`.
+3. `src/motion/tokens.ts`, `src/motion/presets.ts`, `src/motion/MotionProvider.tsx` (règle : **`m.div`**, jamais `motion.div`, car `LazyMotion strict`).
+4. `src/lib/gsap.ts` : seul point d'entrée GSAP. Lis aussi les skills GreenSock déjà installés.
+5. `src/lib/utils/*`, `src/stores/*`, `src/types/*`, `src/mocks/*`, `src/app/router.tsx`, `src/app/layouts/RootLayout.tsx`.
+
+**Contraintes du projet existant (ne pas casser) :**
+
+- Le projet tourne dans Google AI Studio : garde le port 3000, la logique `DISABLE_HMR` de `vite.config.ts` et les dépendances `@google/genai`, `express`, `dotenv` (ne les supprime pas, ne les utilise pas).
+- Garde la page `/_dev` fonctionnelle.
+- **Aucune couleur en dur** (`#…`, `rgb(…)`) hors de `src/styles/index.css` et des mocks : uniquement les jetons (`bg-ink`, `text-red`, `bg-surface`…). Si un jeton manque (par exemple un voile noir à 55 %), **ajoute-le dans `@theme`** et signale-le dans le rapport.
+- `npm run lint`, `npm run typecheck`, `npm run test` et `npm run build` doivent rester verts.
+
+---
+
+## 2. WORKFLOW OBLIGATOIRE
+
+| Phase | Contenu | Sections |
+| --- | --- | --- |
+| P1 | Lecture du projet, plan écrit (composants, fichiers, ordre), captures d'écran de l'état actuel à 390 px et 1440 px | 1 |
+| P2 | Pipeline d'images et enrichissement des données de démonstration | 4 |
+| P3 | Kit visuel | 5 |
+| P4 | Coquille : en-tête, méga-menu, barre basse, WhatsApp, pied de page | 6 |
+| P5 | Accueil, sections 1 à 5 | 7.1 à 7.5 |
+| P6 | Accueil, sections 6 à 11 | 7.6 à 7.11 |
+| P7 | Animations GSAP, réglages fins, animations réduites | 8 |
+| P8 | Recette visuelle (comparaison avec la maquette), performance, accessibilité | 9 |
+| P9 | Rapport `RAPPORT_M1.md` | 10 |
+
+À la fin de **chaque** phase : lint + typecheck + build, commit (Conventional Commits) et résumé en 3 à 5 lignes. À partir de P4, fais à chaque phase **une capture à 390 px et une à 1440 px**, et compare-les honnêtement à la maquette : liste ce qui diffère encore.
+
+Les règles d'or :
+
+- **Mobile d'abord** : écris d'abord la version 390 px, puis élargis (`md:`, `lg:`).
+- **Pas de texte inventé qui ment** : pas de faux avis, pas de « 20 000 clients », pas de fausse notation, pas de « Quelqu'un vient d'acheter… ». Utilise les textes fournis en section 7.
+- **Tout texte visible est en français**, avec les bons caractères (é, è, à, ç, apostrophe typographique ’ dans les textes, guillemets « »).
+
+---
+
+## 3. LA MAQUETTE : CE QU'ON GARDE, CE QU'ON TRANSFORME
+
+La maquette « Bralder » est une marketplace de designers. On garde **son ambiance et sa mise en page** ; on remplace ce qui ne correspond pas à une boutique de réservation.
+
+| Section de la maquette | Devient chez DR Choco | Section du prompt |
+| --- | --- | --- |
+| En-tête (logo, recherche, icônes, menu, bouton noir) | En-tête DR Choco + méga-menu des catégories | 6.1 |
+| Hero sombre, photo de mannequins, titre en capitales, 2 boutons | Hero DR Choco | 7.1 |
+| « Brands our designers have helped build » (avatars) | **Supprimé**, remplacé par le bandeau rouge des avantages | 7.2 |
+| Tuiles de catégories sombres (6 tuiles) | 6 tuiles : 3 catégories + 3 sous-catégories | 7.3 |
+| « Best Selling » | « Les plus réservés » | 7.4 |
+| « Featured Services » | « Nouveautés » (carrousel) | 7.5 |
+| « Trusted By Our Brand » (logos qui défilent) | Bandeau des moyens de paiement et de livraison | 7.6 |
+| « Top Rated Designers » | « Spécial babouches » (sélection d'une catégorie) | 7.7 |
+| « Transform Your Ideas » (étapes 01, 02, 03) | « Comment ça marche » | 7.8 |
+| « Trusted by 20k+ Happy Customer » (mosaïque) | « Nos engagements » : même mosaïque, avec de vraies promesses | 7.9 |
+| « Upgrade Your Profile » (tarifs) | **Supprimé**, remplacé par le bloc WhatsApp + installation | 7.10 |
+| « Built for the Next Generation » (articles) | « Portés par l'Incompris » (looks cliquables) | 7.11 |
+| Pied de page | Pied de page DR Choco | 6.4 |
+| Bulle « Someone from Bangladesh… » | **Supprimée** (fausse preuve sociale) | — |
+| Bulle de support en bas à droite | Bouton WhatsApp flottant | 6.3 |
+
+---
+
+## 4. IMAGES : PIPELINE ET DONNÉES
+
+La maquette est belle **grâce à ses photos**. Avec des silhouettes SVG, rien ne ressemblera à la maquette. Il faut donc un système qui accepte de vraies photos et qui reste élégant tant qu'elles manquent.
+
+### 4.1 Emplacements des photos (à remplir par le propriétaire du projet)
+
+Crée ces dossiers avec un `README.md` qui liste les fichiers attendus, leur format et leur taille :
+
+| Fichier | Format conseillé | Usage |
+| --- | --- | --- |
+| `public/images/hero/hero-desktop.webp` | 1920 × 1080, mannequins à droite, fond sombre | Hero sur ordinateur |
+| `public/images/hero/hero-mobile.webp` | 1080 × 1600, portrait | Hero sur téléphone |
+| `public/images/categories/vetements.webp`, `chaussures.webp`, `babouches.webp`, `t-shirts.webp`, `hoodies.webp`, `pantalons.webp` | 1200 × 600 | Tuiles de catégories |
+| `public/images/how/how-it-works.webp` | 1000 × 1250, groupe de mannequins | « Comment ça marche » |
+| `public/images/engagements/engagement-1.webp` à `engagement-3.webp` | 900 × 1200 | Mosaïque « Nos engagements » |
+| `public/images/looks/look-1.webp` à `look-4.webp` | 960 × 1200 (4:5) | « Portés par l'Incompris » |
+| `public/images/products/{slug}-1.webp`, `{slug}-2.webp`… | 960 × 1200 (4:5), fond uniforme clair | Photos produits |
+| `public/brand/logo-white.svg` et `logo-black.svg` | vectoriel | Logo (optionnel ; sinon logotype texte, voir 5.1) |
+
+### 4.2 Composant `SmartImage`
+
+`src/components/ui/SmartImage.tsx` :
+
+- Props : `src`, `fallback` (SVG ou dégradé), `alt`, `ratio` (`'4/5'`, `'16/9'`, `'2/1'`…), `priority` (booléen), `sizes`, `className`, `tone` (`'product' | 'mood'`).
+- Réserve la place avec `aspect-ratio` : **aucun saut de mise en page**.
+- `loading="lazy"` et `decoding="async"` par défaut ; `priority` → `loading="eager"` et `fetchPriority="high"` (hero uniquement).
+- Pendant le chargement : fond `surface` (produit) ou `ink-2` (ambiance) avec un léger miroitement animé en CSS, désactivé si les animations sont réduites.
+- Une fois chargée : fondu de 0,4 s.
+- En cas d'erreur (fichier absent) : affiche `fallback` **sans erreur dans la console**.
+- `tone="mood"` applique le traitement « ambiance » : `filter: grayscale(1) contrast(1.08) brightness(0.92)` + un **grain** (couche `::after` avec un bruit SVG `feTurbulence` en data-URI, opacité 0,07, `mix-blend-mode: overlay`). Ainsi, n'importe quelle photo prend l'allure noir et blanc granuleuse de la maquette.
+
+### 4.3 Images de remplacement (en attendant les vraies photos)
+
+Crée des SVG de remplacement **soignés** dans `public/images/fallback/` :
+
+- **Ambiance** (hero, catégories, looks, engagements) : dégradé `#1A1A18` → `#2A2A27`, éclairage radial doux, motif de **fil barbelé** très discret en filigrane (trait `#87888A` à 12 % d'opacité), et le mot de la catégorie en grand, en capitales condensées, à 6 % d'opacité.
+- **Produit** : fond `#F4F4F3`, silhouette propre et centrée du type d'article (t-shirt, hoodie, pantalon, chaussure, babouche) en `#1A1A18`, ombre portée au sol. Reprends et améliore les SVG existants de `public/mock/`.
+
+### 4.4 Données de démonstration
+
+Dans `src/mocks/fixtures/` :
+
+- Chaque catégorie et sous-catégorie reçoit `coverImage` (chemin `public/images/categories/…`) et `fallbackImage`.
+- Chaque produit reçoit `images: ['/images/products/{slug}-1.webp', …]` et `fallbackImages` (les SVG). `SmartImage` bascule seul sur le SVG si la photo manque.
+- Ajoute un champ `reservationsCount` (entier) pour trier « Les plus réservés », et `badges` dérivés (`'new'` si `isNew`, `'low-stock'` si le stock total est entre 1 et 3, `'sold-out'` si 0).
+- Ajoute `src/mocks/fixtures/looks.ts` : 4 looks `{ id, title, image, fallback, productSlugs[] }`.
+- Mets à jour les types (`src/types/domain.ts`) et le gestionnaire `GET /products` : `sort=popular` (par `reservationsCount`) et `sort=newest`.
+
+### 4.5 Hooks de données
+
+Dans `src/features/catalog/api/` : `useCategories()`, `useProducts(filters)`, `useLooks()`, construits avec TanStack Query et les clés `qk` existantes. Chaque section de l'accueil affiche un **squelette** pendant le chargement (latence simulée de 300 à 900 ms), et un état d'erreur discret avec « Réessayer ».
+
+---
+
+## 5. KIT VISUEL (`src/components/ui/`)
+
+Chaque composant : TypeScript strict, `cn()`, variantes typées, accessible au clavier, cibles tactiles de 44 px minimum, états `hover` (ordinateur seulement, via `@media (hover: hover)`), `active`, `focus-visible`, `disabled`. Montre-les tous dans une nouvelle section **« Kit »** de la page `/_dev`.
+
+### 5.1 `Logo`
+
+- Props : `variant: 'light' | 'dark'`, `size: 'sm' | 'md' | 'lg'`.
+- Si `public/brand/logo-*.svg` existe, l'affiche.
+- Sinon, **logotype texte** : « DR CHOCO » en Archivo 800, largeur 75 %, approche −0,02 em, puis « L'INCOMPRIS » dessous en `text-label` (approche +0,3 em), le tout précédé d'un petit cercle plein (rouge) de 8 px. Hauteur `md` : 32 px.
+
+### 5.2 `Button`
+
+| Variante | Apparence | Usage |
+| --- | --- | --- |
+| `primary` | fond `red`, texte blanc | Action principale (« Découvrir la collection », « Réserver ») |
+| `dark` | fond `ink`, texte blanc | Action secondaire forte (« Réserver · 45 000 FCFA » sur les cartes) |
+| `light` | fond blanc, texte `ink` | Sur fond sombre (hero) |
+| `outline` | bordure 1,5 px `ink`, fond transparent | Action tertiaire |
+| `outline-light` | bordure 1,5 px blanche | Sur fond sombre |
+| `ghost` | texte `ink`, sans fond, icône à gauche | « Ajouter » sur les cartes |
+
+- Tailles : `sm` (36 px de haut, texte 13 px), `md` (44 px, 14 px), `lg` (52 px, 15 px). Texte 600, **pas** de capitales forcées (comme la maquette). Rayon 8 px. Padding horizontal 16 / 20 / 24 px.
+- Props : `iconLeft`, `iconRight`, `loading` (petite roue + texte conservé), `fullWidth`, `asChild` ou `href` (rendu en `Link`).
+- Animation : `whileTap` d'échelle 0,97 (preset `pressable`). Au survol sur ordinateur, `primary` fonce légèrement via un voile noir à 8 % (pas de nouvelle couleur).
+
+### 5.3 `IconButton`
+
+Bouton rond de 40 px (zone tactile 44 px), icône Lucide de 20 px, trait 1,75. Variantes `plain`, `surface` (fond blanc, ombre très légère : cœur sur les cartes), `dark`. Prop `badge` (nombre) : pastille rouge de 18 px, texte blanc 11 px 700, positionnée en haut à droite ; à chaque changement de nombre, **rebond** (ressort `bounce` des jetons).
+
+### 5.4 `Badge` et `Chip`
+
+- `Badge` : `new` (fond `ink`, texte blanc, « Nouveau »), `low-stock` (fond `red`, texte blanc, « Plus que 2 »), `sold-out` (fond `silver`, texte `ink`, « Épuisé »), `info`. Texte `text-label`, hauteur 22 px, rayon complet.
+- `Chip` (filtres, onglets) : hauteur 36 px, rayon complet, bordure `silver` ; actif = fond `ink` et texte blanc.
+
+### 5.5 `SectionHeader`
+
+Titre de section (`text-h2`) à gauche et lien « Voir tout → » à droite (`text-small` 600, souligné au survol, flèche qui glisse de 4 px au survol). Option `eyebrow` : petite étiquette rouge au-dessus du titre (`text-label`). Marge basse : 20 px sur mobile, 28 px sur ordinateur. **Reproduit la disposition « Best Selling … See All » de la maquette.**
+
+### 5.6 `ProductCard` (le composant le plus important)
+
+Reproduit la carte de la maquette, adaptée :
+
+```
+┌──────────────────────────┐
+│ ♡                [Badge] │  ← cœur en haut à gauche (cercle blanc 32 px), badge en haut à droite
+│                          │
+│        PHOTO 4:5         │  ← fond surface, rayon 8, photo en object-fit: cover
+│                          │
+└──────────────────────────┘
+ Hoodie Barbelé Noir          ← text-h3, 2 lignes max (line-clamp)
+ Vêtements · ● ● ●            ← catégorie en text-small text-2 + pastilles de couleurs (10 px)
+ 45 000 FCFA                  ← text-price 16 px
+ [Réserver]  [🛍 Ajouter]     ← Button dark sm + Button ghost sm
+```
+
+- Les pastilles de couleur viennent de `product.colors` ; au-delà de 3, affiche « +2 ».
+- **Pas d'étoiles ni d'avis** (fonctionnalité future).
+- Article épuisé : photo à 60 % d'opacité, badge « Épuisé », boutons remplacés par « Voir l'article ».
+- Toute la carte est un lien vers `/produit/:slug`, sauf le cœur et les deux boutons (qui stoppent la propagation).
+- **Cœur** : bascule les favoris dans un nouveau store `favoritesStore` (Zustand, persistant, sûr). Animation : échelle 0,8 → 1,25 → 1, remplissage rouge, et 6 petites particules rouges qui s'écartent en 0,4 s (Motion) ; vibration `haptic('light')`.
+- **« Réserver »** et **« Ajouter »** ouvrent la feuille de choix de taille (5.8). « Réserver » enchaîne ensuite vers `/panier`.
+- Appui : échelle 0,98 sur toute la carte. Survol (ordinateur) : la photo zoome à 1,05 en 0,9 s (courbe `out`) et la 2ᵉ photo du produit apparaît en fondu si elle existe.
+- `ProductCardSkeleton` : même gabarit, blocs gris animés.
+- Largeur : grille de 2 colonnes sur mobile (écart 12 px), 4 sur ordinateur (écart 24 px) ; en carrousel, 72 % de la largeur sur mobile, 25 % sur ordinateur.
+
+### 5.7 `CategoryTile`
+
+Reproduit les tuiles sombres de la maquette :
+
+- Photo d'ambiance (`tone="mood"`) en fond, voile `ink` à 55 %, rayon 8, ratio 2:1 sur ordinateur, 16:9 sur mobile.
+- Nom centré en blanc, `text-h3` 600 (maquette : « Hoodies », « Caps »), et le nombre d'articles dessous en `text-label` `silver`.
+- Survol : la photo zoome à 1,06, le voile passe à 40 %, le nom monte de 4 px. Appui : échelle 0,97.
+- Lien vers `/explorer/:category`.
+
+### 5.8 `Sheet` et `SizePicker`
+
+- `Sheet` : feuille qui monte du bas sur mobile (preset `sheetUp`, fond assombri `ink` à 50 %, haut arrondi 20 px, poignée de 36 × 4 px, fermeture par glissement vers le bas avec `drag="y"`, par appui sur le fond ou par la touche Échap, focus piégé à l'intérieur, défilement de la page bloqué). Sur ordinateur (`lg`), elle devient une fenêtre centrée de 440 px.
+- `SizePicker` (dans la feuille) : photo miniature, nom, prix, pastilles de couleur, grille de tailles (boutons de 48 px ; taille épuisée barrée et désactivée), puis bouton `primary` pleine largeur « Ajouter au panier ».
+- Ajout : `cartStore.add()`, `haptic('success')`, fermeture de la feuille, rebond du badge du panier et message flash.
+
+### 5.9 `Toast`
+
+Message flash minimal : en bas (au-dessus de la barre de navigation) sur mobile, en bas à droite sur ordinateur. Fond `ink`, texte blanc, icône, action optionnelle (« Voir le panier »), fermeture automatique après 3,5 s. Entrée : glissement depuis le bas + fondu (Motion). Un petit store `toastStore` + un composant `Toaster` monté dans `RootLayout`.
+
+### 5.10 `Marquee`
+
+Bandeau défilant en boucle infinie (voir 8.3). Props : `items` (texte + icône), `tone: 'red' | 'surface' | 'ink'`, `speed`, `direction`. `aria-hidden` sur la partie dupliquée ; le contenu reste lisible une fois par les lecteurs d'écran.
+
+### 5.11 Autres
+
+`Container` (`max-w-content mx-auto px-page`), `Section` (espacement vertical `py-section`, prop `tone: 'white' | 'surface' | 'ink'`), `Skeleton`, `VisuallyHidden`, `Price` (utilise `formatPrice`).
+
+---
+
+## 6. COQUILLE DE L'APPLICATION
+
+### 6.1 En-tête
+
+**Ordinateur (`lg` et plus), sur deux lignes comme la maquette :**
+
+- **Ligne 1** (hauteur 72 px, fond blanc) : `Logo` à gauche ; champ de recherche (largeur 360 px, hauteur 40 px, fond `surface`, rayon complet, icône loupe, texte d'exemple « Rechercher un hoodie, des babouches… ») qui mène à `/recherche` ; à droite, `IconButton` Favoris (cœur, avec badge), Panier (sac, badge rouge) et Compte (avatar rond `ink` avec initiale, ou icône utilisateur).
+- **Ligne 2** (hauteur 48 px, bordure basse `silver` à 60 %) : à gauche « ▦ Catégories » (ouvre le méga-menu) ; au centre, les liens Accueil · Vêtements · Chaussures · Babouches · Comment réserver (texte 14 px 500 ; lien actif souligné par une barre rouge de 2 px qui **glisse** d'un lien à l'autre avec `layoutId`) ; à droite, bouton `dark sm` « Mes réservations ».
+- Au défilement (plus de 80 px) : la ligne 2 se replie en douceur (hauteur à 0 et fondu, via `transform` et `opacity`, sans animer `height`), une ombre très légère apparaît sous la ligne 1. Au retour en haut, tout revient.
+
+**Mobile (sous `lg`) :**
+
+- Hauteur 56 px (`--header-h`), `Logo` taille `sm` à gauche, à droite `IconButton` Recherche et Panier (avec badge).
+- Fond blanc ; **sur l'accueil**, au-dessus du hero, il est transparent avec logo et icônes en blanc, puis devient blanc avec ombre après 40 px de défilement (transition 0,25 s).
+- **Se cache** quand on fait défiler vers le bas (plus de 8 px d'un coup) et **réapparaît** dès qu'on remonte (Motion `useScroll` + `useMotionValueEvent`, translation `y`).
+- Respecte `pt-safe`.
+
+### 6.2 Méga-menu « Catégories » (ordinateur)
+
+Panneau qui s'ouvre sous l'en-tête (`clipPath` de `inset(0 0 100% 0)` à `inset(0 0 0 0)`, 0,45 s, courbe `inOut`) : 3 colonnes (Vêtements, Chaussures, Babouches) avec leurs sous-catégories, et à droite une tuile d'ambiance « Nouveautés » avec bouton. Fermeture au clic extérieur, à la touche Échap et au changement de page. Navigable au clavier (`aria-expanded`, `aria-controls`).
+
+### 6.3 Barre de navigation basse (mobile) et bouton WhatsApp
+
+- **Barre basse** : 5 onglets, Accueil (`Home`), Explorer (`LayoutGrid`), Panier (`ShoppingBag` + badge), Réservations (`ReceiptText`), Profil (`User`). Hauteur 64 px + `pb-safe`, fond blanc à 92 % avec `backdrop-filter: blur(16px)`, ombre `--shadow-nav`. Icône 22 px et libellé 11 px 600 dessous. Onglet actif : icône et texte `red`, petite barre rouge de 3 × 20 px au-dessus de l'icône qui **glisse** d'un onglet à l'autre (`layoutId`, ressort `snappy`). Appui : échelle 0,9 de l'icône.
+- Ajoute en bas du contenu un espace égal à la hauteur de la barre, pour que rien ne soit caché.
+- **Bouton WhatsApp flottant** : cercle de 52 px, fond `ink`, icône WhatsApp blanche (SVG inline, pas de couleur verte de marque), en bas à droite, au-dessus de la barre basse sur mobile. Lien `https://wa.me/<numéro>` avec un message prérempli « Bonjour DR Choco, j'ai une question. ». Le numéro vient de `GET /settings/public`. Apparition après 1,5 s (échelle 0,6 → 1, ressort `bounce`) ; caché sur les pages de paiement (futur).
+
+### 6.4 Pied de page
+
+Fond `ink`, texte `silver`, comme une version sombre du pied de page de la maquette :
+
+- **Haut** : `Logo` `light` taille `lg`, phrase « Vêtements, chaussures et babouches pour hommes. Réservez en ligne, payez par Mobile Money. », bouton `outline-light` « Nous écrire sur WhatsApp ».
+- **Colonnes** (4 sur ordinateur, accordéons repliables sur mobile) : **Catégories** (Vêtements, Chaussures, Babouches, Nouveautés) · **Aide** (Comment réserver, Paiement Mobile Money, Livraison et retrait, Suivre ma réservation) · **Légal** (Conditions générales, Politique d'annulation et de retour, Confidentialité) · **Boutique** (adresse de retrait et horaires issus de `/settings/public`).
+- **Bas** : « © 2026 DR Choco L'Incompris. Tous droits réservés. » à gauche, pastilles texte « Orange Money » et « MTN MoMo » à droite (en `ink-2` avec texte blanc, **sans** logos officiels).
+- Sur mobile, ajoute l'espace de la barre basse sous le pied de page.
+
+### 6.5 `RootLayout`
+
+Remplace les emplacements réservés : en-tête, `<main id="contenu">` avec un lien d'évitement « Aller au contenu », pied de page, barre basse (mobile), bouton WhatsApp, `Toaster`, et la `Sheet` globale du choix de taille (pilotée par un petit store `uiStore`).
+
+---
+
+## 7. LA PAGE D'ACCUEIL (`src/pages/HomePage.tsx` + `src/features/catalog/home/*`)
+
+Une section = un composant. Espacement vertical `py-section`. Largeur `Container`, sauf mention contraire.
+
+### 7.1 Hero (section signature)
+
+- **Ordinateur** : pleine largeur, hauteur `min(88vh, 760px)`, photo `hero-desktop` (`tone="mood"`, `priority`) en fond, voile en dégradé de gauche (`ink` à 85 %) vers la droite (transparent), pour que le texte reste lisible et que les mannequins à droite ressortent. Contenu à gauche, aligné sur le `Container`, largeur max 620 px, centré verticalement.
+- **Mobile** : hauteur `88svh` (minimum 560 px), photo `hero-mobile` en fond, dégradé du bas (`ink` à 95 %) vers le haut (transparent à 55 %). Contenu **en bas**, à 32 px du bord bas. L'en-tête transparent est posé par-dessus.
+- **Contenu, de haut en bas :**
+  1. Pastille (rayon complet, fond blanc à 10 %, bordure blanche à 20 %, flou d'arrière-plan) : point rouge + « Nouvelle collection » (`text-label`, blanc).
+  2. Titre `text-display` blanc, sur 3 lignes, chacune dans un `.mask-line` : « L'INCOMPRIS » / « NE SE PLIE » / « À PERSONNE. » (le point final en `red`).
+  3. Phrase `text-body` `silver`, largeur max 420 px : « Vêtements, chaussures et babouches pour hommes. Réservez en ligne, payez par Mobile Money, recevez partout au Cameroun. »
+  4. Deux boutons `lg` côte à côte (empilés en pleine largeur sous 400 px) : `primary` « Découvrir la collection » (→ `/explorer`) et `light` « Comment réserver » (fait défiler jusqu'à la section 7.8).
+- **Indicateur de défilement** (ordinateur) : petite ligne verticale de 40 px en bas au centre, dans laquelle un segment rouge descend en boucle.
+- **Animation** : voir 8.2.
+
+### 7.2 Bandeau des avantages
+
+Juste sous le hero, pleine largeur, hauteur 48 px, `Marquee` `tone="red"`, texte blanc `text-label`, séparateur « ✦ » :
+LIVRAISON PARTOUT AU CAMEROUN ✦ PAIEMENT ORANGE MONEY & MTN MOMO ✦ RETRAIT GRATUIT EN BOUTIQUE ✦ ARTICLES MIS DE CÔTÉ 24 H POUR VOUS ✦ PHOTO DE VOTRE COLIS AVANT L'ENVOI ✦
+
+### 7.3 Catégories (les tuiles sombres de la maquette)
+
+- `SectionHeader` : étiquette « Explorer », titre « Nos univers », lien « Tout voir » → `/explorer`.
+- **Ordinateur** : grille de 3 colonnes × 2 lignes, écart 16 px, comme la maquette : Vêtements, Chaussures, Babouches (ligne 1), T-shirts, Hoodies, Pantalons (ligne 2).
+- **Mobile** : disposition en mosaïque, Vêtements en pleine largeur (16:9), puis Chaussures et Babouches côte à côte (1:1), puis un carrousel horizontal de chips pour les sous-catégories.
+- **Animation** : apparition en cascade (`staggerContainer` + `fadeUp`, une seule fois, à 25 % de visibilité).
+
+### 7.4 Les plus réservés
+
+- `SectionHeader` : titre « Les plus réservés », lien « Voir tout » → `/explorer?sort=popular`.
+- `useProducts({ sort: 'popular', pageSize: 8 })` ; affiche 4 cartes sur ordinateur, 4 sur mobile (grille 2 × 2), puis un bouton `outline` pleine largeur « Voir plus d'articles » sur mobile.
+- **Animation** : cartes qui montent en cascade (décalage 0,06 s).
+
+### 7.5 Nouveautés
+
+- `SectionHeader` : étiquette « Tout juste arrivés », titre « Nouveautés », lien « Voir tout » → `/explorer?sort=newest`.
+- **Carrousel horizontal** avec `scroll-snap-type: x mandatory` (arrêt net sur chaque carte), défilement natif, sans barre de défilement visible. Sur ordinateur, deux `IconButton` flèches à côté du titre ; elles se désactivent aux extrémités.
+- La première carte est alignée sur le bord gauche du `Container` ; le carrousel déborde à droite jusqu'au bord de l'écran.
+- **Animation** : les cartes arrivent depuis la droite en cascade (`x: 40` → `0`).
+
+### 7.6 Bandeau paiement et livraison
+
+Pleine largeur, fond `surface`, hauteur 72 px, `Marquee` `tone="surface"` en sens inverse du bandeau rouge. Éléments en `ink`, 15 px 700, chacun précédé d'une icône Lucide de 20 px : `Smartphone` Orange Money · `Smartphone` MTN MoMo · `Truck` Livraison partout au Cameroun · `Store` Retrait en boutique · `ShieldCheck` Paiement vérifié par la boutique · `Camera` Photo de votre colis. Reproduit la sensation du bandeau « Trusted By Our Brand ».
+
+### 7.7 Spécial babouches
+
+- Bloc en deux parties sur ordinateur : à gauche, une tuile d'ambiance verticale (photo `babouches`, voile, titre `text-h1` blanc « L'ART DE LA BABOUCHE », phrase courte « Cuir travaillé à la main, confort de tous les jours. », bouton `light` « Voir les babouches ») ; à droite, une grille de 3 `ProductCard` de la catégorie babouches.
+- **Mobile** : la tuile d'ambiance en 4:5 pleine largeur, puis un carrousel de cartes.
+- **Animation** : la photo de la tuile se dévoile de bas en haut derrière un masque (`clipPath`, 0,9 s, courbe `out`).
+
+### 7.8 Comment ça marche (`id="comment-reserver"`)
+
+Reproduit la section « Transform Your Ideas Into Design Mockups » de la maquette :
+
+- **Ordinateur** : 2 colonnes. À gauche, titre `text-h1` « RÉSERVEZ EN 3 ÉTAPES » et les étapes ; à droite, la grande photo `how-it-works` (`tone="mood"`, rayon 8, ratio 4:5).
+- **Étapes**, avec une ligne verticale fine (`silver`) qui relie les numéros :
+  - **01 · Réservez** : « Choisissez vos articles et votre taille. Ils sont mis de côté pour vous pendant 24 h. »
+  - **02 · Payez par Mobile Money** : « Orange Money ou MTN MoMo. Envoyez la capture de votre paiement en un geste. »
+  - **03 · Recevez ou retirez** : « Nous validons, préparons et vous envoyons la photo de votre colis. Livraison ou retrait en boutique. »
+  - Numéro dans un carré de 44 px à bordure `ink` (comme la maquette), petite étiquette « Étape 01 » en `text-label` `text-2`, titre `text-h3`, texte `text-small` `text-2`.
+- Bouton `dark lg` « Commencer mes achats » → `/explorer`.
+- **Mobile** : photo en haut (16:10), étapes dessous.
+- **Animation** : voir 8.4 (ligne qui se remplit au défilement).
+
+### 7.9 Nos engagements (la mosaïque de la maquette)
+
+Reproduit la mosaïque « Trusted by 20k+ Happy Customer » avec un **contenu honnête** :
+
+- Titre centré `text-h2` « POURQUOI NOUS FAIRE CONFIANCE ».
+- **Ordinateur** : mosaïque de 3 colonnes de hauteurs décalées (colonne du milieu décalée de 48 px vers le bas), qui alterne photos (`engagement-1` à `3`, `tone="mood"`) et cartes de texte (fond blanc, bordure `silver` à 60 %, rayon 8, padding 24 px, icône rouge de 24 px, titre `text-h3`, texte `text-small` `text-2`).
+- **Les 4 cartes** :
+  - `PackageCheck` **Vos articles mis de côté** : « Dès que vous réservez, votre taille est bloquée pour vous pendant 24 h. Personne ne peut vous la prendre. »
+  - `Smartphone` **Paiement Mobile Money** : « Payez avec Orange Money ou MTN MoMo, comme d'habitude. Chaque paiement est vérifié par la boutique. »
+  - `Camera` **La photo de votre colis** : « Avant l'envoi, vous recevez la photo de votre commande emballée. Vous savez exactement ce qui arrive. »
+  - `MapPin` **Partout au Cameroun** : « Livraison dans votre ville ou envoi par agence de transport. Ou retrait gratuit en boutique. »
+- **Mobile** : une seule colonne qui alterne carte, photo, carte, carte, photo, carte.
+- **Animation** : chaque élément apparaît en `fadeUp` à son entrée dans l'écran ; sur ordinateur, les colonnes bougent légèrement à des vitesses différentes au défilement (parallaxe de −24 px à 24 px, Motion `useScroll` + `useTransform`).
+
+### 7.10 Bloc WhatsApp et application
+
+- Section fond `ink`, `Container`, rayon 8 sur ordinateur (bloc « carte » avec marges), pleine largeur sur mobile.
+- Gauche : étiquette rouge « Besoin d'aide ? », titre `text-h1` blanc « UNE QUESTION ? ON VOUS RÉPOND SUR WHATSAPP. », texte `silver`, bouton `primary` « Écrire sur WhatsApp ».
+- Droite (ordinateur) ou dessous (mobile) : carte `ink-2` « Ajoutez DR Choco à votre écran d'accueil », 3 avantages courts (Accès en un appui · Suivi de vos réservations · Alertes nouveautés), bouton `outline-light` « Installer l'application ». Pour l'instant, ce bouton affiche un toast « Bientôt disponible » ; l'installation réelle arrive au module de la coquille PWA.
+- **Animation** : le titre se révèle mot par mot (SplitText `type: "words"`, masques), une seule fois.
+
+### 7.11 Portés par l'Incompris (looks)
+
+Reproduit la rangée « Built for the Next Generation of Streetwear » :
+
+- Titre centré sur 2 lignes `text-h2` « PORTÉS PAR / L'INCOMPRIS ».
+- 4 cartes portrait 4:5 (grille de 4 sur ordinateur, carrousel à 78 % de largeur sur mobile) : photo du look (`tone="mood"`), dessous le titre du look en `text-h3` (ex. « Total black barbelé ») et le lien « Voir le look → ».
+- Au survol (ordinateur), la photo repasse **en couleur** (grayscale de 1 à 0 en 0,6 s) et zoome à 1,04.
+- Le lien mène à `/explorer?look=<id>` (page provisoire pour l'instant).
+
+---
+
+## 8. ANIMATIONS DE LA VITRINE
+
+Règles M0 inchangées : `transform` et `opacity` uniquement, un seul animateur par élément, `m.div`, `useGSAP` + `scope` + `contextSafe`, jetons de `motion/tokens.ts`, animations réduites respectées partout.
+
+### 8.1 Répartition
+
+| Élément | Outil |
+| --- | --- |
+| Hero (séquence d'entrée), bandeaux défilants, « Comment ça marche », titre du bloc WhatsApp | GSAP (chargé avec la page d'accueil, jamais au démarrage de l'app) |
+| Tout le reste (apparitions, cartes, cœur, feuille, toast, en-tête, barre basse, méga-menu) | Motion |
+
+### 8.2 Séquence d'entrée du hero (GSAP, timeline unique)
+
+| Temps | Élément | Mouvement |
+| --- | --- | --- |
+| 0 s | Photo | échelle 1,12 → 1, `autoAlpha` 0 → 1, 1,6 s, `power3.out` |
+| 0,15 s | Pastille | `y` 12 → 0, `autoAlpha` 0 → 1, 0,5 s |
+| 0,25 s | Titre | chaque ligne monte de `yPercent: 110` à 0 dans son masque, 1 s, `power4.out`, décalage 0,1 s |
+| 0,75 s | Phrase | `y` 16 → 0, `autoAlpha` 0 → 1, 0,7 s |
+| 0,9 s | Boutons | `y` 16 → 0, `autoAlpha` 0 → 1, décalage 0,08 s |
+| après | Photo | parallaxe au défilement : `yPercent` 0 → 12 et échelle 1 → 1,06, `scrub: true`, de « top top » à « bottom top » |
+
+Durée totale avant interaction : moins de 1,7 s. Les boutons sont **cliquables dès le départ** (pas de `pointer-events: none`). Avec les animations réduites : tout est affiché directement, sans parallaxe.
+
+### 8.3 Bandeaux défilants (GSAP)
+
+- Boucle `xPercent: -50` sur une piste qui contient le contenu en double, `ease: "none"`, `repeat: -1` (vitesse de base : 40 s pour un tour).
+- **Réaction au défilement** : un `ScrollTrigger` lit la vitesse de défilement (`self.getVelocity()`) et accélère temporairement la boucle (`timeScale` jusqu'à 4), puis revient doucement à 1 en 0,8 s. Faire défiler vers le haut inverse brièvement le sens.
+- Pause quand le bandeau n'est pas visible (`ScrollTrigger` `onToggle`), et quand l'onglet du navigateur est masqué.
+- Animations réduites : bandeau immobile, contenu affiché une fois.
+
+### 8.4 Comment ça marche (GSAP + ScrollTrigger)
+
+- La ligne verticale entre les numéros se remplit en rouge (`scaleY` 0 → 1, `transformOrigin: top`) au rythme du défilement (`scrub: 0.6`, de « top 70% » à « bottom 60% »).
+- Quand la ligne atteint une étape, son carré numéroté passe de bordure `ink` à fond `ink` et texte blanc, et le texte de l'étape passe de 40 % à 100 % d'opacité.
+- Sur ordinateur, la photo à droite reste visible pendant ce temps (colonne `position: sticky`, pas de `pin` GSAP, plus simple et plus fiable).
+- `ScrollTrigger.refresh()` une seule fois après le chargement de la photo.
+
+### 8.5 Motion : détails
+
+- **Apparitions** : `whileInView` + `viewport={{ once: true, amount: 0.25 }}`, preset `fadeUp`, cascade `staggerContainer(0.06)`.
+- **En-tête qui se cache** : translation `y` de 0 à `-100%`, 0,25 s, courbe `out`.
+- **Badge du panier** : `key={count}` pour rejouer l'entrée ; ressort `bounce`.
+- **Cœur** : séquence d'images clés sur `scale` + particules (6 `m.span` en `position: absolute`, `x/y` en cercle, `opacity` 1 → 0).
+- **Feuille** : `sheetUp` + `drag="y"` avec `dragConstraints={{ top: 0 }}` ; fermeture si glissement de plus de 120 px ou vitesse supérieure à 500.
+- **Méga-menu** : `clipPath` + fondu de la liste en cascade.
+
+### 8.6 Performance des animations
+
+- Teste en simulation « processeur ralenti ×4 » dans Chrome : **pas de saccade** au défilement de l'accueil.
+- `will-change: transform` seulement pendant les animations (GSAP le gère ; ne le pose pas en CSS permanent).
+- Pas plus de 2 `ScrollTrigger` actifs en même temps sur mobile, en plus des bandeaux.
+
+---
+
+## 9. RECETTE
+
+### 9.1 Comparaison visuelle avec la maquette
+
+À 1440 px, vérifie section par section que tu retrouves : la même hiérarchie (hero sombre imposant, tuiles sombres, grilles de cartes claires, bandeau de logos, étapes 01-02-03 avec photo, mosaïque, rangée de looks, pied de page), les mêmes respirations entre sections, le même contraste noir et blanc, la même sobriété des cartes. Rédige le tableau « maquette / réalisé / écart » dans le rapport.
+
+À 390 px et à 360 px : aucune barre de défilement horizontale, aucun texte coupé, boutons de 44 px minimum, rien sous la barre basse, en-tête qui se cache et réapparaît, feuille de taille qui se ferme au glissement.
+
+### 9.2 Performance (build de production, Lighthouse mobile)
+
+- Performance **≥ 85**, Accessibilité **≥ 95**, Bonnes pratiques **≥ 95**.
+- LCP (photo du hero) **< 2,5 s** en 4G simulée ; CLS **< 0,05**.
+- JavaScript initial de l'app toujours **< 180 kB gzip** ; le morceau de la page d'accueil (GSAP compris) chargé à la demande.
+- Images : `width` et `height` (ou `aspect-ratio`) partout, `sizes` correct sur les cartes.
+
+### 9.3 Accessibilité
+
+- Navigation complète au clavier : en-tête, méga-menu, cartes, feuille, pied de page. Focus visible rouge partout.
+- Textes alternatifs : photos produits = nom du produit ; photos d'ambiance = `alt=""`.
+- Contrastes conformes aux règles M0 (pas de texte rouge sur fond `ink`, pas de gris moyen sur blanc).
+- Animations réduites : tout le contenu est visible et utilisable, rien ne bouge seul.
+
+### 9.4 Tests automatiques
+
+Ajoute des tests pour : `ProductCard` (épuisé, badges, propagation des clics), `favoritesStore`, `SizePicker` (taille épuisée non sélectionnable, ajout au panier), `Sheet` (fermeture par Échap), `Marquee` (contenu non dupliqué pour les lecteurs d'écran), et un test de rendu de l'accueil avec les mocks.
+
+---
+
+## 10. CRITÈRES D'ACCEPTATION ET RAPPORT
+
+### 10.1 Le module est terminé quand
+
+- [ ] L'accueil affiche ses 11 sections, avec de vraies données (mocks), à 360, 390, 768, 1024 et 1440 px.
+- [ ] Le rendu à 1440 px est reconnaissable comme une adaptation fidèle de la maquette.
+- [ ] Avec les photos de remplacement, la page reste élégante ; dès qu'on dépose de vraies photos aux bons emplacements, elles s'affichent sans toucher au code.
+- [ ] En-tête (ordinateur et mobile), méga-menu, barre basse, bouton WhatsApp et pied de page sont fonctionnels sur toutes les pages, y compris les pages encore provisoires.
+- [ ] Favoris et panier fonctionnent depuis les cartes (feuille de taille, badge animé, toast) et persistent après rechargement.
+- [ ] Les animations des sections 8.2 à 8.5 sont en place, fluides, et désactivées proprement en mode réduit.
+- [ ] Lint, typecheck, tests et build sont verts ; les objectifs Lighthouse sont atteints.
+- [ ] La section « Kit » de `/_dev` montre tous les composants.
+
+### 10.2 `RAPPORT_M1.md`
+
+1. Ce qui est livré, avec les captures à 390 px et 1440 px.
+2. Tableau de comparaison avec la maquette (section 9.1).
+3. Scores Lighthouse et poids des morceaux JavaScript.
+4. Jetons ajoutés dans `@theme`, et pourquoi.
+5. Liste des photos à fournir (section 4.1), avec celles qui manquent encore.
+6. Hypothèses et écarts par rapport à ce prompt.
+7. Idées pour les modules suivants (catalogue, fiche produit).
+
+---
+
+**Commence par la phase P1** : lis le projet, puis présente ton plan avant d'écrire le moindre composant.

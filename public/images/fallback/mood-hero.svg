@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000" width="1600" height="1000">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1A1A18" />
+      <stop offset="55%" stop-color="#2A2A27" />
+      <stop offset="100%" stop-color="#1A1A18" />
+    </linearGradient>
+    <radialGradient id="glow" cx="72%" cy="42%" r="48%">
+      <stop offset="0%" stop-color="#87888A" stop-opacity="0.26" />
+      <stop offset="60%" stop-color="#2A2A27" stop-opacity="0.08" />
+      <stop offset="100%" stop-color="#1A1A18" stop-opacity="0" />
+    </radialGradient>
+    <pattern id="barbed" width="240" height="120" patternUnits="userSpaceOnUse" patternTransform="rotate(-12)">
+      <line x1="0" y1="60" x2="240" y2="60" stroke="#87888A" stroke-width="1.5" stroke-opacity="0.12" />
+      <path d="M50 48 L70 72 M70 48 L50 72 M170 48 L190 72 M190 48 L170 72" stroke="#87888A" stroke-width="1.5" stroke-opacity="0.12" />
+    </pattern>
+  </defs>
+  <rect width="1600" height="1000" fill="url(#bg)" />
+  <rect width="1600" height="1000" fill="url(#glow)" />
+  <rect width="1600" height="1000" fill="url(#barbed)" />
+  <!-- Silhouette éditoriale abstraite à droite -->
+  <g opacity="0.22">
+    <path d="M1040 180 C1040 120 1130 120 1130 180 L1240 260 L1290 620 L1210 640 L1180 390 L1180 960 L990 960 L990 390 L960 640 L880 620 L930 260 Z" fill="#C6C7C8" />
+    <path d="M1230 240 C1230 190 1305 190 1305 240 L1390 310 L1430 620 L1365 635 L1340 420 L1340 960 L1190 960 L1190 420 Z" fill="#87888A" />
+  </g>
+  <text x="1520" y="880" text-anchor="end" fill="#FFFFFF" fill-opacity="0.06" font-family="sans-serif" font-weight="900" font-size="180" letter-spacing="-6">L'INCOMPRIS</text>
+</svg>

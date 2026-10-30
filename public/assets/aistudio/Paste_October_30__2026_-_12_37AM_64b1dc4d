@@ -1,0 +1,698 @@
+# PROMPT — MODULE M0 « FONDATIONS » — PWA DR CHOCO L'INCOMPRIS
+
+> À coller tel quel dans ton agent de code (Claude Code, Cursor…), à la racine d'un dossier vide.
+> Langue de travail : français. Code, noms de fichiers et identifiants : anglais. Textes visibles par l'utilisateur : français.
+
+---
+
+## 0. TON RÔLE
+
+Tu es un développeur front-end senior spécialisé en React, PWA mobile et animation (Motion + GSAP). Tu construis le **module M0 « Fondations »** de l'application client de **DR Choco L'Incompris**. Ce module ne contient presque aucun écran visible : il pose le socle technique, l'identité visuelle (jetons, police) et la configuration des animations sur lesquels les 10 modules suivants vont s'appuyer. **La qualité de ce module conditionne tout le reste** : sois rigoureux, propre et explicite.
+
+Avant d'écrire du code GSAP, installe et lis les skills officiels de GreenSock, puis respecte-les :
+
+```bash
+npx skills add https://github.com/greensock/gsap-skills
+```
+
+---
+
+## 1. LE PROJET EN BREF
+
+- **Client** : DR Choco L'Incompris, marque camerounaise d'accessoires pour hommes : **vêtements, chaussures et babouches**.
+- **Produit** : une **PWA de réservation**, pas une boutique à paiement automatique. Parcours : le client parcourt le catalogue → remplit son panier → se connecte par **numéro de téléphone + code OTP par SMS** au moment de réserver → réserve (le stock est bloqué 24 h maximum) → paie par **Mobile Money** (Orange Money / MTN MoMo, code marchand ou QR code) → **envoie la capture d'écran** du paiement → la boutique valide → préparation → livraison ou retrait en boutique → suivi par étapes.
+- **Utilisateurs** : à plus de 90 % sur **téléphone Android milieu de gamme** (Tecno, Infinix, Samsung A), souvent en **3G/4G instable**. Tout est conçu **mobile d'abord**, puis adapté à l'ordinateur.
+- **Ambiance visuelle** : streetwear premium, sombre, brute et contrastée. Hero sombre avec photo de mannequin en noir et blanc, grands titres en capitales grasses, tuiles de catégories sombres, cartes produits claires, un rouge vif rare et percutant. Objectif : une app **qui coupe le souffle, fluide, et qui donne envie de revenir**.
+- **Back-end** (développé en parallèle, hors de ce module) : API REST **Symfony 6.4/7**, authentification **JWT**, images produits sur **Cloudinary**, base MySQL/MariaDB. **L'API n'est pas encore prête** : tu travailles sur des **mocks (MSW)** qui respectent le contrat décrit en section 11.
+
+---
+
+## 2. PÉRIMÈTRE DU MODULE M0
+
+### 2.1 Ce que tu dois livrer
+
+1. Projet **Vite + React + TypeScript** initialisé, propre, avec qualité de code (ESLint, Prettier, Vitest).
+2. **Arborescence** complète de l'application (section 5).
+3. **Jetons de design** dans Tailwind CSS v4 : couleurs, typographie fluide, espacements, rayons, ombres, z-index, zones de sécurité (sections 6 et 7).
+4. **Police Archivo Variable** installée en local, avec ses axes de graisse et de largeur (section 7).
+5. **Fondations du mouvement** : jetons d'animation, fournisseur Motion (`LazyMotion` + `MotionConfig`), configuration GSAP, détection des animations réduites (section 8).
+6. **Routeur** avec toutes les routes client en pages provisoires chargées à la demande (section 9).
+7. **Couche API** : client `fetch` avec JWT, gestion d'erreurs, TanStack Query, clés de requêtes (section 10).
+8. **Contrat d'API** typé + **mocks MSW** avec données de démonstration (section 11).
+9. **Stores Zustand** : session et panier, persistés de façon sûre (section 12).
+10. **Utilitaires** : prix en FCFA, téléphone +237, URL Cloudinary, haptique, stockage sûr, `cn()` (section 13).
+11. **Types métier** et métadonnées des statuts de réservation (section 14).
+12. **Page de contrôle `/_dev`** qui prouve que tout fonctionne : couleurs, typographie, Motion, GSAP, mocks, animations réduites (section 15).
+13. **Tests**, build et **déploiement de prévisualisation** (sections 16 et 17).
+14. Un **rapport final** (section 19).
+
+### 2.2 Ce qui est HORS périmètre (ne pas faire)
+
+- Le kit de composants (boutons, cartes, champs…) → **M1**.
+- Les composants animés réutilisables (`Reveal`, `Sheet`, `Toast`, transitions de page abouties) → **M2**.
+- En-tête, barre de navigation basse, manifeste PWA, service worker, installation → **M3**.
+- Tous les vrais écrans (accueil, catalogue, panier…) → **M4 et suivants**.
+
+Si tu as envie d'aller plus loin, **arrête-toi** et note l'idée dans le rapport final.
+
+---
+
+## 3. WORKFLOW OBLIGATOIRE
+
+Travaille **phase par phase**, dans cet ordre. À la fin de **chaque** phase :
+
+1. lance `npm run lint`, `npm run typecheck` et `npm run build` ; corrige tout avant de continuer ;
+2. fais un commit au format Conventional Commits (`chore:`, `feat:`, `test:`, `docs:`) ;
+3. écris 3 à 5 lignes de résumé : ce qui est fait, ce qui reste, les décisions prises.
+
+| Phase | Contenu | Sections |
+| --- | --- | --- |
+| P1 | Initialisation Vite + TS, dépendances, scripts, ESLint, Prettier, alias `@/` | 4 |
+| P2 | Arborescence, `index.html`, variables d'environnement | 5, 4.4 |
+| P3 | Tailwind v4, jetons, CSS de base, police Archivo, typographie fluide | 6, 7 |
+| P4 | Fondations du mouvement (Motion + GSAP + animations réduites) | 8 |
+| P5 | Routeur, mise en page racine, pages provisoires chargées à la demande | 9 |
+| P6 | Types, utilitaires, couche API, TanStack Query, stores Zustand | 10, 12, 13, 14 |
+| P7 | Contrat d'API, mocks MSW, données de démonstration | 11 |
+| P8 | Page `/_dev` | 15 |
+| P9 | Tests, mesure du poids, déploiement de prévisualisation, README, rapport | 16, 17, 18, 19 |
+
+**Règles de conduite :**
+
+- **Pas d'invention silencieuse.** Quand une information manque (contrat d'API, choix produit), prends l'hypothèse la plus raisonnable, **marque-la `// HYPOTHÈSE:`** dans le code et liste-la dans le rapport.
+- **Pas de dépendance non listée** sans justification écrite dans le rapport.
+- **Versions** : installe les dernières versions stables. Si une version majeure diffère de celles indiquées ici et change l'API, suis la documentation officielle et signale-le.
+- **TypeScript strict** : pas de `any` (sauf exception commentée).
+- **Accessibilité dès le départ** : `lang="fr"`, contrastes, focus visible, animations réduites.
+- **Tout doit fonctionner à 390 px de large** (iPhone 12-15) et à 360 px (Android courant).
+
+---
+
+## 4. STACK, INSTALLATION ET CONFIGURATION
+
+### 4.1 Pile technique
+
+| Rôle | Outil | Version de référence |
+| --- | --- | --- |
+| Build | Vite | 8.x |
+| UI | React + React DOM | 19.x |
+| Langage | TypeScript (strict) | 5.x |
+| Styles | Tailwind CSS v4 + `@tailwindcss/vite` | 4.x |
+| Routage | React Router (paquet `react-router`) | 7.x |
+| Données serveur | TanStack Query (+ devtools en dev) | 5.x |
+| État local | Zustand (avec `persist`) | 5.x |
+| Animation d'interface | Motion (`motion/react`) | 14.x |
+| Mise en scène | GSAP + `@gsap/react` | 3.15 / 2.1 |
+| Police | `@fontsource-variable/archivo` | dernière |
+| Icônes | `lucide-react` | dernière |
+| Classes | `clsx` + `tailwind-merge` | dernières |
+| Mocks API | MSW | 2.x |
+| Tests | Vitest + Testing Library + jsdom | dernières |
+| Qualité | ESLint (flat config) + Prettier + `prettier-plugin-tailwindcss` | dernières |
+| Analyse du poids | `rollup-plugin-visualizer` | dernière |
+
+GSAP et **tous ses plugins** (ScrollTrigger, SplitText, DrawSVG…) sont **gratuits** et inclus dans le paquet public `gsap`. Pas de registre privé.
+
+### 4.2 Commandes
+
+```bash
+npm create vite@latest drchoco-app -- --template react-ts
+cd drchoco-app
+npm install
+npm install react-router @tanstack/react-query zustand motion gsap @gsap/react \
+  @fontsource-variable/archivo lucide-react clsx tailwind-merge
+npm install -D tailwindcss @tailwindcss/vite @tanstack/react-query-devtools msw \
+  vitest @testing-library/react @testing-library/jest-dom @testing-library/user-event jsdom \
+  prettier prettier-plugin-tailwindcss rollup-plugin-visualizer
+npx msw init public/ --save
+```
+
+### 4.3 `vite.config.ts`
+
+- Plugins : `react()`, `tailwindcss()`, et `visualizer()` seulement quand `ANALYZE=true`.
+- Alias : `@` → `./src`, à déclarer aussi dans `tsconfig.app.json` (`paths`).
+- Serveur : port **5173**, `host: true` pour tester depuis un vrai téléphone sur le même Wi-Fi.
+- Build : `target: 'es2020'`, `sourcemap: true` ; laisse Vite découper le code par route (pas de `manualChunks` agressif). Seule exception : isole `gsap` dans son propre morceau pour qu'il ne soit jamais chargé au démarrage.
+- Vitest : `environment: 'jsdom'`, `setupFiles: './src/test/setup.ts'`, `globals: true`.
+
+### 4.4 Variables d'environnement
+
+Crée `.env.example` (versionné) et `.env.local` (ignoré par git) :
+
+```dotenv
+VITE_API_BASE_URL=http://localhost:8000/api
+VITE_API_MOCK=true
+VITE_CLOUDINARY_CLOUD_NAME=demo
+VITE_APP_NAME="DR Choco L'Incompris"
+VITE_SHOP_WHATSAPP=+237600000000
+```
+
+Crée `src/lib/env.ts` : il lit et **valide** ces variables au démarrage et lève une erreur lisible si l'une manque. Ce fichier exporte un objet `env` typé. Le reste du code ne lit jamais `import.meta.env` directement.
+
+### 4.5 Scripts `package.json`
+
+`dev`, `build` (`tsc -b && vite build`), `preview`, `lint`, `lint:fix`, `format`, `typecheck` (`tsc -b --noEmit`), `test`, `test:watch`, `analyze` (`ANALYZE=true vite build`).
+
+### 4.6 Qualité
+
+- ESLint : règles recommandées TS + React Hooks + React Refresh ; `no-console` en avertissement (sauf `warn` et `error`).
+- Prettier : `singleQuote: true`, `semi: true`, `printWidth: 100`, plugin Tailwind pour trier les classes.
+- `.editorconfig` et `.gitignore` propres (`node_modules`, `dist`, `.env.local`, `stats.html`).
+
+---
+
+## 5. ARBORESCENCE
+
+```
+drchoco-app/
+├─ index.html
+├─ public/
+│  ├─ mockServiceWorker.js          (généré par MSW)
+│  ├─ favicon.svg                   (provisoire : carré anthracite avec un "C" blanc)
+│  └─ mock/                         (images SVG de démonstration pour les mocks)
+├─ src/
+│  ├─ main.tsx                      (démarrage : mocks éventuels, puis rendu)
+│  ├─ app/
+│  │  ├─ App.tsx                    (assemble les fournisseurs + RouterProvider)
+│  │  ├─ providers.tsx              (QueryClient, MotionProvider)
+│  │  ├─ router.tsx                 (toutes les routes)
+│  │  └─ layouts/
+│  │     └─ RootLayout.tsx          (Outlet, ScrollRestoration, emplacements réservés M3)
+│  ├─ pages/                        (une page provisoire par écran, voir section 9)
+│  ├─ features/                     (vide pour l'instant, un dossier par domaine)
+│  │  ├─ catalog/  auth/  cart/  reservation/  payment/  tracking/  favorites/  profile/
+│  ├─ components/
+│  │  └─ ui/                        (vide : kit M1)
+│  ├─ motion/
+│  │  ├─ tokens.ts                  (durées, courbes, ressorts, décalages)
+│  │  ├─ presets.ts                 (variants Motion prêts à l'emploi)
+│  │  ├─ MotionProvider.tsx         (LazyMotion + MotionConfig)
+│  │  ├─ features.ts                (domMax, chargé à la demande)
+│  │  └─ useReducedMotionPref.ts    (hook animations réduites)
+│  ├─ lib/
+│  │  ├─ env.ts
+│  │  ├─ gsap.ts                    (enregistrement unique des plugins)
+│  │  ├─ api/
+│  │  │  ├─ client.ts               (fetch + JWT + erreurs)
+│  │  │  ├─ endpoints.ts            (chemins de l'API)
+│  │  │  ├─ queryClient.ts
+│  │  │  └─ queryKeys.ts
+│  │  └─ utils/
+│  │     ├─ cn.ts  price.ts  phone.ts  cloudinary.ts  haptics.ts  storage.ts  date.ts
+│  ├─ stores/
+│  │  ├─ authStore.ts
+│  │  └─ cartStore.ts
+│  ├─ types/
+│  │  ├─ domain.ts                  (Product, Variant, Reservation…)
+│  │  ├─ api.ts                     (formes des réponses de l'API)
+│  │  └─ reservationStatus.ts       (statuts + libellés + tons + icônes)
+│  ├─ mocks/
+│  │  ├─ browser.ts
+│  │  ├─ handlers.ts
+│  │  └─ fixtures/  categories.ts  products.ts  settings.ts
+│  ├─ styles/
+│  │  └─ index.css                  (Tailwind + jetons + base)
+│  ├─ dev/
+│  │  └─ DevPage.tsx                (page /_dev, uniquement en développement)
+│  └─ test/
+│     └─ setup.ts
+├─ .env.example
+├─ README.md
+└─ RAPPORT_M0.md
+```
+
+### 5.1 `index.html`
+
+- `<html lang="fr">`
+- `<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">`. Ne bloque jamais le zoom.
+- `<meta name="theme-color" content="#1A1A18">`
+- `<title>DR Choco L'Incompris</title>` et une `<meta name="description">` : « Vêtements, chaussures et babouches pour hommes. Réservez en ligne, payez par Mobile Money. »
+- `<body>` avec `background:#FFFFFF` en style inline minimal pour éviter un flash au chargement.
+- Pas de polices externes (Google Fonts interdit) : tout est servi en local.
+
+---
+
+## 6. JETONS DE DESIGN (Tailwind CSS v4)
+
+Tout vit dans `src/styles/index.css`, avec `@import "tailwindcss";` puis un bloc `@theme`. **Aucune couleur en dur ailleurs dans le code** : uniquement ces jetons.
+
+### 6.1 Couleurs de la charte (imposées par le client)
+
+| Jeton Tailwind | Code | Rôle |
+| --- | --- | --- |
+| `--color-ink` | `#1A1A18` | Anthracite : texte principal, header, hero, tuiles de catégories, footer, boutons secondaires |
+| `--color-red` | `#E31E24` | Rouge vif : bouton « Réserver », badge du panier, onglet actif, badge de stock, focus |
+| `--color-grey` | `#87888A` | Gris moyen : texte secondaire et icônes **sur fond anthracite uniquement** |
+| `--color-silver` | `#C6C7C8` | Gris clair : bordures, séparateurs, squelettes, texte sur fond sombre |
+| `--color-white` | `#FFFFFF` | Fond principal |
+
+### 6.2 Nuances techniques (dérivées, pas de nouvelles couleurs de marque)
+
+| Jeton | Code | Rôle | Contraste mesuré |
+| --- | --- | --- | --- |
+| `--color-surface` | `#F4F4F3` | Fond des photos produits et zones groupées | anthracite dessus : 15,8 |
+| `--color-ink-2` | `#2A2A27` | Cartes et feuilles posées sur fond anthracite | gris clair dessus : 8,5 |
+| `--color-text-2` | `#6B6C6E` | Texte secondaire **sur blanc** | 5,26 |
+| `--color-success` | `#17733F` | Confirmée, livrée | 5,9 |
+| `--color-warning` | `#9A5B00` | En attente de validation | 5,43 |
+| `--color-danger` | `#E31E24` | Rejet, expiration, erreurs (toujours avec une icône et un libellé) | 4,69 |
+
+### 6.3 Règles de contraste (à documenter en commentaire dans le CSS)
+
+- Jamais de **texte rouge sur fond anthracite** (3,72, insuffisant). Sur fond sombre, le rouge sert de fond de bouton avec du texte blanc.
+- Jamais de **gris moyen pour du texte sur blanc** (3,55) : utiliser `text-2`.
+- Jamais de **gris clair pour du texte sur blanc** (1,69).
+- Répartition visée : environ 60 % de blanc ou surface, 30 % d'anthracite, 10 % de rouge.
+
+### 6.4 Autres jetons
+
+- **Espacements** : échelle Tailwind par défaut (base 4 px). Marges latérales de page : utilitaire `px-page` = `clamp(1rem, 0.6rem + 1.6vw, 3.5rem)`. Espace entre sections : `py-section` = `clamp(3rem, 1.9rem + 4.6vw, 6rem)`.
+- **Rayons** : `--radius-sm: 6px`, `--radius-md: 8px` (boutons, cartes, champs), `--radius-sheet: 20px` (haut des feuilles), `--radius-full: 9999px` (badges, filtres).
+- **Ombres** (rares, comme sur la maquette) : `--shadow-nav` pour la barre basse et `--shadow-sheet` pour les feuilles. Ombres douces et sombres, jamais colorées.
+- **Z-index** nommés : `base 0`, `sticky 20`, `header 30`, `nav 40`, `overlay 50`, `sheet 60`, `toast 70`, `cursor 80`.
+- **Points de rupture** : ceux de Tailwind par défaut (sm 640, md 768, lg 1024, xl 1280). Largeur de contenu maximale : 1280 px (`max-w-content`).
+- **Zones de sécurité** : utilitaires `pt-safe`, `pb-safe`, `pl-safe`, `pr-safe` basés sur `env(safe-area-inset-*)`.
+- **Hauteurs fixes** : `--header-h: 56px`, `--bottom-nav-h: 64px`, `--action-bar-h: 72px`.
+
+### 6.5 CSS de base (`@layer base`)
+
+- `html` : `-webkit-tap-highlight-color: transparent`, `text-size-adjust: 100%`, `scroll-behavior: smooth` seulement si les animations ne sont pas réduites.
+- `body` : fond blanc, couleur `ink`, police Archivo, `-webkit-font-smoothing: antialiased`, `font-synthesis: none`, `min-height: 100dvh`.
+- Champs (`input`, `select`, `textarea`) : `font-size: 16px` minimum, sinon l'iPhone zoome.
+- `:focus-visible` : contour de 2 px `red`, décalage de 2 px. Jamais `outline: none` sans remplacement.
+- `::selection` : fond `red`, texte blanc.
+- `img` : `display: block`, `max-width: 100%`.
+- Bloc `@media (prefers-reduced-motion: reduce)` qui ramène `animation-duration` et `transition-duration` à `0.01ms` et désactive `scroll-behavior: smooth`.
+- Utilitaire `tabular-nums` pour tous les prix et compteurs.
+
+---
+
+## 7. TYPOGRAPHIE
+
+### 7.1 Police
+
+- Une seule famille : **Archivo Variable**, installée avec `@fontsource-variable/archivo`.
+- Importe la version qui contient **l'axe de largeur `wdth` en plus de la graisse** (selon le paquet : `wdth.css` ou `full.css`). Vérifie dans `node_modules/@fontsource-variable/archivo` quel fichier expose les deux axes et justifie ton choix dans le rapport.
+- L'import se fait **une seule fois**, en haut de `main.tsx`.
+- Déclare la pile dans `@theme` : `--font-sans: 'Archivo Variable', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;`.
+- Graisses utilisées : 400 (texte), 600 (noms, étiquettes), 700 (titres de section, prix), 800 (display, titre 1).
+- Largeur : `font-stretch: 75%` (condensé) pour les titres display et titre 1 ; `100%` partout ailleurs.
+
+### 7.2 Échelle fluide (calculée entre 390 px et 1440 px de large)
+
+Crée ces utilitaires avec `@utility` :
+
+| Utilitaire | Taille fluide | Réglages |
+| --- | --- | --- |
+| `text-display` | `clamp(2.75rem, 1.543rem + 4.952vw, 6rem)` (44 → 96 px) | 800, capitales, `line-height: 0.92`, `letter-spacing: -0.03em`, `font-stretch: 75%` |
+| `text-h1` | `clamp(1.75rem, 1.471rem + 1.143vw, 2.5rem)` (28 → 40 px) | 800, capitales, `line-height: 1`, `letter-spacing: -0.02em`, `font-stretch: 75%` |
+| `text-h2` | `clamp(1.375rem, 1.236rem + 0.571vw, 1.75rem)` (22 → 28 px) | 700, capitales, `line-height: 1.1` |
+| `text-h3` | `clamp(1rem, 0.954rem + 0.19vw, 1.125rem)` (16 → 18 px) | 600, `line-height: 1.3` |
+| `text-body` | 16 px | 400, `line-height: 1.5` |
+| `text-small` | 14 px | 400, `line-height: 1.45` |
+| `text-label` | 12 px | 600, capitales, `letter-spacing: 0.08em` |
+| `text-price` | hérite de la taille | 700, `tabular-nums` |
+
+Ajoute la classe `.mask-line` (`display: block; overflow: hidden; padding-block: 0.1em; margin-block: -0.1em;`) : elle servira aux révélations de titres ligne par ligne sans couper les lettres g, p et q.
+
+---
+
+## 8. FONDATIONS DU MOUVEMENT
+
+### 8.1 Principe directeur
+
+- **Motion** anime toute l'interface **pilotée par l'état** : pages, feuilles, panier, statuts, onglets, retours d'appui, apparitions.
+- **GSAP** met en scène **5 moments forts** (modules suivants) : titre du hero (SplitText), section « Comment ça marche » (ScrollTrigger + scrub), article qui vole vers le panier, écran de succès (DrawSVG), frise de suivi.
+- **Règle absolue** : un élément = **un seul animateur**. Jamais Motion et GSAP sur la même balise.
+- **Seulement `transform` et `opacity`** (`x`, `y`, `scale`, `rotate`, `opacity` ou `autoAlpha`). Jamais `width`, `height`, `top`, `left`, `margin`.
+- Objectif : **60 images/seconde sur un Android milieu de gamme**.
+- **Pas de Lenis** ni de défilement simulé : le défilement natif est plus fluide sur mobile et ne gêne pas les formulaires.
+
+### 8.2 `src/motion/tokens.ts`
+
+Exporte, typés et `as const` :
+
+```ts
+export const duration = {
+  tap: 0.12,      // enfoncement d'un bouton ou d'une carte
+  fast: 0.2,      // bascule d'onglet, cœur favori, badge
+  base: 0.35,     // feuilles, changement de page, mini-panier
+  reveal: 0.7,    // apparition de blocs au défilement
+  story: 1,       // titre du hero, écran de succès
+  curtain: 0.7,   // recherche plein écran, rideaux
+} as const;
+
+export const ease = {
+  out: [0.22, 1, 0.36, 1],     // "douce à l'arrivée" : apparitions
+  inOut: [0.76, 0, 0.24, 1],   // rideaux, plein écran
+  soft: 'easeOut',             // retours rapides
+} as const;
+
+export const gsapEase = {
+  out: 'power4.out',
+  base: 'power3.out',
+  inOut: 'power3.inOut',
+  soft: 'power2.out',
+  elastic: 'elastic.out(1, 0.4)',
+} as const;
+
+export const spring = {
+  sheet: { type: 'spring', stiffness: 400, damping: 34 },
+  snappy: { type: 'spring', stiffness: 500, damping: 30 },
+  bounce: { type: 'spring', stiffness: 600, damping: 15 }, // badge du panier
+} as const;
+
+export const staggerStep = 0.06;
+export const pressScale = 0.97;
+```
+
+### 8.3 `src/motion/presets.ts`
+
+Variants prêts à l'emploi, construits **uniquement** à partir des jetons :
+
+- `fadeUp` : `hidden { opacity: 0, y: 24 }` → `visible { opacity: 1, y: 0 }` (durée `reveal`, courbe `out`).
+- `fade` : opacité seule (durée `fast`).
+- `staggerContainer(step = staggerStep)` : parent qui décale ses enfants avec `delayChildren: stagger(step)`.
+- `lineReveal` : `hidden { y: '120%' }` → `visible { y: '0%' }` (durée `story`, courbe `out`), à utiliser dans `.mask-line`.
+- `pageSlide` : entrée depuis la droite (`x: '100%'` → `0`), sortie vers `x: '-20%'` avec léger fondu (ressort `sheet`).
+- `pageFade` : fondu croisé de 0,2 s pour les changements d'onglet.
+- `sheetUp` : de `y: '100%'` à `0` (ressort `sheet`).
+- `pressable` : objet de props `{ whileTap: { scale: pressScale }, transition: { duration: duration.tap } }`.
+
+### 8.4 `src/motion/MotionProvider.tsx`
+
+- Enveloppe l'application dans `<MotionConfig reducedMotion="user">` puis `<LazyMotion features={loadFeatures} strict>`.
+- `loadFeatures` charge **à la demande** `src/motion/features.ts`, qui exporte `domMax` par défaut. On a besoin de `domMax` (et non de `domAnimation`) parce que les modules suivants utilisent `layout`, `layoutId` et `drag`.
+- Avec `strict`, on écrit **toujours** `m.div` (`import * as m from 'motion/react-m'`), jamais `motion.div`. Documente cette règle en tête du fichier.
+
+### 8.5 `src/motion/useReducedMotionPref.ts`
+
+- Hook qui suit `matchMedia('(prefers-reduced-motion: reduce)')` **en direct** (écoute du changement) et renvoie un booléen.
+- Exporte aussi `prefersReducedMotion()` (lecture ponctuelle) pour le code GSAP.
+
+### 8.6 `src/lib/gsap.ts`
+
+```ts
+import gsap from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { SplitText } from 'gsap/SplitText';
+import { DrawSVGPlugin } from 'gsap/DrawSVGPlugin';
+import { useGSAP } from '@gsap/react';
+
+gsap.registerPlugin(useGSAP, ScrollTrigger, SplitText, DrawSVGPlugin);
+gsap.defaults({ ease: 'power3.out', duration: 0.6 });
+
+export { gsap, ScrollTrigger, SplitText, DrawSVGPlugin, useGSAP };
+```
+
+**Règles à écrire en commentaire dans ce fichier et à respecter dans tout le projet :**
+
+1. Ce fichier est **le seul** endroit où les plugins sont enregistrés.
+2. Il n'est importé **que** par des composants chargés à la demande (pages ou sections lazy). Il ne doit **jamais** faire partie du chargement initial. Vérifie-le avec `npm run analyze`.
+3. Dans un composant : **toujours** `useGSAP(() => { … }, { scope: ref })`. Jamais de sélecteur global, jamais `useEffect` pour GSAP.
+4. Toute animation déclenchée par un événement (appui, clic) passe par `contextSafe`.
+5. Chaque effet commence par `if (prefersReducedMotion()) return;` ou affiche directement l'état final.
+6. `autoAlpha` plutôt que `opacity` pour les apparitions et disparitions.
+7. `ScrollTrigger.refresh()` uniquement après un vrai changement de mise en page (images chargées), jamais à chaque redimensionnement.
+8. `gsap.matchMedia()` pour réserver les effets lourds aux grands écrans.
+9. `markers: true` seulement pendant le réglage, jamais en production.
+
+### 8.7 Retour haptique (`src/lib/utils/haptics.ts`)
+
+`haptic(pattern: 'light' | 'success' | 'error')` appelle `navigator.vibrate` avec respectivement `10`, `[10, 40, 10]` et `[30, 40, 30]`, **seulement si** l'API existe et que les animations ne sont pas réduites. Ne lève jamais d'erreur (l'iPhone ne la supporte pas dans le navigateur).
+
+---
+
+## 9. ROUTAGE
+
+### 9.1 Mise en place
+
+- `createBrowserRouter` + `RouterProvider` (React Router 7).
+- Chaque page est chargée à la demande via la propriété `lazy` de la route, qui renvoie `{ Component }`.
+- `RootLayout` contient : `<Outlet />`, `<ScrollRestoration />` et deux **emplacements réservés commentés** pour l'en-tête et la barre de navigation basse (module M3).
+- Prévois un `errorElement` simple et lisible (« Oups, quelque chose s'est mal passé » + bouton « Revenir à l'accueil »).
+- Un fallback de chargement neutre : fond blanc avec une fine barre anthracite animée en haut, **jamais d'écran blanc vide**.
+
+### 9.2 Routes
+
+| Chemin | Page provisoire | Écran du document de design |
+| --- | --- | --- |
+| `/` | `HomePage` | 5.2 Accueil |
+| `/explorer` et `/explorer/:category` | `ExplorePage` | 5.3 Catalogue |
+| `/recherche` | `SearchPage` | 5.4 Recherche |
+| `/produit/:slug` | `ProductPage` | 5.6 Fiche produit |
+| `/favoris` | `FavoritesPage` | 5.15 Favoris |
+| `/panier` | `CartPage` | 5.7 Panier |
+| `/reservation` | `CheckoutPage` | 5.9 Réservation |
+| `/reservation/:ref/paiement` | `PaymentPage` | 5.10 Paiement |
+| `/reservation/:ref/preuve` | `ProofPage` | 5.11 Envoi de la preuve |
+| `/reservation/:ref/merci` | `SuccessPage` | 5.12 Succès |
+| `/reservations` | `ReservationsPage` | 5.13 Mes réservations |
+| `/reservations/:ref` | `ReservationDetailPage` | 5.14 Détail |
+| `/profil` | `ProfilePage` | 5.16 Profil |
+| `/pages/:slug` | `LegalPage` | 5.17 Pages légales |
+| `/hors-ligne` | `OfflinePage` | 5.17 |
+| `/_dev` | `DevPage` (**uniquement si `import.meta.env.DEV`**) | — |
+| `*` | `NotFoundPage` | 5.17 |
+
+La connexion OTP n'a **pas de route** : ce sera une feuille montante (module M5).
+
+Chaque page provisoire affiche : le nom de l'écran en `text-h1`, son numéro de section, ses paramètres d'URL s'il y en a, et un lien de retour vers l'accueil. Utilise un composant commun `PlaceholderPage` dans `src/pages/_PlaceholderPage.tsx`. Chaque page porte un `<title>` adapté (`Panier · DR Choco`), via un petit hook `useDocumentTitle`.
+
+---
+
+## 10. COUCHE API
+
+### 10.1 `src/lib/api/client.ts`
+
+Un client `fetch` maison, sans axios :
+
+- URL de base issue de `env.apiBaseUrl`.
+- En-têtes : `Accept: application/json`, `Content-Type: application/json` (sauf `FormData`), `Authorization: Bearer <token>` si un jeton existe dans `authStore`.
+- **Délai d'attente de 15 s** avec `AbortController` (30 s pour l'envoi de fichiers).
+- **Erreurs normalisées** en une classe `ApiError { status, code, message, details }`. Messages en français pour l'utilisateur : réseau indisponible, délai dépassé, session expirée, erreur serveur.
+- **401** : tente une seule fois `POST /auth/refresh`, puis rejoue la requête ; en cas d'échec, vide la session et laisse l'appelant gérer.
+- Fonctions exportées : `api.get<T>()`, `api.post<T>()`, `api.patch<T>()`, `api.delete<T>()`, `api.upload<T>(path, formData, { onProgress? })`. L'envoi avec progression utilise `XMLHttpRequest`, car `fetch` ne remonte pas la progression d'envoi : il servira à l'anneau de chargement de la preuve de paiement.
+- `// HYPOTHÈSE:` stratégie de jeton à confirmer avec le back-end Symfony. Recommandation : jeton d'accès en mémoire, jeton de rafraîchissement en cookie `httpOnly` (session longue d'environ 90 jours, donc pas de nouvel OTP à chaque visite). Isole cette logique dans `authStore` pour pouvoir la changer sans toucher au reste.
+
+### 10.2 `src/lib/api/queryClient.ts`
+
+```ts
+new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 60_000,
+      gcTime: 10 * 60_000,
+      refetchOnWindowFocus: false,
+      networkMode: 'offlineFirst',
+      retry: (count, error) => !(error instanceof ApiError && error.status < 500) && count < 2,
+    },
+    mutations: { networkMode: 'offlineFirst', retry: 0 },
+  },
+});
+```
+
+Les devtools TanStack Query s'affichent uniquement en développement.
+
+### 10.3 `src/lib/api/queryKeys.ts`
+
+Une fabrique de clés, par exemple :
+`qk.categories()`, `qk.products(filters)`, `qk.product(slug)`, `qk.settings()`, `qk.me()`, `qk.reservations()`, `qk.reservation(ref)`, `qk.favorites()`, `qk.cities()`, `qk.agencies(city)`.
+
+---
+
+## 11. CONTRAT D'API (HYPOTHÈSE) ET MOCKS
+
+### 11.1 Points d'accès (`src/lib/api/endpoints.ts`)
+
+Toutes les routes sont préfixées par `VITE_API_BASE_URL`. **Hypothèse à faire valider par le back-end.**
+
+| Méthode | Chemin | Usage |
+| --- | --- | --- |
+| POST | `/auth/otp/request` `{ phone }` | Envoi du code OTP |
+| POST | `/auth/otp/verify` `{ phone, code }` → `{ accessToken, user }` | Connexion |
+| POST | `/auth/refresh` | Nouveau jeton d'accès |
+| POST | `/auth/logout` | Déconnexion |
+| GET / PATCH | `/me` | Profil |
+| GET / POST / PATCH / DELETE | `/me/addresses` | Adresses enregistrées |
+| GET | `/categories` | Catégories et sous-catégories |
+| GET | `/products?category=&q=&size=&minPrice=&maxPrice=&available=&sort=&page=` | Liste paginée |
+| GET | `/products/:slug` | Fiche produit avec variantes |
+| GET | `/delivery/cities` | Villes et tarifs de livraison |
+| GET | `/delivery/agencies?city=` | Agences de transport |
+| GET | `/settings/public` | Codes marchands, QR code, WhatsApp, délai d'expiration, adresse de retrait |
+| POST | `/reservations` | Créer une réservation |
+| GET | `/reservations` et `/reservations/:ref` | Liste et détail ; le détail inclut `packagePhotos` et `packageReadyAt` (photo du colis prêt) |
+| POST | `/reservations/:ref/proof` (multipart) | Envoi de la capture |
+| POST | `/reservations/:ref/cancel` | Annulation |
+| GET / POST / DELETE | `/favorites` | Favoris |
+| POST | `/push/subscribe` | Abonnement aux notifications |
+
+### 11.2 Mocks MSW
+
+- `src/mocks/browser.ts` : `setupWorker(...handlers)`.
+- Dans `main.tsx` : si `import.meta.env.DEV && env.apiMock`, démarre le worker (`onUnhandledRequest: 'bypass'`) **avant** le rendu.
+- Dans ce module, implémente les gestionnaires de : `GET /categories`, `GET /products` (filtres, tri, pagination de 12), `GET /products/:slug`, `GET /settings/public`, `POST /auth/otp/request` et `POST /auth/otp/verify` (le code `123456` est valide, tout autre code renvoie une erreur 422).
+- Ajoute aussi `GET /reservations/:ref` avec 3 réservations de démonstration : `RES-000101` (statut `pending_validation`, sans photo), `RES-000102` (statut `ready_for_pickup`, avec 2 photos de colis emballé en SVG local dans `public/mock/colis-*.svg`) et `RES-000103` (statut `payment_rejected`, avec un motif de rejet).
+- Ajoute une **latence simulée** aléatoire de 300 à 900 ms, pour voir les états de chargement comme sur un vrai réseau mobile.
+
+### 11.3 Données de démonstration
+
+- 3 catégories : `vetements` (sous-catégories T-shirts, Hoodies, Pantalons), `chaussures`, `babouches`.
+- **24 produits** réalistes, prix en FCFA entre 8 000 et 65 000, avec 1 à 5 images, 1 à 4 couleurs, des tailles (S à XXL pour les vêtements, 39 à 46 pour les chaussures et babouches) et un stock par variante. Certains produits ont un stock à 0 ou à 1-2, d'autres sont marqués comme nouveautés.
+- Images : **SVG locaux** dans `public/mock/` (silhouettes simples de vêtements sur fond `#F4F4F3`, format 4:5), pour ne dépendre d'aucun service externe.
+- Paramètres publics : opérateurs `orange` et `mtn` avec un code marchand fictif, numéro WhatsApp fictif, délai d'expiration `24` heures, adresse de retrait fictive à Douala.
+
+---
+
+## 12. STORES ZUSTAND
+
+### 12.1 `authStore`
+
+État : `accessToken: string | null`, `user: User | null`, `status: 'unknown' | 'authenticated' | 'guest'`.
+Actions : `setSession()`, `clearSession()`, `getToken()`.
+Persistance : seulement `user` (pas le jeton si la stratégie cookie est retenue ; voir 10.1).
+
+### 12.2 `cartStore`
+
+État : `items: CartItem[]` (`productId`, `slug`, `name`, `image`, `variantId`, `size`, `color`, `unitPrice`, `quantity`, `maxQuantity`).
+Actions : `add()` (fusionne si la variante existe déjà, plafonnée par `maxQuantity`), `remove()`, `setQuantity()`, `clear()`.
+Sélecteurs : `count`, `subtotal`.
+Persistance : `localStorage` via `persist` + `createJSONStorage`, nom `drchoco-cart`, avec `version: 1` et une fonction `migrate`.
+
+### 12.3 Stockage sûr (`src/lib/utils/storage.ts`)
+
+Enveloppe `localStorage` dans des `try/catch` : navigation privée, stockage plein ou bloqué. En cas d'échec, l'app continue de fonctionner avec un stockage en mémoire.
+
+---
+
+## 13. UTILITAIRES (`src/lib/utils/`)
+
+| Fichier | Fonction | Comportement attendu |
+| --- | --- | --- |
+| `cn.ts` | `cn(...classes)` | `clsx` + `tailwind-merge` |
+| `price.ts` | `formatPrice(45000)` | `"45 000 FCFA"` avec espaces insécables fines (`Intl.NumberFormat('fr-FR')` + ` FCFA`). Pas de décimales. |
+| `phone.ts` | `normalizeCmPhone()`, `formatCmPhone()`, `isValidCmPhone()` | Accepte `6XXXXXXXX`, `+2376…`, `002376…`, avec ou sans espaces ; renvoie `+2376XXXXXXXX`. Affichage : `6XX XX XX XX`. Valide : 9 chiffres commençant par 6. |
+| `cloudinary.ts` | `cloudinaryUrl(publicId, { w, h, crop, blur })` | Construit l'URL avec `f_auto,q_auto`, la largeur, `c_fill` par défaut, et une version floue minuscule (`w_24,e_blur:1000`) pour le chargement. Renvoie l'URL telle quelle si c'est déjà une URL complète (mocks). |
+| `cloudinary.ts` | `cloudinarySrcSet(publicId, [320, 480, 640, 960])` | Génère `srcSet` et `sizes` pour les cartes en 2 colonnes sur mobile. |
+| `haptics.ts` | `haptic()` | Voir 8.7 |
+| `date.ts` | `formatDate()`, `formatRelative()`, `formatCountdown(ms)` | En français (`Intl.DateTimeFormat('fr-FR')`, `Intl.RelativeTimeFormat('fr')`) ; compte à rebours `"23 h 58 min"` |
+| `storage.ts` | `safeStorage` | Voir 12.3 |
+
+Chaque utilitaire a ses **tests unitaires** (section 16).
+
+---
+
+## 14. TYPES MÉTIER
+
+### 14.1 `src/types/domain.ts`
+
+Définis au minimum : `Category`, `Product` (`id`, `slug`, `name`, `description`, `categorySlug`, `price`, `images[]`, `colors[]`, `sizes[]`, `variants[]`, `isNew`, `createdAt`), `ProductVariant` (`id`, `size`, `colorCode`, `stock`), `ProductColor` (`code`, `name`, `hex`), `User`, `Address`, `DeliveryCity` (`id`, `name`, `fee`, `isLocal`), `Agency`, `PublicSettings`, `CartItem`, `Reservation`, `ReservationItem`, `ReservationTimelineStep`, `PackagePhoto`, `ReceptionMode = 'delivery' | 'pickup'`, `Paginated<T>`.
+
+**Photo du colis prêt** (fonctionnalité demandée par le client) : quand la commande est emballée, le gérant envoie 1 à 3 photos du colis, et le client les voit dans le détail de sa réservation.
+
+- `PackagePhoto` : `{ id: string; url: string; thumbnailUrl: string; width: number; height: number; takenAt: string /* ISO */ }`.
+- `Reservation` porte `packagePhotos: PackagePhoto[]` (vide tant que le colis n'est pas prêt) et `packageReadyAt: string | null`.
+- `ReservationTimelineStep` porte `photos?: PackagePhoto[]`, pour afficher une miniature dans la frise à l'étape `handed_to_agency` ou `ready_for_pickup`.
+- Ajoute le sélecteur `hasPackagePhotos(reservation)`.
+- Ces photos sont privées (Cloudinary, dossier par réservation, URL signées) : le front ne construit jamais lui-même leur URL, il utilise celles renvoyées par l'API. `cloudinaryUrl()` ne s'applique donc pas à elles. `// HYPOTHÈSE:` à confirmer avec le back-end.
+
+### 14.2 `src/types/reservationStatus.ts`
+
+Les statuts du cahier des charges, avec leurs métadonnées d'affichage :
+
+| Code | Libellé | Ton | Icône Lucide |
+| --- | --- | --- | --- |
+| `reserved` | Réservée | neutral | `Clock` |
+| `pending_validation` | En attente de validation | warning | `Hourglass` |
+| `payment_rejected` | Paiement rejeté | danger | `XCircle` |
+| `confirmed` | Confirmée | success | `CheckCircle2` |
+| `preparing` | En préparation | neutral | `Package` |
+| `handed_to_agency` | Remise à l'agence | neutral | `Truck` |
+| `ready_for_pickup` | Prête pour retrait | success | `Store` |
+| `in_delivery` | En cours de livraison | neutral | `Truck` |
+| `delivered` | Livrée | success | `PackageCheck` |
+| `picked_up` | Retirée | success | `PackageCheck` |
+| `expired` | Expirée | danger | `TimerOff` |
+| `cancelled` | Annulée | danger | `Ban` |
+
+Exporte `STATUS_META`, `isFinalStatus()` et `TIMELINE_ORDER(mode)`, qui renvoie l'ordre de la frise selon le mode de réception : livraison (`… → handed_to_agency → in_delivery → delivered`) ou retrait (`… → ready_for_pickup → picked_up`). Un ton se traduit toujours en **couleur + icône + libellé**.
+
+---
+
+## 15. PAGE DE CONTRÔLE `/_dev`
+
+Une page **accessible seulement en développement**, soignée car elle servira à montrer le socle au client. Mise en page mobile d'abord, sections empilées, chacune avec un titre en `text-h2` :
+
+1. **Couleurs** : une pastille par jeton (charte + dérivées), avec son code et le contraste mesuré du texte posé dessus (calcul WCAG en direct dans une petite fonction utilitaire).
+2. **Typographie** : chaque utilitaire de la section 7.2 avec un exemple réel (« NOUVELLE COLLECTION », « Hoodie Barbelé Noir », « 45 000 FCFA »), plus une démonstration de l'axe de largeur (75 %, 100 %, 125 %).
+3. **Bloc héros de test** : fond `ink`, titre `text-display` sur 3 lignes (« L'INCOMPRIS », « NE SE PLIE », « À PERSONNE. ») révélé ligne par ligne avec **Motion** (`staggerContainer` + `lineReveal` + `.mask-line`), et un bouton rouge avec `pressable`. Le bouton « Rejouer » relance l'animation.
+4. **Test GSAP** : un composant chargé à la demande (`React.lazy`) qui importe `@/lib/gsap` et fait, au clic, une timeline courte : un carré anthracite se déplace, tourne, puis un cercle SVG se **dessine** avec DrawSVG. Il utilise `useGSAP` + `scope` + `contextSafe`. Affiche « GSAP chargé à la demande ✓ » une fois le morceau chargé.
+5. **Animations réduites** : indicateur en direct (« Réglage “réduire les animations” : activé / désactivé ») et rappel de la manière de le simuler dans Chrome (Outils de développement → Rendering → `prefers-reduced-motion: reduce`).
+6. **Données (mocks)** : appel réel à `GET /products?page=1` via TanStack Query. Affiche le nombre de produits, les 4 premiers noms avec `formatPrice`, l'état de chargement et l'état d'erreur.
+7. **Utilitaires** : exemples de `formatPrice`, `formatCmPhone`, `formatCountdown` et un bouton « Tester la vibration » (`haptic('success')`).
+8. **Statuts** : tous les badges de `STATUS_META` en rendu simple (couleur + icône + libellé).
+8 bis. **Photo du colis** : charge `RES-000102` via les mocks et affiche ses photos de colis dans une grille simple, avec la date de `packageReadyAt` (sans animation : l'animation de dévoilement viendra au module M8).
+9. **Environnement** : valeurs non sensibles de `env`, version de l'app, mode mocks activé ou non.
+
+---
+
+## 16. TESTS
+
+- `src/test/setup.ts` : `@testing-library/jest-dom`, simulation de `matchMedia`, de `navigator.vibrate` et de `localStorage`.
+- Tests unitaires **obligatoires** : `price`, `phone` (au moins 8 cas, dont les formats invalides), `cloudinary`, `date` (compte à rebours), `storage` (échec du `localStorage`), `cartStore` (ajout, fusion, plafond, sous-total), `STATUS_META` / `TIMELINE_ORDER`, `hasPackagePhotos`, `ApiError` et le client API (401 → rafraîchissement → nouvelle tentative, délai dépassé).
+- Un test de rendu : le routeur affiche la page provisoire de `/panier`.
+- `npm run test` doit passer à 100 %.
+
+---
+
+## 17. PERFORMANCE ET DÉPLOIEMENT
+
+### 17.1 Budget
+
+- JavaScript **initial** (route `/`) : **moins de 180 kB compressé (gzip)**, React, Router, Query, Zustand et Motion inclus.
+- GSAP **absent** du chargement initial.
+- Lance `npm run analyze`, ouvre `stats.html` et reporte dans le rapport le poids de chaque morceau principal.
+
+### 17.2 Déploiement de prévisualisation
+
+- Prépare la configuration **Vercel** (`vercel.json` avec redirection de toutes les routes vers `index.html`) **et** Netlify (`public/_redirects` : `/* /index.html 200`).
+- En prévisualisation, les mocks restent activés grâce à une variable dédiée (`VITE_API_MOCK=true`). Le démarrage MSW doit donc fonctionner aussi en build de prévisualisation quand cette variable est vraie. Documente ce comportement et rappelle que les mocks seront **désactivés en production**.
+- Vérifie la page `/_dev` en local avec `npm run preview` (elle doit être absente du build de production, sauf si une variable explicite l'active en prévisualisation : à toi de proposer le mécanisme le plus simple).
+
+---
+
+## 18. README
+
+Le `README.md` doit contenir : présentation du projet, prérequis (Node 20.19+ ou 22.12+), installation, scripts, variables d'environnement, arborescence commentée, conventions (Motion vs GSAP, `m.div`, `useGSAP` + `scope`, jetons uniquement, textes en français), procédure de test sur un vrai téléphone (`npm run dev -- --host` puis l'adresse IP locale), et la liste des modules suivants (M1 à M10).
+
+---
+
+## 19. CRITÈRES D'ACCEPTATION ET RAPPORT FINAL
+
+### 19.1 Le module est terminé quand
+
+- [ ] `npm run lint`, `npm run typecheck`, `npm run test` et `npm run build` passent sans erreur ni avertissement bloquant.
+- [ ] Toutes les routes de la section 9.2 s'affichent, avec leur titre d'onglet, sans erreur dans la console.
+- [ ] La police Archivo est servie en local, avec les axes de graisse **et** de largeur fonctionnels (vérifié sur `/_dev`).
+- [ ] Aucune couleur en dur hors des jetons (recherche `#` dans `src/` hors `styles/` et `mocks/`).
+- [ ] La révélation du titre (Motion) et la timeline (GSAP) tournent de façon fluide en simulation « Mid-tier mobile » dans Chrome (processeur ralenti ×4).
+- [ ] Avec `prefers-reduced-motion: reduce`, les animations s'affichent directement dans leur état final.
+- [ ] GSAP n'apparaît pas dans le JavaScript initial ; le JS initial fait moins de 180 kB gzip.
+- [ ] Les mocks répondent avec latence ; les états de chargement et d'erreur sont visibles sur `/_dev`.
+- [ ] Le site est utilisable et lisible à 360 px, 390 px et 1440 px de large.
+- [ ] La prévisualisation est déployée (ou la configuration est prête si tu n'as pas accès à l'hébergeur).
+
+### 19.2 `RAPPORT_M0.md`
+
+1. Résumé de ce qui a été livré.
+2. Versions exactes installées.
+3. **Liste de toutes les `HYPOTHÈSE:`** (surtout le contrat d'API et la stratégie de jeton) à faire valider.
+4. Poids des morceaux JavaScript (initial et par route).
+5. Écarts par rapport à ce prompt, et pourquoi.
+6. Idées notées pour les modules suivants.
+7. Points d'attention pour le module M1 (Design system).
+
+---
+
+**Commence par la phase P1.** Annonce chaque phase avant de la démarrer et résume-la à la fin. Ne passe à la phase suivante que lorsque la précédente compile, passe le lint et est commitée.

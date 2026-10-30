@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" width="240" height="240" role="img" aria-label="QR Code fictif MTN MoMo DR Choco">
+  <rect width="240" height="240" rx="12" fill="#FFFFFF"/>
+  <rect x="12" y="12" width="216" height="216" rx="8" fill="none" stroke="#0A0A0A" stroke-width="4"/>
+  <!-- Coins de repérage QR -->
+  <rect x="28" y="28" width="52" height="52" fill="none" stroke="#0A0A0A" stroke-width="8"/>
+  <rect x="42" y="42" width="24" height="24" fill="#0A0A0A"/>
+  <rect x="160" y="28" width="52" height="52" fill="none" stroke="#0A0A0A" stroke-width="8"/>
+  <rect x="174" y="42" width="24" height="24" fill="#D42620"/>
+  <rect x="28" y="160" width="52" height="52" fill="none" stroke="#0A0A0A" stroke-width="8"/>
+  <rect x="42" y="174" width="24" height="24" fill="#0A0A0A"/>
+  <!-- Grille centrale fictive -->
+  <g fill="#0A0A0A">
+    <rect x="96" y="28" width="24" height="12"/>
+    <rect x="132" y="28" width="12" height="24"/>
+    <rect x="96" y="52" width="12" height="24"/>
+    <rect x="120" y="64" width="24" height="12"/>
+    <rect x="28" y="96" width="12" height="24"/>
+    <rect x="52" y="96" width="28" height="12"/>
+    <rect x="28" y="132" width="24" height="12"/>
+    <rect x="64" y="120" width="16" height="24"/>
+    <rect x="160" y="96" width="24" height="12"/>
+    <rect x="196" y="96" width="16" height="24"/>
+    <rect x="160" y="120" width="16" height="24"/>
+    <rect x="188" y="132" width="24" height="12"/>
+    <rect x="96" y="160" width="16" height="24"/>
+    <rect x="124" y="160" width="20" height="12"/>
+    <rect x="96" y="196" width="28" height="16"/>
+    <rect x="132" y="184" width="12" height="28"/>
+    <rect x="160" y="160" width="16" height="16"/>
+    <rect x="188" y="160" width="24" height="24"/>
+    <rect x="160" y="196" width="52" height="16"/>
+  </g>
+  <!-- Médaillon central -->
+  <rect x="92" y="92" width="56" height="56" rx="8" fill="#0A0A0A"/>
+  <text x="120" y="117" text-anchor="middle" fill="#FFFFFF" font-family="monospace" font-weight="700" font-size="12">MoMo</text>
+  <text x="120" y="135" text-anchor="middle" fill="#D42620" font-family="monospace" font-weight="700" font-size="11">000222</text>
+</svg>

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600">
+  <rect width="800" height="600" fill="#F4F4F3" />
+  <polygon points="400,90 650,200 650,430 400,520 150,430 150,200" fill="#1A1A18" />
+  <polygon points="400,90 650,200 400,300 150,200" fill="#2A2A27" />
+  <line x1="275" y1="145" x2="525" y2="245" stroke="#E31E24" stroke-width="16" />
+  <rect x="310" y="340" width="180" height="80" rx="6" fill="#FFFFFF" />
+  <text x="400" y="375" text-anchor="middle" fill="#1A1A18" font-family="sans-serif" font-weight="800" font-size="16">RES-000102</text>
+  <text x="400" y="400" text-anchor="middle" fill="#6B6C6E" font-family="sans-serif" font-weight="600" font-size="13">PRÊT EN BOUTIQUE · VUE 2/2</text>
+</svg>

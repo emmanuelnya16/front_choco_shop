@@ -1,0 +1,366 @@
+# PROMPT — MODULE M4 « PAIEMENT ET PREUVE » — PWA DR CHOCO L'INCOMPRIS
+
+> À coller dans ton agent de code, **dans le projet existant** (après M0 à M3).
+> Langue de travail : français. Code et identifiants : anglais. Textes visibles : français.
+
+---
+
+## 0. TON RÔLE ET L'OBJECTIF
+
+Tu es un développeur front-end senior et un designer d'interface exigeant, spécialisé en paiement mobile, en parcours de confiance, en React et en animation (Motion + GSAP).
+
+À la fin de M3, le client a une réservation au statut `reserved`, un numéro (RES-000124), un montant et un compte à rebours de 24 h. **Ce module l'amène jusqu'au paiement vérifiable** :
+
+1. **Écran de paiement** : référence, montant exact, compte à rebours, choix de l'opérateur (Orange Money / MTN MoMo), bouton qui **ouvre directement le clavier du téléphone avec le code de paiement déjà saisi**, QR code, instructions pas à pas.
+2. **Envoi de la preuve** : choix de la capture d'écran, compression sur le téléphone, envoi avec anneau de progression, reprise en cas de coupure.
+3. **Écran « Merci »** animé, avec le statut « En attente de validation », le message WhatsApp prérempli pour la boutique et la proposition d'être prévenu par notification.
+4. **Suivi en direct** : si la boutique valide ou rejette pendant que le client a l'app ouverte, il le voit immédiatement.
+5. **Renvoi d'une preuve** après un rejet, et **expiration** propre de la réservation.
+6. **Outils de test** dans `/_dev` pour simuler la validation ou le rejet par la boutique.
+
+Le paiement par réservation est **inhabituel** pour le client : c'est l'écran où il doute le plus. Il doit toujours savoir **combien payer, à qui, comment, avant quand, et ce qui se passe ensuite**. Aucune ambiguïté n'est acceptable.
+
+---
+
+## 1. AVANT DE CODER : LIS LE PROJET
+
+Lis et **réutilise tout ce qui existe** :
+
+1. `RAPPORT_M0.md` à `RAPPORT_M3.md`, `README.md`.
+2. `src/styles/*`, `src/motion/*`, `src/lib/gsap.ts` et les skills GreenSock installés.
+3. `src/components/ui/*`, la coquille, l'indicateur d'étapes de M3 (`Réception → Paiement → Preuve`), `HoldCountdown`, le bandeau « Réservation en attente », `AuthSheet` / `useRequireAuth`.
+4. `src/stores/*` (dont `reservationStore`), `src/lib/api/client.ts` (`api.upload` avec progression), `src/lib/utils/*` (dont `operator.ts`, `haptics.ts`, `price.ts`), `src/types/reservationStatus.ts` (`STATUS_META`).
+5. `src/mocks/*`, `src/app/router.tsx` (routes `/reservation/:ref/paiement`, `/preuve`, `/merci` encore provisoires ou partielles).
+
+Adapte-toi au code existant si quelque chose diffère de ce prompt, et note les écarts dans le rapport.
+
+**Contraintes inchangées :** port 3000 et `DISABLE_HMR` ; dépendances AI Studio conservées ; aucune couleur en dur hors `src/styles/index.css` et mocks ; `transform` et `opacity` pour animer (exceptions tolérées : tracés SVG de l'anneau de progression et du compte à rebours) ; un seul animateur par élément ; `useGSAP` + `scope` + `contextSafe` ; animations réduites respectées ; rien sous `/admin` ; lint, typecheck, tests et build verts.
+
+**Aucune nouvelle dépendance** n'est nécessaire (compression d'image avec `canvas`, empreinte avec `crypto.subtle`). Si tu en ajoutes une, justifie-la dans le rapport.
+
+---
+
+## 2. WORKFLOW OBLIGATOIRE
+
+| Phase | Contenu | Sections |
+| --- | --- | --- |
+| P1 | Lecture du projet, plan écrit, captures de l'état actuel | 1 |
+| P2 | Données : paramètres de paiement, contrat d'API, mocks, outils de simulation | 3 |
+| P3 | Écran de paiement (mobile puis ordinateur) | 4 |
+| P4 | Envoi de la preuve (sélection, compression, envoi, erreurs) | 5 |
+| P5 | Écran « Merci », message WhatsApp, proposition de notifications | 6 |
+| P6 | Suivi en direct, rejet et renvoi, expiration | 7 |
+| P7 | Recette, tests, `RAPPORT_M4.md` | 8, 9 |
+
+À la fin de **chaque** phase : lint + typecheck + build, commit (Conventional Commits), résumé de 3 à 5 lignes, captures à 390 et 1440 px.
+
+Règles : mobile d'abord (390 px, vérifié à 360 px) ; textes en français correct ; messages d'erreur humains (ce qui s'est passé + quoi faire) ; chaque hypothèse marquée `// HYPOTHÈSE:` et listée dans le rapport.
+
+---
+
+## 3. DONNÉES
+
+### 3.1 Paramètres de paiement (`GET /settings/public`)
+
+Ajoute à la réponse existante :
+
+```ts
+payment: {
+  operators: Array<{
+    id: 'orange' | 'mtn';
+    label: string;              // "Orange Money", "MTN MoMo"
+    merchantName: string;       // nom affiché chez l'opérateur, ex. "DR CHOCO"
+    merchantCode: string;       // code marchand
+    ussdTemplate: string | null;// ex. "#150*47*{code}*{amount}#" — {code} et {amount} remplacés
+    qrImageUrl: string | null;  // QR code marchand fourni par l'opérateur
+    steps: string[];            // instructions propres à l'opérateur, dans l'ordre
+    enabled: boolean;
+  }>;
+  exactAmountRequired: true;
+  validationDelayText: string;  // ex. "en général en moins d'une heure, de 8 h à 20 h"
+  proofMaxSizeMb: 10;
+}
+```
+
+`// HYPOTHÈSE:` les codes USSD réels, les codes marchands, les QR codes et les instructions sont **fournis par le client** et modifiables dans l'administration. **N'écris aucun code USSD réel en dur dans le code.** Les mocks utilisent des valeurs fictives clairement marquées.
+
+### 3.2 Contrat d'API (hypothèse à faire valider par le back-end)
+
+| Méthode | Chemin | Détail |
+| --- | --- | --- |
+| GET | `/reservations/:ref` | `{ ref, status, expiresAt, serverTime, amount: { subtotal, deliveryFee, total }, items, receptionMode, city, address?, agency?, proof?: { thumbnailUrl, uploadedAt }, rejection?: { reason, rejectedAt }, timeline }` |
+| POST | `/reservations/:ref/proof` | `multipart/form-data` : `file`, `sha256`, `operator`, `payerPhone?`, `transactionId?` → `{ status: 'pending_validation', proof }` ; **409** `DUPLICATE_PROOF` (même image déjà utilisée) ; **410** `RESERVATION_EXPIRED` ; **413** `FILE_TOO_LARGE` ; **422** `INVALID_STATUS` (réservation déjà validée, annulée…) |
+| POST | `/reservations/:ref/cancel` | annulation par le client (utilisée en M5, prévue ici pour le bouton « Annuler » de l'écran de paiement) |
+
+### 3.3 Mocks
+
+- Deux opérateurs fictifs : Orange Money (code marchand `000111`, `ussdTemplate: "#000*1*{code}*{amount}#"`, marqué `// FICTIF`) et MTN MoMo (code `000222`, `ussdTemplate: "*000*2*{code}*{amount}#"`, `// FICTIF`), chacun avec un QR fictif en SVG (`public/mock/qr-orange.svg`, `qr-mtn.svg`) et 3 à 4 étapes.
+- `POST /reservations/:ref/proof` : latence de 1,5 à 3 s ; vérifie l'empreinte `sha256` (une empreinte déjà vue → 409) ; passe la réservation à `pending_validation`.
+- La réservation mock garde son statut en mémoire (et dans `sessionStorage` pour survivre à un rechargement en développement).
+- **Outils de simulation** (mocks seulement, jamais en production) : `POST /_mock/reservations/:ref/validate`, `POST /_mock/reservations/:ref/reject` (avec `reason`), `POST /_mock/reservations/:ref/expire-soon` (expiration dans 2 minutes), `POST /_mock/reservations/:ref/expire`.
+- Dans `/_dev`, ajoute une section **« Simulateur boutique »** : champ référence (prérempli avec la dernière réservation), boutons « Valider le paiement », « Rejeter (capture illisible) », « Rejeter (montant incorrect) », « Expire dans 2 min », « Faire expirer ».
+
+### 3.4 Hooks
+
+`useReservation(ref, { live })` (avec suivi en direct, voir 7.1), `usePaymentSettings()`, `useUploadProof(ref)` (progression, annulation, reprise), `useCancelReservation(ref)`.
+
+---
+
+## 4. ÉCRAN DE PAIEMENT (`/reservation/:ref/paiement`)
+
+### 4.1 Structure mobile (de haut en bas)
+
+1. **En-tête de page** : flèche retour (vers l'accueil, pas vers le formulaire : la réservation est déjà créée), indicateur d'étapes sur **Paiement**.
+2. **Carte de référence** (fond `ink`, texte blanc, rayon 8, padding 20 px) :
+   - « Votre réservation » en `text-label` `grey` ;
+   - **RES-000124** en 32 px 800 largeur 75 %, avec une icône copier : **un appui sur la carte copie la référence**, `haptic('light')`, l'icône devient une coche 1,5 s, toast « Référence copiée » ;
+   - `HoldCountdown variant="ring"` à droite (couleurs selon le temps restant), avec « Payez avant le 31 oct. à 11 h 42 » en `text-small` `silver` dessous.
+3. **Montant à payer** (bloc blanc, bordure `silver`) :
+   - « Montant exact à payer » en `text-label` ;
+   - **63 000 FCFA** en 40 px 800, chiffres tabulaires ; appui = copie du montant **sans espaces** (« 63000 ») pour le coller dans l'app de l'opérateur, toast « Montant copié » ;
+   - détail repliable : sous-total, livraison, total ;
+   - avertissement `warning` avec icône : « Payez exactement ce montant, en une seule fois. Un montant différent ralentit la validation. »
+4. **Choix de l'opérateur** : deux onglets larges « Orange Money » / « MTN MoMo » (indicateur qui glisse, `layoutId`). **Présélection** : l'opérateur déduit du numéro du client (`operator.ts`), sinon le premier activé. Un seul opérateur activé → pas d'onglets. Le contenu change en fondu croisé.
+5. **Payer en un appui** (contenu de l'onglet) :
+   - `Button primary lg` pleine largeur, icône `Phone` : **« Composer le code de paiement »**. Il ouvre l'application Téléphone avec le code USSD complet déjà saisi (code marchand **et** montant) : lien `tel:` où `#` est encodé en `%23` (et `*` laissé tel quel). Le client n'a plus qu'à appuyer sur « Appeler » et saisir son code secret.
+   - Sous le bouton, le code affiché en clair en police à chasse fixe (« #000*1*000111*63000# ») avec un bouton « Copier ».
+   - **iPhone** : iOS bloque l'ouverture d'un code contenant `*` ou `#` depuis une page web. Détecte iOS (`/iPad|iPhone|iPod/` ou `navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1`) : le bouton devient « Copier le code de paiement », suivi du texte « Ouvrez l'application Téléphone, collez le code puis appelez. ». Vérifie ce comportement sur un vrai iPhone si possible et note le résultat.
+   - Pas de `ussdTemplate` pour cet opérateur → pas de bouton ; seules les étapes manuelles et le QR s'affichent.
+6. **Étapes** (liste numérotée, révélées une à une à l'arrivée, cascade 0,08 s) : les `steps` de l'opérateur, plus une étape finale commune : « Faites une capture d'écran du message de confirmation. ». Si l'opérateur demande un motif ou une référence : « Si on vous demande un motif, indiquez RES-000124. »
+7. **QR code** (accordéon « Payer depuis un autre téléphone ») : QR marchand en 200 × 200 px sur fond blanc, nom du marchand dessous, bouton « Enregistrer l'image » (téléchargement du fichier).
+8. **Liens secondaires** en bas : « Payer plus tard » (retour à l'accueil, la réservation reste active et le bandeau la rappelle) et « Annuler la réservation » (feuille de confirmation : « Vos articles seront remis en vente. » → `POST /cancel` → toast et retour au panier **avec les articles remis dedans**).
+
+**Barre d'action collée** : `Button primary lg` pleine largeur **« J'ai payé, envoyer ma preuve »** → `/reservation/:ref/preuve`.
+
+### 4.2 Retour depuis l'application Téléphone
+
+Quand le client a appuyé sur « Composer le code » puis revient dans l'app (`visibilitychange` vers `visible` dans les 15 minutes), ouvre automatiquement une petite feuille :
+
+- coche animée, titre « Paiement effectué ? », texte « Envoyez maintenant la capture de votre confirmation. » ;
+- `Button primary` « Envoyer ma capture » (→ page de preuve, avec le sélecteur de fichier ouvert directement) ;
+- lien « Pas encore » (ferme la feuille).
+
+C'est ce qui évite qu'un client paie puis oublie d'envoyer sa preuve.
+
+### 4.3 Ordinateur (`lg` et plus)
+
+- 2 colonnes : à gauche, carte de référence, montant, onglets d'opérateur et étapes ; à droite, **le QR code mis en avant** (« Scannez avec votre téléphone », 240 px) et le code à composer à la main, puis le récapitulatif de la réservation (articles, mode de réception).
+- Le bouton « Composer le code » n'existe pas sur ordinateur (remplacé par le code à copier).
+- Bouton « J'ai payé, envoyer ma preuve » dans la colonne de gauche, pleine largeur.
+
+### 4.4 Animations de l'écran
+
+- Arrivée (après le moment signature de M3) : carte de référence (fondu + `y` 16), montant (le chiffre **défile** de 0 au montant en 0,8 s, `power3.out`), puis onglets et étapes en cascade.
+- Le bouton « Composer le code » a un **halo** discret qui pulse une fois toutes les 3 s (pseudo-élément en `scale` et `opacity`), arrêté après le premier appui, absent en mode réduit.
+- Sous 30 minutes restantes, l'anneau du compte à rebours passe en `red` et pulse doucement.
+
+### 4.5 États
+
+- **Réservation déjà en attente de validation, validée ou plus loin** : redirection vers `/reservation/:ref/merci` (en attente) ou vers le détail de la réservation (au-delà).
+- **Paiement rejeté** : redirection vers la page de preuve en mode renvoi (7.2).
+- **Expirée ou annulée** : voir 7.3.
+- **Chargement** : squelettes au gabarit exact ; si la réservation est déjà dans le cache (venant de M3), affichage immédiat.
+
+---
+
+## 5. ENVOI DE LA PREUVE (`/reservation/:ref/preuve`)
+
+### 5.1 Structure
+
+1. Indicateur d'étapes sur **Preuve**.
+2. Rappel compact : « RES-000124 · 63 000 FCFA · Orange Money » (l'opérateur est modifiable : petit lien « Changer »).
+3. **Zone d'envoi** (tant qu'aucune image n'est choisie) :
+   - grand cadre en pointillés `silver` (ratio 4:3, rayon 8), icône `ImagePlus` 40 px, titre « Ajouter ma capture d'écran », texte « Le message de confirmation Orange Money ou MTN MoMo » ;
+   - un appui ouvre la **galerie** du téléphone : `<input type="file" accept="image/*">` **sans** l'attribut `capture` (qui forcerait l'appareil photo, alors que la capture est déjà dans la galerie) ;
+   - sur ordinateur : glisser-déposer accepté (le cadre passe en bordure `ink` pleine pendant le survol) et collage depuis le presse-papiers (`paste`).
+   - Lien sous le cadre : « Comment faire une capture d'écran ? » → feuille avec 2 conseils (Android : bouton marche + volume bas ; iPhone : bouton latéral + volume haut).
+4. **Aperçu** (après le choix) : l'image dans le cadre (`object-fit: contain` sur fond `surface`), poids final affiché (« 284 Ko »), boutons « Changer » et « Agrandir » (visionneuse simple).
+5. **Informations facultatives** (accordéon « Aider la boutique à vérifier plus vite », replié par défaut) :
+   - « Numéro qui a payé » (prérempli avec le numéro du client, modifiable : utile si un proche a payé) ;
+   - « Identifiant de la transaction » (texte d'aide : « Il figure dans le SMS de confirmation, ex. : PP241030.1142.A12345 »).
+   - `// HYPOTHÈSE:` champs facultatifs, à valider avec le client.
+6. **Barre d'action** : `Button primary lg` « Envoyer ma preuve » (désactivé visuellement tant qu'aucune image n'est choisie, mais l'appui explique « Ajoutez d'abord votre capture d'écran » et ouvre la galerie).
+
+### 5.2 Préparation de l'image (sur le téléphone, avant l'envoi)
+
+Dans `src/features/payment/proof/prepareProof.ts` :
+
+1. **Vérifications** : type image (`image/jpeg`, `image/png`, `image/webp` ; HEIC accepté si le navigateur sait le lire, sinon message « Ce format n'est pas pris en charge. Faites une capture d'écran classique. ») ; poids d'origine ≤ `proofMaxSizeMb`.
+2. **Compression** : `createImageBitmap(file, { imageOrientation: 'from-image' })`, redimensionnement pour que le plus grand côté fasse au maximum 1600 px, export en JPEG qualité 0,82 avec `canvas.toBlob` (ou `OffscreenCanvas` si disponible). Objectif : environ 200 à 400 Ko. Une capture d'écran déjà légère (moins de 400 Ko) est envoyée telle quelle.
+3. **Empreinte** : `crypto.subtle.digest('SHA-256', …)` sur le fichier **final**, envoyée avec l'image (aide la boutique à repérer une capture réutilisée).
+4. Le tout ne doit pas bloquer l'interface : affiche « Préparation de l'image… » si cela dure plus de 300 ms.
+5. L'image n'est **jamais** écrite dans `localStorage` ; elle reste en mémoire (objet `Blob` + URL temporaire révoquée au démontage).
+
+### 5.3 Envoi
+
+- `api.upload` (XMLHttpRequest) avec progression.
+- **Anneau de progression** : le bouton « Envoyer ma preuve » se transforme en anneau de 56 px centré dans la barre (Motion `layout`), dont le tracé se remplit selon le pourcentage réel ; le pourcentage s'affiche au centre ; l'aperçu de l'image passe à 70 % d'opacité avec un voile.
+- Bouton « Annuler l'envoi » sous l'anneau (abandon de la requête, retour à l'aperçu).
+- **Coupure réseau** : message « L'envoi a été interrompu. Votre capture est conservée. » + bouton « Réessayer » ; reprise automatique une fois au retour du réseau (`online`).
+- **Hors connexion avant l'envoi** : bouton désactivé avec « Reconnectez-vous pour envoyer votre preuve. » ; la capture reste choisie.
+- **Erreurs serveur** :
+  - 409 `DUPLICATE_PROOF` : « Cette capture a déjà été envoyée pour une autre réservation. Envoyez la capture de ce paiement-ci. » (l'image est retirée) ;
+  - 410 `RESERVATION_EXPIRED` : voir 7.3 ;
+  - 413 : « Image trop lourde. » (ne devrait pas arriver grâce à la compression) ;
+  - 422 `INVALID_STATUS` : rechargement de la réservation et redirection selon son statut.
+- **Succès** : l'anneau se referme en cercle complet et la transition vers l'écran « Merci » s'enchaîne (6.2). Mise à jour du cache (`qk.reservation(ref)`) et de `reservationStore` (la réservation n'est plus « en attente de paiement » : le bandeau de M3 disparaît).
+
+---
+
+## 6. ÉCRAN « MERCI » (`/reservation/:ref/merci`)
+
+### 6.1 Contenu
+
+1. **Animation** (6.2) puis titre `text-display` « MERCI ! » (largeur 75 %).
+2. Texte : « Nous avons bien reçu votre preuve de paiement. »
+3. **Badge de statut** `STATUS_META.pending_validation` : icône sablier + « En attente de validation » en ton `warning`.
+4. **Ce qui va se passer** (mini-frise verticale de 3 étapes, la première cochée) :
+   - ✓ « Preuve envoyée » (heure) ;
+   - ◌ « Vérification par la boutique » : `validationDelayText` ;
+   - ◌ « Confirmation par SMS, puis préparation de votre colis avec photo avant l'envoi ».
+5. **Prévenir la boutique sur WhatsApp** (`Button dark lg`, icône WhatsApp) : ouvre `https://wa.me/<numéro boutique>?text=<message>` (voir 6.3). Texte d'aide : « Facultatif : la boutique est déjà prévenue. »
+6. **Carte « Être prévenu »** (si les notifications ne sont pas encore autorisées ni refusées) : voir 6.4.
+7. Boutons : `Button primary` « Suivre ma réservation » (→ `/reservations/:ref`, provisoire jusqu'au module M5) et `Button outline` « Continuer mes achats ».
+
+### 6.2 Animation (GSAP, environ 1,6 s)
+
+| Temps | Mouvement |
+| --- | --- |
+| 0 s | L'anneau d'envoi (venant de la page de preuve, même position grâce à une transition de vue ou à une position mémorisée) finit de se refermer en cercle complet, puis grossit jusqu'à 96 px au centre. |
+| 0,35 s | Une coche blanche se dessine dans un disque `success` qui apparaît derrière (DrawSVG 0,4 s), `haptic('success')`. |
+| 0,7 s | « MERCI ! » monte de derrière son masque (`yPercent` 110 → 0, 0,8 s, `power4.out`). |
+| 0,95 s | Texte, badge et frise apparaissent en cascade (`autoAlpha` + `y` 12, décalage 0,08 s). |
+| 1,3 s | Les boutons apparaissent ; le bouton WhatsApp fait un léger rebond. |
+
+Animations réduites : tout est affiché directement, coche déjà tracée.
+
+### 6.3 Message WhatsApp prérempli (cahier des charges)
+
+Construit dans `src/features/payment/whatsapp.ts`, encodé avec `encodeURIComponent`, moins de 1 000 caractères :
+
+```
+Bonjour DR Choco 👋
+Je viens d'envoyer ma preuve de paiement.
+
+Réservation : RES-000124
+Articles :
+• Hoodie Barbelé Noir — Noir Charbon, L × 1
+• Babouche Royale Akwa — 42 × 1
+Total payé : 63 000 FCFA (Orange Money)
+Réception : Livraison — Yaoundé, agence Express Centre
+Mon numéro : +237 6XX XX XX XX
+
+Fiche : https://<domaine>/admin/reservations/RES-000124
+```
+
+- Plus de 4 articles : les 4 premiers puis « + 2 autres articles ».
+- Le lien de la fiche pointe vers l'espace d'administration (construit plus tard dans ce projet, sous `/admin`) : utilise `window.location.origin`.
+- Rappel du cahier des charges : le client doit lui-même appuyer sur « Envoyer » dans WhatsApp ; la réservation est enregistrée de toute façon.
+
+### 6.4 Proposition de notifications
+
+- Carte sur fond `surface`, bordure `silver` à 60 %, rayon 8 : icône cloche, titre « Être prévenu dès la validation », texte « Recevez une notification quand votre paiement est validé et quand votre colis est prêt. », `Button primary sm` « Activer » et lien « Non merci ».
+- **La demande du navigateur ne s'affiche qu'après l'appui sur « Activer »** (jamais automatiquement), pour ne pas gaspiller le refus définitif.
+- Appel à `pushService.requestPermission()` dans `src/features/notifications/pushService.ts` : pour l'instant, il demande la permission (`Notification.requestPermission()`) si l'API existe et mémorise le résultat ; **l'abonnement réel au serveur sera fait au module M6** (laisse une fonction `subscribe()` vide documentée).
+- iPhone sans app installée (`Notification` absent) : la carte devient « Ajoutez l'app à votre écran d'accueil pour recevoir les notifications » avec un lien vers la feuille d'installation (provisoire : toast « Bientôt disponible » jusqu'au module M6).
+- « Non merci » masque la carte pour 7 jours (`safeStorage`).
+
+---
+
+## 7. SUIVI EN DIRECT, REJET ET EXPIRATION
+
+### 7.1 Suivi en direct
+
+- Sur l'écran de paiement, de preuve et « Merci », `useReservation(ref, { live: true })` recharge la réservation **toutes les 20 s quand la page est visible** (`refetchInterval` + `refetchIntervalInBackground: false`) et immédiatement au retour sur l'app. `// HYPOTHÈSE:` simple interrogation périodique ; les notifications push (M6) prendront le relais.
+- **Paiement validé pendant que l'écran « Merci » est ouvert** : le badge passe de « En attente de validation » à « Confirmée » (`success`) avec une transition (ancien badge qui sort vers le haut, nouveau qui entre, petite pulsation), la 2ᵉ étape de la mini-frise se coche avec un trait qui se remplit, toast « Paiement validé ! », `haptic('success')`. Le titre devient « C'EST CONFIRMÉ ! » (révélation par masque).
+- **Paiement rejeté pendant ce temps** : redirection douce vers la page de preuve en mode renvoi (7.2), avec toast.
+
+### 7.2 Rejet et renvoi d'une preuve
+
+Quand la réservation est au statut `payment_rejected`, la page de preuve s'affiche en **mode renvoi** :
+
+- **Bandeau `danger`** en haut : icône, « Paiement non validé », le motif donné par la boutique (« Capture illisible »), et le temps restant (`HoldCountdown variant="inline"`).
+- Rappel du montant exact et lien « Revoir les instructions de paiement » (→ écran de paiement).
+- Miniature de la preuve précédente barrée, avec « Capture refusée ».
+- Zone d'envoi comme en 5.1, titre « Envoyer une nouvelle capture ».
+- Après l'envoi : écran « Merci » avec le texte « Nouvelle preuve reçue. ».
+- Le bandeau global de M3 affiche aussi « RES-000124 · paiement non validé · Renvoyer » sur les autres pages.
+
+### 7.3 Expiration
+
+- **Pendant que le client est sur l'écran de paiement ou de preuve** et que le compte à rebours atteint 0 : un calque apparaît en fondu : icône `TimerOff`, titre « Réservation expirée », texte « Le délai de 24 h est dépassé : vos articles ont été remis en vente. », `Button primary` « Refaire ma réservation » (remet les articles dans le panier **s'ils sont encore disponibles**, après `/cart/validate`, puis ouvre `/panier`) et lien « Retour à l'accueil ».
+- Si l'API répond 410 à l'envoi de la preuve : même calque, avec en plus : « Vous avez déjà payé ? Contactez la boutique sur WhatsApp avec votre capture. » + bouton WhatsApp (message prérempli adapté : « Ma réservation RES-000124 a expiré mais j'ai payé… »).
+- 2 heures avant l'expiration, si le client ouvre l'app : toast d'information « Votre réservation RES-000124 expire dans 1 h 58. » (une seule fois par session).
+
+---
+
+## 8. RECETTE
+
+### 8.1 Parcours à vérifier
+
+**Sur un vrai Android (390 px) :**
+
+1. Réservation créée (M3) → écran de paiement → opérateur présélectionné selon le numéro → « Composer le code » ouvre l'application Téléphone avec le code complet (vérifie que le `#` final est bien présent) → retour dans l'app → la feuille « Paiement effectué ? » s'ouvre → « Envoyer ma capture » ouvre la galerie.
+2. Capture de 3 Mo → compression (poids affiché sous 500 Ko) → envoi avec l'anneau qui progresse → écran « Merci » animé.
+3. Bouton WhatsApp → WhatsApp s'ouvre sur le bon numéro avec le message complet et lisible.
+4. « Activer » les notifications → demande du navigateur → carte masquée.
+5. Simulateur `/_dev` : « Valider » pendant que « Merci » est ouvert → passage à « Confirmée » en moins de 20 s, sans recharger.
+6. Simulateur : « Rejeter (capture illisible) » → mode renvoi avec le motif → nouvel envoi.
+7. Même capture renvoyée sur une autre réservation → message de doublon.
+8. Coupure du réseau à 50 % de l'envoi → message, capture conservée → reprise au retour du réseau.
+9. « Expire dans 2 min » → passage au rouge → calque d'expiration → « Refaire ma réservation ».
+10. « Payer plus tard » → bandeau visible sur l'accueil → « Payer » ramène à l'écran de paiement.
+
+**Sur iPhone (ou simulateur Safari) :** le bouton devient « Copier le code de paiement », le texte d'aide s'affiche, la galerie s'ouvre, la compression fonctionne.
+
+**Sur ordinateur :** QR mis en avant, glisser-déposer et collage d'une capture.
+
+**Animations réduites :** tout fonctionne sans aucune animation automatique.
+
+### 8.2 Performance et accessibilité
+
+- Lighthouse mobile sur l'écran de paiement : Performance ≥ 85, Accessibilité ≥ 95, Bonnes pratiques ≥ 95.
+- Compression d'une capture de 4 Mo en moins de 1,5 s sur un Android milieu de gamme (mesure et note le temps).
+- JavaScript initial toujours < 180 kB gzip ; GSAP et le code de paiement chargés seulement sur ces écrans.
+- Lecteurs d'écran : référence et montant lus en entier (« 63 000 francs CFA »), copies annoncées, progression de l'envoi annoncée par paliers de 25 %, changement de statut annoncé (`aria-live="polite"`).
+- Clavier : onglets d'opérateur, boutons de copie, zone d'envoi (Entrée ouvre la sélection de fichier), calques.
+- Contrastes conformes ; cibles tactiles de 44 px minimum.
+
+### 8.3 Tests automatiques
+
+- Construction du lien USSD : remplacement de `{code}` et `{amount}`, encodage du `#` en `%23`, montant sans espaces ni séparateurs.
+- Détection iOS et choix « Composer » / « Copier ».
+- `prepareProof` : refus d'un type non image, d'un fichier trop lourd ; redimensionnement à 1600 px maximum ; fichier léger conservé tel quel ; empreinte SHA-256 stable.
+- Message WhatsApp : contenu complet, limite de 4 articles, longueur < 1 000 caractères, encodage correct des accents et des emojis.
+- Envoi : progression, annulation, reprise, erreurs 409, 410, 422.
+- Suivi en direct : passage de `pending_validation` à `confirmed` et à `payment_rejected`.
+- Expiration : calque à 0, « Refaire ma réservation » remet seulement les articles disponibles.
+
+---
+
+## 9. CRITÈRES D'ACCEPTATION ET RAPPORT
+
+### 9.1 Le module est terminé quand
+
+- [ ] L'écran de paiement affiche référence et montant copiables, compte à rebours, opérateur présélectionné, bouton qui compose le code sur Android (copie sur iPhone), étapes, QR code, « Payer plus tard » et « Annuler ».
+- [ ] La feuille « Paiement effectué ? » s'ouvre au retour depuis l'application Téléphone.
+- [ ] La capture est compressée sur le téléphone, envoyée avec un anneau de progression réel, et conservée en cas de coupure.
+- [ ] L'écran « Merci » s'anime, propose WhatsApp (message complet) et les notifications au bon moment.
+- [ ] La validation ou le rejet par la boutique s'affichent en direct ; le renvoi d'une preuve fonctionne ; l'expiration est gérée proprement.
+- [ ] Le simulateur boutique de `/_dev` permet de tester tous les cas.
+- [ ] Les parcours de la section 8.1 passent sur un vrai Android.
+- [ ] Lint, typecheck, tests et build sont verts ; objectifs Lighthouse atteints.
+
+### 9.2 `RAPPORT_M4.md`
+
+1. Ce qui est livré, avec captures à 390 et 1440 px (paiement Orange et MTN, feuille de retour, preuve vide, aperçu, envoi en cours, Merci, Confirmée, mode renvoi, expiration).
+2. Résultat des tests sur vrai Android et sur iPhone (bouton « Composer », galerie, compression : temps et poids).
+3. Scores Lighthouse et poids des morceaux JavaScript.
+4. **Pour le client** : liste des informations à fournir (codes marchands, codes USSD exacts par opérateur, QR codes officiels, instructions, délai de validation affiché, numéro WhatsApp de la boutique, champs facultatifs souhaités ou non).
+5. **Pour l'équipe back-end** : contrat de `POST /reservations/:ref/proof` (empreinte, erreurs 409, 410, 413, 422), stockage privé des preuves, statut en direct, et rappel que l'image de preuve ne doit jamais être mise en cache par le service worker (module M6).
+6. Hypothèses et écarts par rapport à ce prompt.
+7. Points d'attention pour le module M5 (suivi des réservations, photo du colis prêt, profil).
+
+---
+
+**Commence par la phase P1** : lis le projet, puis présente ton plan avant d'écrire le moindre composant.

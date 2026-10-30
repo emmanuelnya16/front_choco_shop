@@ -1,0 +1,316 @@
+@import "tailwindcss";
+@import "./transitions.css";
+
+/*
+ * ============================================================================
+ * CHARTE GRAPHIQUE & RÈGLES DE CONTRASTE — DR CHOCO L'INCOMPRIS (M0 + M1)
+ * ============================================================================
+ * 1. Jamais de texte rouge (--color-red) sur fond anthracite (--color-ink) :
+ *    contraste de 3,72:1 (insuffisant WCAG AA). Sur fond sombre, le rouge sert
+ *    exclusivement de fond de bouton ou de badge avec du texte blanc (#FFFFFF).
+ * 2. Jamais de gris moyen (--color-grey) pour du texte sur fond blanc :
+ *    contraste de 3,55:1 (insuffisant). Utiliser --color-text-2 (#6B6C6E, 5,26:1).
+ *    --color-grey est réservé au texte secondaire et aux icônes sur fond anthracite.
+ * 3. Jamais de gris clair (--color-silver) pour du texte sur fond blanc (1,69:1).
+ * 4. Répartition chromatique visée : ~60 % de blanc/surface, ~30 % d'anthracite,
+ *    ~10 % de rouge vif concentré sur les appels à l'action et états actifs.
+ */
+
+@theme {
+  /* Police unique : Archivo Variable (axes wght 100-900 + wdth 62%-125%) */
+  --font-sans: 'Archivo Variable', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+  /* 6.1 Couleurs de la charte (imposées par le client) */
+  --color-ink: #1A1A18;
+  --color-red: #E31E24;
+  --color-grey: #87888A;
+  --color-silver: #C6C7C8;
+  --color-white: #FFFFFF;
+
+  /* 6.2 Nuances techniques dérivées */
+  --color-surface: #F4F4F3;
+  --color-ink-2: #2A2A27;
+  --color-text-2: #6B6C6E;
+  --color-success: #17733F;
+  --color-warning: #9A5B00;
+  --color-danger: #E31E24;
+
+  /* Voiles et transparences techniques (ajoutés au Module M1 pour la vitrine) */
+  --color-scrim-40: rgba(26, 26, 24, 0.4);
+  --color-scrim-50: rgba(26, 26, 24, 0.5);
+  --color-scrim-55: rgba(26, 26, 24, 0.55);
+  --color-scrim-85: rgba(26, 26, 24, 0.85);
+  --color-scrim-95: rgba(26, 26, 24, 0.95);
+  --color-press-scrim: rgba(26, 26, 24, 0.08);
+  --color-glass-light: rgba(255, 255, 255, 0.1);
+  --color-glass-border: rgba(255, 255, 255, 0.2);
+  --color-nav-glass: rgba(255, 255, 255, 0.92);
+
+  /* 6.4 Rayons */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-sheet: 20px;
+  --radius-full: 9999px;
+
+  /* 6.4 Ombres (rares, douces et sombres, jamais colorées) */
+  --shadow-nav: 0 -4px 20px rgba(26, 26, 24, 0.08);
+  --shadow-sheet: 0 -12px 36px rgba(26, 26, 24, 0.24);
+  --shadow-header: 0 2px 14px rgba(26, 26, 24, 0.06);
+  --shadow-card-icon: 0 2px 8px rgba(26, 26, 24, 0.12);
+
+  /* 6.4 Z-index nommés */
+  --z-index-base: 0;
+  --z-index-sticky: 20;
+  --z-index-header: 30;
+  --z-index-nav: 40;
+  --z-index-overlay: 50;
+  --z-index-sheet: 60;
+  --z-index-toast: 70;
+  --z-index-cursor: 80;
+
+  /* 6.4 Largeur maximale de contenu */
+  --spacing-content: 1280px;
+  --max-width-content: 1280px;
+
+  /* 6.4 Hauteurs fixes de coquille */
+  --header-h: 56px;
+  --bottom-nav-h: 64px;
+  --action-bar-h: 72px;
+}
+
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+    text-size-adjust: 100%;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: var(--color-white);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    font-synthesis: none;
+    min-height: 100dvh;
+    margin: 0;
+    overflow-x: hidden;
+  }
+
+  input,
+  select,
+  textarea {
+    font-size: max(16px, 1rem);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-red);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background-color: var(--color-red);
+    color: var(--color-white);
+  }
+
+  img {
+    display: block;
+    max-width: 100%;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+/* ============================================================================
+ * 6.4 ESPACEMENTS FLUIDES, LARGEUR CONTENU, ZONES DE SÉCURITÉ & Z-INDEX
+ * ============================================================================ */
+
+@utility px-page {
+  padding-inline: clamp(1rem, 0.6rem + 1.6vw, 3.5rem);
+}
+
+@utility py-section {
+  padding-block: clamp(3rem, 1.9rem + 4.6vw, 6rem);
+}
+
+@utility max-w-content {
+  max-width: 1280px;
+}
+
+@utility pt-safe {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+@utility pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+@utility pl-safe {
+  padding-left: env(safe-area-inset-left, 0px);
+}
+
+@utility pr-safe {
+  padding-right: env(safe-area-inset-right, 0px);
+}
+
+@utility z-base {
+  z-index: 0;
+}
+
+@utility z-sticky {
+  z-index: 20;
+}
+
+@utility z-header {
+  z-index: 30;
+}
+
+@utility z-nav {
+  z-index: 40;
+}
+
+@utility z-overlay {
+  z-index: 50;
+}
+
+@utility z-sheet {
+  z-index: 60;
+}
+
+@utility z-toast {
+  z-index: 70;
+}
+
+@utility z-cursor {
+  z-index: 80;
+}
+
+@utility tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ============================================================================
+ * 7.2 ÉCHELLE TYPOGRAPHIQUE FLUIDE (390 px → 1440 px)
+ * ============================================================================ */
+
+@utility text-display {
+  font-size: clamp(2.75rem, 1.543rem + 4.952vw, 6rem);
+  font-weight: 800;
+  text-transform: uppercase;
+  line-height: 0.92;
+  letter-spacing: -0.03em;
+  font-stretch: 75%;
+  font-variation-settings: 'wdth' 75;
+}
+
+@utility text-h1 {
+  font-size: clamp(1.75rem, 1.471rem + 1.143vw, 2.5rem);
+  font-weight: 800;
+  text-transform: uppercase;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-stretch: 75%;
+  font-variation-settings: 'wdth' 75;
+}
+
+@utility text-h2 {
+  font-size: clamp(1.375rem, 1.236rem + 0.571vw, 1.75rem);
+  font-weight: 700;
+  text-transform: uppercase;
+  line-height: 1.1;
+  font-stretch: 100%;
+  font-variation-settings: 'wdth' 100;
+}
+
+@utility text-h3 {
+  font-size: clamp(1rem, 0.954rem + 0.19vw, 1.125rem);
+  font-weight: 600;
+  line-height: 1.3;
+  font-stretch: 100%;
+  font-variation-settings: 'wdth' 100;
+}
+
+@utility text-body {
+  font-size: 1rem;
+  font-weight: 400;
+  line-height: 1.5;
+  font-stretch: 100%;
+}
+
+@utility text-small {
+  font-size: 0.875rem;
+  font-weight: 400;
+  line-height: 1.45;
+  font-stretch: 100%;
+}
+
+@utility text-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-stretch: 100%;
+}
+
+@utility text-price {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Masque de ligne pour les révélations de titres sans couper les jambages (g, p, q) */
+.mask-line {
+  display: block;
+  overflow: hidden;
+  padding-block: 0.1em;
+  margin-block: -0.1em;
+}
+
+/* Traitement d'ambiance noir et blanc contrasté + grain feTurbulence (Module M1 §4.2) */
+.mood-image {
+  filter: grayscale(1) contrast(1.08) brightness(0.92);
+  transition:
+    filter 0.6s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.9s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (hover: hover) {
+  .group\/look:hover .mood-image-color-reveal {
+    filter: grayscale(0) contrast(1.02) brightness(1);
+  }
+}
+
+.mood-grain {
+  position: relative;
+}
+
+.mood-grain::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.07;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* Masquage propre de la barre de défilement sur les carrousels horizontaux natifs */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}

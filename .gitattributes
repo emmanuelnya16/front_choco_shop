@@ -1,0 +1,7 @@
+# Fins de ligne LF dans le dépôt et la copie de travail (cohérent avec .editorconfig), même avec core.autocrlf=true
+* text=auto eol=lf
+
+*.webp binary
+*.png binary
+*.jpg binary
+*.woff2 binary

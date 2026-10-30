@@ -1,6 +1,14 @@
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { setupServer } from 'msw/node';
+import { RouterProvider } from 'react-router';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { AppProviders } from '@/app/providers';
+import { createTestRouter } from '@/app/router';
 import { applyDefaultAddress, removeAddress } from '@/features/profile/api/useAddressMutations';
+import { rebookToastMessage } from '@/features/tracking/api/useRebook';
+import { getCardAction } from '@/features/tracking/cardAction';
+import { createAppQueryClient } from '@/lib/api/queryClient';
+import { useAuthStore } from '@/stores/authStore';
 import {
   hasUnseenChange,
   needsAttention,
@@ -288,5 +296,107 @@ describe('Module M5 — 4. Adresses (cache local)', () => {
       ['b', true],
       ['c', false],
     ]);
+  });
+});
+
+const JUNIOR_SESSION_USER = {
+  id: 'usr-junior-01',
+  phone: '+237690000001',
+  firstName: 'Junior',
+  lastName: 'Mbarga',
+  city: 'Douala',
+  createdAt: '2026-09-15T10:00:00.000Z',
+};
+
+function loginAsJunior() {
+  useAuthStore.getState().setSession('mock-token-m5', JUNIOR_SESSION_USER);
+}
+
+function renderRoute(path: string) {
+  const router = createTestRouter([path]);
+  render(
+    <AppProviders client={createAppQueryClient()}>
+      <RouterProvider router={router} />
+    </AppProviders>,
+  );
+  return router;
+}
+
+describe('Module M5 — 5. Mes réservations (cartes et page)', () => {
+  beforeEach(() => {
+    resetMockM3State();
+    useSeenStore.setState({ initializedAt: new Date().toISOString(), byRef: {}, packageToastShown: [] });
+  });
+
+  afterEach(() => {
+    useAuthStore.getState().clearSession();
+  });
+
+  it('associe la bonne action contextuelle à chaque statut', () => {
+    const base = { ref: 'RES-000124', city: 'Yaoundé', packagePhotoThumb: null };
+    expect(getCardAction({ ...base, status: 'reserved' })).toMatchObject({
+      kind: 'pay',
+      href: '/reservation/RES-000124/paiement',
+    });
+    expect(getCardAction({ ...base, status: 'payment_rejected' })).toMatchObject({
+      kind: 'resend-proof',
+      label: 'Renvoyer ma preuve',
+      href: '/reservation/RES-000124/preuve',
+    });
+    expect(getCardAction({ ...base, status: 'pending_validation' })).toEqual({
+      kind: 'text',
+      text: 'Vérification en cours',
+    });
+    expect(getCardAction({ ...base, status: 'preparing' })).toEqual({
+      kind: 'text',
+      text: 'Paiement validé · préparation en cours',
+    });
+    expect(
+      getCardAction({ ...base, status: 'ready_for_pickup', packagePhotoThumb: '/mock/colis-1.svg' }),
+    ).toMatchObject({ kind: 'view-package', label: 'Voir mon colis' });
+    expect(getCardAction({ ...base, status: 'in_delivery' })).toEqual({
+      kind: 'text',
+      text: 'En route vers Yaoundé',
+    });
+    expect(getCardAction({ ...base, status: 'delivered' })).toMatchObject({ kind: 'rebook' });
+    expect(getCardAction({ ...base, status: 'cancelled' })).toMatchObject({
+      kind: 'rebook',
+      text: 'Réservation annulée',
+    });
+  });
+
+  it('formule le bilan de « Réserver à nouveau »', () => {
+    expect(rebookToastMessage({ added: 2, unavailable: 1 })).toBe('2 articles ajoutés · 1 n’est plus disponible');
+    expect(rebookToastMessage({ added: 1, unavailable: 0 })).toBe('1 article ajouté au panier');
+    expect(rebookToastMessage({ added: 0, unavailable: 2 })).toBe('Ces articles ne sont plus disponibles.');
+  });
+
+  it('invite à se connecter quand le client n’est pas connecté', async () => {
+    renderRoute('/reservations');
+    expect(
+      await screen.findByText('Connectez-vous avec votre numéro pour suivre vos réservations.'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Me connecter' })).toBeInTheDocument();
+  });
+
+  it('affiche les onglets avec leurs nombres, 8 cartes en cours puis les terminées', async () => {
+    loginAsJunior();
+    renderRoute('/reservations');
+
+    const activeTab = await screen.findByRole('tab', { name: /En cours \(8\)/ });
+    expect(activeTab).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: /Terminées \(11\)/ })).toBeInTheDocument();
+
+    const panel = screen.getByRole('tabpanel');
+    await waitFor(() => expect(within(panel).getAllByRole('article')).toHaveLength(8));
+    expect(within(panel).getByText('RES-000103')).toBeInTheDocument();
+    expect(within(panel).getByRole('link', { name: /Renvoyer ma preuve/ })).toHaveAttribute(
+      'href',
+      '/reservation/RES-000103/preuve',
+    );
+
+    fireEvent.click(screen.getByRole('tab', { name: /Terminées/ }));
+    expect(await screen.findByText('RES-000109')).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Réserver à nouveau' }).length).toBeGreaterThan(0);
   });
 });

@@ -97,7 +97,8 @@ export function PendingReservationBanner() {
     });
   }, [activeReservation, remainingMs, showToast]);
 
-  // Masqué sur les écrans de réservation, paiement, preuve et merci (§7.4)
+  // Masqué sur les écrans de réservation, paiement, preuve et merci (§7.4), et volontairement aussi sur
+  // « Mes réservations » (`/reservations…`) dont les cartes et le bloc d'action montrent déjà le paiement attendu (M5).
   const isHiddenRoute =
     location.pathname.startsWith('/reservation') ||
     location.pathname.includes('/paiement') ||

@@ -37,6 +37,9 @@ export interface UiState {
   /** Slug de l'article dont la photo porte `view-transition-name: product-${slug}` (§4.2) */
   activeTransitionSlug: string | null;
 
+  /** Référence de la carte touchée dont le titre porte `view-transition-name: res-${ref}` (§4.2 M5) */
+  activeReservationTransitionRef: string | null;
+
   /** Coordonnées (px) de l'icône loupe pour l'ouverture circulaire de la recherche mobile (§6.1) */
   searchOrigin: { x: number; y: number } | null;
 
@@ -67,6 +70,7 @@ export interface UiState {
   consumeAuthAction: () => void;
 
   setActiveTransitionSlug: (slug: string | null) => void;
+  setActiveReservationTransitionRef: (ref: string | null) => void;
   setSearchOrigin: (origin: { x: number; y: number } | null) => void;
   triggerFlyToCart: (item: Omit<FlyingCartItem, 'id'>) => void;
   completeFlyToCart: (id: string) => void;
@@ -88,6 +92,7 @@ export const useUiStore = create<UiState>((set, get) => ({
   pendingAuthAction: null,
   onAuthSheetCancel: null,
   activeTransitionSlug: null,
+  activeReservationTransitionRef: null,
   searchOrigin: null,
   flyingItems: [],
   cartBounceTick: 0,
@@ -175,6 +180,10 @@ export const useUiStore = create<UiState>((set, get) => ({
 
   setActiveTransitionSlug: (slug: string | null) => {
     set({ activeTransitionSlug: slug });
+  },
+
+  setActiveReservationTransitionRef: (ref: string | null) => {
+    set({ activeReservationTransitionRef: ref });
   },
 
   setSearchOrigin: (origin) => {

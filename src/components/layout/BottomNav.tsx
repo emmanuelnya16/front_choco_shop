@@ -29,7 +29,9 @@ const NAV_TABS = [
     to: '/panier',
     icon: ShoppingBag,
     showCartBadge: true,
-    matchPrefixes: ['/panier', '/reservation'],
+    // Parcours de réservation (`/reservation`, `/reservation/:ref/*`), mais pas « Mes réservations »
+    matchPrefixes: ['/panier', '/reservation/'],
+    matchExact: ['/reservation'],
   },
   {
     id: 'reservations',
@@ -54,9 +56,12 @@ export function BottomNav() {
   const reducedMotion = useReducedMotionPref();
 
   // Masqué sur la fiche produit, le parcours de réservation/paiement/preuve et le panier non vide pour laisser place à la barre d'action collante
+  // `/reservation` et `/reservation/:ref/*` seulement : « Mes réservations » (`/reservations`) garde la barre (M5).
+  const isCheckoutFlow =
+    location.pathname === '/reservation' || location.pathname.startsWith('/reservation/');
   if (
     location.pathname.startsWith('/produit/') ||
-    location.pathname.startsWith('/reservation') ||
+    isCheckoutFlow ||
     (location.pathname === '/panier' && cartCount > 0)
   ) {
     return null;
@@ -64,6 +69,7 @@ export function BottomNav() {
 
   const isTabActive = (tab: (typeof NAV_TABS)[number]) => {
     if (tab.exact) return location.pathname === location.pathname && location.pathname === tab.to;
+    if (tab.matchExact?.includes(location.pathname)) return true;
     if (tab.matchPrefixes) {
       return tab.matchPrefixes.some((prefix) => location.pathname.startsWith(prefix));
     }

@@ -4,16 +4,16 @@ import { MessageCircle, RotateCcw, TimerOff } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { Button } from '@/components/ui/Button';
+import {
+  addReservationItemsWithoutCheck,
+  restoreReservationItemsToCart,
+} from '@/features/cart/restoreReservationItems';
 import { buildWhatsAppExpiredPaidUrl } from '@/features/payment/whatsapp';
-import { api } from '@/lib/api/client';
-import { endpoints } from '@/lib/api/endpoints';
 import { haptic } from '@/lib/utils/haptics';
 import { ease } from '@/motion/tokens';
 import { useReducedMotionPref } from '@/motion/useReducedMotionPref';
-import { useCartStore } from '@/stores/cartStore';
 import { useReservationStore } from '@/stores/reservationStore';
 import { useToastStore } from '@/stores/toastStore';
-import type { CartValidatePayload, CartValidationResult } from '@/types/api';
 import type { Reservation } from '@/types/domain';
 
 export interface ReservationExpiredOverlayProps {
@@ -54,52 +54,9 @@ export function ReservationExpiredOverlay({
     haptic('light');
 
     try {
-      const payload: CartValidatePayload = {
-        items: reservation.items.map((item) => ({
-          variantId: item.variantId,
-          quantity: item.quantity,
-        })),
-      };
-
-      const validation = await api.post<CartValidationResult>(
-        endpoints.cart.validate,
-        payload,
+      const { added: restoredCount } = await restoreReservationItemsToCart(
+        reservation.items,
       );
-
-      const validationByVariant = new Map(
-        validation.items.map((v) => [v.variantId, v]),
-      );
-
-      const cartStore = useCartStore.getState();
-      let restoredCount = 0;
-
-      for (const item of reservation.items) {
-        const check = validationByVariant.get(item.variantId);
-        const availableQty = check ? check.availableQuantity : item.quantity;
-        const isUnavailable =
-          check?.status === 'unavailable' || availableQty <= 0;
-
-        if (!isUnavailable && availableQty > 0) {
-          const finalQty = Math.min(item.quantity, availableQty);
-          cartStore.add({
-            productId: item.productId,
-            slug: item.slug,
-            name: item.name,
-            image: item.image,
-            variantId: item.variantId,
-            size: item.size,
-            color: {
-              code: item.colorName.toLowerCase().replace(/\s+/g, '-'),
-              name: item.colorName,
-              hex: '#0A0A0A',
-            },
-            unitPrice: check?.unitPrice ?? item.unitPrice,
-            quantity: finalQty,
-            maxQuantity: availableQty,
-          });
-          restoredCount += 1;
-        }
-      }
 
       clearActiveReservation();
 
@@ -119,25 +76,7 @@ export function ReservationExpiredOverlay({
       navigate('/panier');
     } catch {
       // Fallback : remet les articles dans le panier et redirige vers /panier où /cart/validate s'exécutera
-      const cartStore = useCartStore.getState();
-      for (const item of reservation.items) {
-        cartStore.add({
-          productId: item.productId,
-          slug: item.slug,
-          name: item.name,
-          image: item.image,
-          variantId: item.variantId,
-          size: item.size,
-          color: {
-            code: item.colorName.toLowerCase().replace(/\s+/g, '-'),
-            name: item.colorName,
-            hex: '#0A0A0A',
-          },
-          unitPrice: item.unitPrice,
-          quantity: item.quantity,
-          maxQuantity: Math.max(1, item.quantity),
-        });
-      }
+      addReservationItemsWithoutCheck(reservation.items);
       clearActiveReservation();
       navigate('/panier');
     } finally {

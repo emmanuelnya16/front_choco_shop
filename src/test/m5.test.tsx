@@ -14,6 +14,7 @@ import { qk } from '@/lib/api/queryKeys';
 import { env } from '@/lib/env';
 import { CANCEL_NOT_ALLOWED_MESSAGE } from '@/features/tracking/cancel';
 import { useAuthStore } from '@/stores/authStore';
+import { useCartStore } from '@/stores/cartStore';
 import {
   hasUnseenChange,
   needsAttention,
@@ -602,5 +603,104 @@ describe('Module M5 — 7. Photo du colis prêt', () => {
     const links = await screen.findAllByRole('link', { name: /Voir mon colis/ });
     expect(links.map((l) => l.getAttribute('href'))).toContain('/reservations/RES-000102#colis');
     await act(async () => undefined);
+  });
+});
+
+describe('Module M5 — 8. Profil, adresses et informations', () => {
+  beforeEach(() => {
+    resetMockM3State();
+    useSeenStore.setState({ initializedAt: new Date().toISOString(), byRef: {}, packageToastShown: [] });
+    loginAsJunior();
+  });
+
+  afterEach(() => {
+    useAuthStore.getState().clearSession();
+    useCartStore.getState().clear();
+  });
+
+  const cardFor = async (label: string) =>
+    (await screen.findByRole('heading', { name: label, level: 2 })).closest('article') as HTMLElement;
+
+  it('définit une autre adresse par défaut : une seule étiquette « Par défaut », placée en tête', async () => {
+    renderRoute('/profil/adresses');
+    const bureau = await cardFor('Bureau');
+    fireEvent.click(within(bureau).getByRole('button', { name: /Actions pour l’adresse Bureau/ }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Définir par défaut' }));
+
+    await waitFor(() => {
+      const headings = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent);
+      expect(headings.indexOf('Bureau')).toBeLessThan(headings.indexOf('Maison'));
+    });
+    expect(screen.getAllByText('Par défaut')).toHaveLength(1);
+    expect(within(await cardFor('Bureau')).getByText('Par défaut')).toBeInTheDocument();
+  });
+
+  it('supprime une adresse avec « Annuler » pendant 5 s, puis définitivement', async () => {
+    renderRoute('/profil/adresses');
+    const openDelete = async () => {
+      const maison = await cardFor('Maison');
+      fireEvent.click(within(maison).getByRole('button', { name: /Actions pour l’adresse Maison/ }));
+      fireEvent.click(await screen.findByRole('button', { name: 'Supprimer' }));
+      const confirm = await screen.findByRole('dialog', { name: /Supprimer « Maison »/ });
+      fireEvent.click(within(confirm).getByRole('button', { name: 'Supprimer' }));
+    };
+
+    await openDelete();
+    await waitFor(() => expect(screen.queryByRole('heading', { name: 'Maison', level: 2 })).not.toBeInTheDocument());
+    fireEvent.click(await screen.findByRole('button', { name: 'Annuler' }));
+    expect(await screen.findByRole('heading', { name: 'Maison', level: 2 })).toBeInTheDocument();
+
+    await openDelete();
+    await waitFor(() => expect(screen.queryByRole('heading', { name: 'Maison', level: 2 })).not.toBeInTheDocument());
+    await waitFor(
+      async () => {
+        const list = await api.get<Address[]>(endpoints.me.addresses);
+        expect(list.map((a) => a.label)).toEqual(['Bureau']);
+      },
+      { timeout: 7000, interval: 250 },
+    );
+  }, 15_000);
+
+  it('modifie le prénom : message, retour au profil et en-tête mis à jour', async () => {
+    renderRoute('/profil/informations');
+    const firstName = await screen.findByLabelText(/PRÉNOM/);
+    fireEvent.change(firstName, { target: { value: 'Jules' } });
+    expect(screen.getByLabelText('TÉLÉPHONE')).toHaveAttribute('readonly');
+    fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }));
+
+    expect(await screen.findByText('Vos informations sont enregistrées')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /Jules Mbarga/, level: 1 })).toBeInTheDocument();
+  });
+
+  it('se déconnecte en conservant le panier sur le téléphone', async () => {
+    useCartStore.getState().add({
+      productId: 'prod-12',
+      slug: 'tshirt-essentiel-lourd',
+      name: 'T-shirt Essentiel Lourd',
+      image: '/mock/product-tee.svg',
+      variantId: 'prod-12-noir-m',
+      size: 'M',
+      color: { code: 'noir', name: 'Noir Charbon', hex: '#1A1A18' },
+      unitPrice: 12000,
+      quantity: 1,
+      maxQuantity: 5,
+    });
+    renderRoute('/profil');
+    fireEvent.click(await screen.findByRole('button', { name: /Se déconnecter/ }));
+    const dialog = await screen.findByRole('dialog', { name: 'Se déconnecter ?' });
+    expect(within(dialog).getByText('Votre panier sera conservé sur ce téléphone.')).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Me déconnecter' }));
+
+    expect(await screen.findByRole('button', { name: 'Me connecter avec mon numéro' })).toBeInTheDocument();
+    expect(useAuthStore.getState().status).toBe('guest');
+    expect(useCartStore.getState().items).toHaveLength(1);
+  });
+
+  it('ouvre la feuille des notifications depuis le profil', async () => {
+    renderRoute('/profil?notifications=1');
+    const sheet = await screen.findByRole('dialog', { name: 'Notifications' });
+    expect(within(sheet).getByText(/paiement est validé, quand votre colis est prêt/)).toBeInTheDocument();
+    // jsdom ne fournit pas l'API Notification
+    expect(within(sheet).getByRole('status')).toHaveTextContent('Non disponibles');
   });
 });

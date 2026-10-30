@@ -122,6 +122,20 @@ export const appRoutes: RouteObject[] = [
         },
       },
       {
+        path: 'profil/adresses',
+        lazy: async () => {
+          const { ProfileAddressesPage } = await import('@/pages/ProfileAddressesPage');
+          return { Component: ProfileAddressesPage };
+        },
+      },
+      {
+        path: 'profil/informations',
+        lazy: async () => {
+          const { ProfileInformationsPage } = await import('@/pages/ProfileInformationsPage');
+          return { Component: ProfileInformationsPage };
+        },
+      },
+      {
         path: 'pages/:slug',
         lazy: async () => {
           const { LegalPage } = await import('@/pages/LegalPage');

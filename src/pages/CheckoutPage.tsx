@@ -15,7 +15,7 @@ import {
   Truck,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useForm, useWatch } from 'react-hook-form';
+import { FormProvider, useForm, useWatch } from 'react-hook-form';
 import { Navigate, useBlocker, useNavigate } from 'react-router';
 import { Button } from '@/components/ui/Button';
 import { Container, Price } from '@/components/ui/Primitives';
@@ -31,7 +31,7 @@ import {
   useSaveAddress,
 } from '@/features/reservation/api/useReservationQueries';
 import { CheckoutStepper } from '@/features/reservation/components/CheckoutStepper';
-import { CityPickerField } from '@/features/reservation/components/CityPickerField';
+import { DeliveryAddressFields } from '@/features/reservation/components/DeliveryAddressFields';
 import { SignatureHoldOverlay } from '@/features/reservation/components/SignatureHoldOverlay';
 import {
   clearReservationDraft,
@@ -50,7 +50,6 @@ import { cn } from '@/lib/utils/cn';
 import { haptic } from '@/lib/utils/haptics';
 import {
   formatCmPhone,
-  formatCmPhoneInput,
   normalizeCmPhone,
 } from '@/lib/utils/phone';
 import { formatPrice } from '@/lib/utils/price';
@@ -152,15 +151,7 @@ export function CheckoutPage() {
 
   const schema = useMemo(() => createReservationFormSchema(cities), [cities]);
 
-  const {
-    register,
-    control,
-    handleSubmit,
-    setValue,
-    getValues,
-    setFocus,
-    formState: { errors, isSubmitting },
-  } = useForm<ReservationFormValues>({
+  const form = useForm<ReservationFormValues>({
     resolver: zodResolver(schema),
     mode: 'onTouched',
     defaultValues: {
@@ -179,6 +170,15 @@ export function CheckoutPage() {
       addressLabel: initialDraft?.addressLabel ?? 'Maison',
     },
   });
+  const {
+    register,
+    control,
+    handleSubmit,
+    setValue,
+    getValues,
+    setFocus,
+    formState: { errors, isSubmitting },
+  } = form;
 
   // Synchronise Prénom/Nom lorsque l'utilisateur se connecte via AuthSheet
   useEffect(() => {
@@ -230,11 +230,9 @@ export function CheckoutPage() {
   const watchedValues = useWatch({ control });
   const receptionMode = watchedValues.receptionMode ?? 'delivery';
   const currentCity = watchedValues.city ?? 'Douala';
-  const recipientType = watchedValues.recipientType ?? 'self';
   const notesValue = watchedValues.notes ?? '';
   const saveAddressChecked = watchedValues.saveAddress ?? true;
   const addressLabelValue = watchedValues.addressLabel ?? 'Maison';
-  const selectedAgencyId = watchedValues.agencyId ?? '';
 
   // Sauvegarde du brouillon dans sessionStorage avec délai de 500 ms (§6.8)
   useEffect(() => {
@@ -257,7 +255,7 @@ export function CheckoutPage() {
 
   const isLocalSelected = isCityLocal(currentCity, cities);
 
-  const { data: cityAgencies = [], isLoading: isLoadingAgencies } = useAgencies(
+  const { data: cityAgencies = [] } = useAgencies(
     receptionMode === 'delivery' && !isLocalSelected ? currentCity : undefined,
   );
 
@@ -665,6 +663,7 @@ export function CheckoutPage() {
         </div>
 
         {/* Grille 2 colonnes sur ordinateur (60 % formulaire / 40 % récapitulatif, §6.1) */}
+        <FormProvider {...form}>
         <form
           onSubmit={(e) => {
             void handleSubmit(executeReservationSubmit, onInvalidSubmit)(e);
@@ -1010,345 +1009,12 @@ export function CheckoutPage() {
                           transition={{ duration: 0.35, ease: ease.out }}
                           className="space-y-4"
                         >
-                          {/* 6.4.2 Choix de la ville */}
-                          <div data-field="city">
-                            <label className="mb-1.5 block text-label text-ink">
-                              VILLE DE LIVRAISON *
-                            </label>
-                            <CityPickerField
-                              cities={cities}
-                              value={currentCity}
-                              disabled={isSending}
-                              error={errors.city?.message}
-                              onChange={(newCity) => {
-                                setSelectedAddressId(null);
-                                setValue('city', newCity, {
-                                  shouldValidate: true,
-                                });
-                                setValue('agencyId', '');
-                              }}
-                            />
-                            {errors.city && (
-                              <p
-                                role="alert"
-                                className="mt-1.5 flex items-center gap-1.5 text-xs font-semibold text-danger"
-                              >
-                                <AlertCircle
-                                  className="h-3.5 w-3.5 shrink-0"
-                                  aria-hidden="true"
-                                />
-                                <span>{errors.city.message}</span>
-                              </p>
-                            )}
-                          </div>
-
-                          {/* 6.4.3 Selon la ville : Ville locale (Quartier + Point de repère) vs Autre ville (Agence) */}
-                          {isLocalSelected ? (
-                            <div className="space-y-4">
-                              <div data-field="district">
-                                <label
-                                  htmlFor="res-district"
-                                  className="block text-label text-ink"
-                                >
-                                  QUARTIER *
-                                </label>
-                                <input
-                                  id="res-district"
-                                  type="text"
-                                  enterKeyHint="next"
-                                  disabled={isSending}
-                                  placeholder="Ex. : Bonamoussadi, Akwa, Makepe…"
-                                  aria-invalid={Boolean(errors.district)}
-                                  aria-describedby={
-                                    errors.district ? 'err-district' : undefined
-                                  }
-                                  {...register('district')}
-                                  className={cn(
-                                    'mt-1.5 h-12 w-full rounded-[var(--radius-md)] border bg-white px-3.5 text-[16px] text-ink placeholder:text-text-2 focus:border-ink focus:outline-none',
-                                    errors.district
-                                      ? 'border-danger'
-                                      : 'border-silver',
-                                  )}
-                                />
-                                {errors.district && (
-                                  <p
-                                    id="err-district"
-                                    role="alert"
-                                    className="mt-1.5 flex items-center gap-1.5 text-xs font-semibold text-danger"
-                                  >
-                                    <AlertCircle
-                                      className="h-3.5 w-3.5 shrink-0"
-                                      aria-hidden="true"
-                                    />
-                                    <span>{errors.district.message}</span>
-                                  </p>
-                                )}
-                              </div>
-
-                              <div data-field="landmark">
-                                <label
-                                  htmlFor="res-landmark"
-                                  className="block text-label text-ink"
-                                >
-                                  POINT DE REPÈRE PRÉCIS *
-                                </label>
-                                <input
-                                  id="res-landmark"
-                                  type="text"
-                                  enterKeyHint="next"
-                                  disabled={isSending}
-                                  placeholder="Ex. : Après la pharmacie du carrefour, portail noir"
-                                  aria-invalid={Boolean(errors.landmark)}
-                                  aria-describedby="help-landmark err-landmark"
-                                  {...register('landmark')}
-                                  className={cn(
-                                    'mt-1.5 h-12 w-full rounded-[var(--radius-md)] border bg-white px-3.5 text-[16px] text-ink placeholder:text-text-2 focus:border-ink focus:outline-none',
-                                    errors.landmark
-                                      ? 'border-danger'
-                                      : 'border-silver',
-                                  )}
-                                />
-                                <p
-                                  id="help-landmark"
-                                  className="mt-1.5 text-xs text-text-2"
-                                >
-                                  Au Cameroun, les livreurs se repèrent surtout
-                                  grâce aux repères connus. Soyez précis.
-                                </p>
-                                {errors.landmark && (
-                                  <p
-                                    id="err-landmark"
-                                    role="alert"
-                                    className="mt-1.5 flex items-center gap-1.5 text-xs font-semibold text-danger"
-                                  >
-                                    <AlertCircle
-                                      className="h-3.5 w-3.5 shrink-0"
-                                      aria-hidden="true"
-                                    />
-                                    <span>{errors.landmark.message}</span>
-                                  </p>
-                                )}
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="space-y-5">
-                              {/* Choix de l'agence de transport */}
-                              <div data-field="agencyId">
-                                <span className="block text-label text-ink">
-                                  AGENCE DE TRANSPORT À{' '}
-                                  {currentCity.toUpperCase()} *
-                                </span>
-                                {isLoadingAgencies ? (
-                                  <div className="mt-2 flex items-center gap-2 text-xs text-text-2">
-                                    <Loader2
-                                      className="h-4 w-4 animate-spin"
-                                      aria-hidden="true"
-                                    />
-                                    <span>
-                                      Chargement des agences de {currentCity}…
-                                    </span>
-                                  </div>
-                                ) : (
-                                  <div
-                                    role="radiogroup"
-                                    aria-label={`Agences de transport à ${currentCity}`}
-                                    className="mt-2 space-y-2.5"
-                                  >
-                                    {cityAgencies.map((agency) => {
-                                      const isSelected =
-                                        selectedAgencyId === agency.id;
-                                      return (
-                                        <button
-                                          key={agency.id}
-                                          type="button"
-                                          role="radio"
-                                          disabled={isSending}
-                                          aria-checked={isSelected}
-                                          onClick={() => {
-                                            haptic('light');
-                                            setValue('agencyId', agency.id, {
-                                              shouldValidate: true,
-                                            });
-                                          }}
-                                          className={cn(
-                                            'flex w-full items-start justify-between gap-3 rounded-[var(--radius-md)] border p-3.5 text-left transition-colors',
-                                            isSelected
-                                              ? 'border-2 border-ink bg-surface'
-                                              : 'border-silver bg-white hover:border-ink',
-                                          )}
-                                        >
-                                          <div>
-                                            <span className="block text-small font-bold text-ink">
-                                              {agency.name}
-                                            </span>
-                                            <span className="mt-0.5 block text-xs text-text-2">
-                                              {agency.address}
-                                            </span>
-                                            <span className="mt-1 block text-[11px] font-semibold text-text-2">
-                                              {agency.openingHours}
-                                            </span>
-                                          </div>
-                                          <span
-                                            className={cn(
-                                              'mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border',
-                                              isSelected
-                                                ? 'border-ink bg-ink text-white'
-                                                : 'border-silver bg-white',
-                                            )}
-                                          >
-                                            {isSelected && (
-                                              <Check
-                                                className="h-3 w-3"
-                                                aria-hidden="true"
-                                              />
-                                            )}
-                                          </span>
-                                        </button>
-                                      );
-                                    })}
-                                  </div>
-                                )}
-                                {errors.agencyId && (
-                                  <p
-                                    role="alert"
-                                    className="mt-1.5 flex items-center gap-1.5 text-xs font-semibold text-danger"
-                                  >
-                                    <AlertCircle
-                                      className="h-3.5 w-3.5 shrink-0"
-                                      aria-hidden="true"
-                                    />
-                                    <span>{errors.agencyId.message}</span>
-                                  </p>
-                                )}
-                              </div>
-
-                              {/* Personne qui récupère le colis (§6.4.3) */}
-                              <div>
-                                <span className="block text-label text-ink">
-                                  PERSONNE QUI RÉCUPÈRE LE COLIS
-                                </span>
-                                <div
-                                  role="radiogroup"
-                                  aria-label="Personne qui récupère le colis"
-                                  className="mt-2 grid grid-cols-2 gap-2.5"
-                                >
-                                  <button
-                                    type="button"
-                                    role="radio"
-                                    aria-checked={recipientType === 'self'}
-                                    onClick={() =>
-                                      setValue('recipientType', 'self', {
-                                        shouldValidate: true,
-                                      })
-                                    }
-                                    className={cn(
-                                      'min-h-[44px] rounded-[var(--radius-md)] border px-3 py-2 text-small font-bold transition-colors',
-                                      recipientType === 'self'
-                                        ? 'border-ink bg-ink text-white'
-                                        : 'border-silver bg-white text-ink hover:bg-surface',
-                                    )}
-                                  >
-                                    Moi-même
-                                  </button>
-                                  <button
-                                    type="button"
-                                    role="radio"
-                                    aria-checked={recipientType === 'other'}
-                                    onClick={() =>
-                                      setValue('recipientType', 'other', {
-                                        shouldValidate: true,
-                                      })
-                                    }
-                                    className={cn(
-                                      'min-h-[44px] rounded-[var(--radius-md)] border px-3 py-2 text-small font-bold transition-colors',
-                                      recipientType === 'other'
-                                        ? 'border-ink bg-ink text-white'
-                                        : 'border-silver bg-white text-ink hover:bg-surface',
-                                    )}
-                                  >
-                                    Quelqu&rsquo;un d&rsquo;autre
-                                  </button>
-                                </div>
-
-                                {recipientType === 'other' && (
-                                  <div className="mt-4 grid grid-cols-1 gap-4 rounded-[var(--radius-md)] bg-surface p-4 sm:grid-cols-2">
-                                    <div data-field="recipientName">
-                                      <label
-                                        htmlFor="res-recipientName"
-                                        className="block text-label text-ink"
-                                      >
-                                        NOM COMPLET DU DESTINATAIRE *
-                                      </label>
-                                      <input
-                                        id="res-recipientName"
-                                        type="text"
-                                        enterKeyHint="next"
-                                        placeholder="Ex. : Paul Biyong"
-                                        aria-invalid={Boolean(
-                                          errors.recipientName,
-                                        )}
-                                        {...register('recipientName')}
-                                        className={cn(
-                                          'mt-1.5 h-11 w-full rounded-[var(--radius-md)] border bg-white px-3 text-[16px] text-ink focus:border-ink focus:outline-none',
-                                          errors.recipientName
-                                            ? 'border-danger'
-                                            : 'border-silver',
-                                        )}
-                                      />
-                                      {errors.recipientName && (
-                                        <p
-                                          role="alert"
-                                          className="mt-1 text-xs font-semibold text-danger"
-                                        >
-                                          {errors.recipientName.message}
-                                        </p>
-                                      )}
-                                    </div>
-
-                                    <div data-field="recipientPhone">
-                                      <label
-                                        htmlFor="res-recipientPhone"
-                                        className="block text-label text-ink"
-                                      >
-                                        TÉLÉPHONE DU DESTINATAIRE *
-                                      </label>
-                                      <input
-                                        id="res-recipientPhone"
-                                        type="tel"
-                                        inputMode="numeric"
-                                        enterKeyHint="next"
-                                        placeholder="677 00 00 00"
-                                        aria-invalid={Boolean(
-                                          errors.recipientPhone,
-                                        )}
-                                        {...register('recipientPhone', {
-                                          onChange: (e) => {
-                                            e.target.value = formatCmPhoneInput(
-                                              e.target.value,
-                                            );
-                                          },
-                                        })}
-                                        className={cn(
-                                          'mt-1.5 h-11 w-full rounded-[var(--radius-md)] border bg-white px-3 font-mono text-[16px] text-ink focus:border-ink focus:outline-none',
-                                          errors.recipientPhone
-                                            ? 'border-danger'
-                                            : 'border-silver',
-                                        )}
-                                      />
-                                      {errors.recipientPhone && (
-                                        <p
-                                          role="alert"
-                                          className="mt-1 text-xs font-semibold text-danger"
-                                        >
-                                          {errors.recipientPhone.message}
-                                        </p>
-                                      )}
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          )}
+                          {/* 6.4.2 à 6.4.3 : ville, puis quartier + repère ou agence + destinataire (composant partagé avec le profil, M5) */}
+                          <DeliveryAddressFields
+                            cities={cities}
+                            disabled={isSending}
+                            onCityChange={() => setSelectedAddressId(null)}
+                          />
 
                           {/* 6.4.5 Case à cocher « Enregistrer cette adresse » + Nom de l'adresse en chips */}
                           {!selectedAddressId && (
@@ -1636,6 +1302,7 @@ export function CheckoutPage() {
             </p>
           </div>
         </form>
+        </FormProvider>
       </Container>
     </div>
   );

@@ -67,66 +67,91 @@ export function createReservationFormSchema(cities?: DeliveryCity[]) {
       if (data.receptionMode !== 'delivery') {
         return;
       }
-
-      if (!data.city) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['city'],
-          message: 'Choisissez votre ville de livraison.',
-        });
-        return;
-      }
-
-      const local = isCityLocal(data.city, cities);
-
-      if (local) {
-        if (data.district.length < 2) {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            path: ['district'],
-            message: 'Indiquez votre quartier (ex. : Bonamoussadi, Akwa).',
-          });
-        }
-        if (data.landmark.length < 5) {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            path: ['landmark'],
-            message:
-              'Précisez un point de repère connu pour guider le livreur.',
-          });
-        }
-      } else {
-        if (!data.agencyId) {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            path: ['agencyId'],
-            message:
-              'Choisissez l’agence de transport où récupérer votre colis.',
-          });
-        }
-        if (data.recipientType === 'other') {
-          if (data.recipientName.length < 2) {
-            ctx.addIssue({
-              code: z.ZodIssueCode.custom,
-              path: ['recipientName'],
-              message:
-                'Indiquez le nom complet de la personne qui récupérera le colis.',
-            });
-          }
-          if (!isValidCmPhone(data.recipientPhone)) {
-            ctx.addIssue({
-              code: z.ZodIssueCode.custom,
-              path: ['recipientPhone'],
-              message:
-                'Entrez un numéro mobile camerounais valide (9 chiffres commençant par 6).',
-            });
-          }
-        }
-      }
+      addDeliveryAddressIssues(data, ctx, cities);
     });
 }
 
 export const reservationFormSchema = createReservationFormSchema();
+
+/** Champs d'adresse de livraison validés par `addDeliveryAddressIssues`. */
+export interface DeliveryAddressRuleInput {
+  city: string;
+  district: string;
+  landmark: string;
+  agencyId: string;
+  recipientType: 'self' | 'other';
+  recipientName: string;
+  recipientPhone: string;
+}
+
+/**
+ * Règles d'une adresse de livraison (§6.4 M3), partagées par le formulaire de réservation
+ * et les adresses du profil (§7.3 M5) :
+ * - Ville locale (Douala) : quartier et point de repère obligatoires.
+ * - Autre ville (agence) : agence obligatoire ; destinataire complet si `recipientType === 'other'`.
+ */
+export function addDeliveryAddressIssues(
+  data: DeliveryAddressRuleInput,
+  ctx: z.RefinementCtx,
+  cities?: DeliveryCity[],
+): void {
+  if (!data.city) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['city'],
+      message: 'Choisissez votre ville de livraison.',
+    });
+    return;
+  }
+
+  const local = isCityLocal(data.city, cities);
+
+  if (local) {
+    if (data.district.length < 2) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['district'],
+        message: 'Indiquez votre quartier (ex. : Bonamoussadi, Akwa).',
+      });
+    }
+    if (data.landmark.length < 5) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['landmark'],
+        message:
+          'Précisez un point de repère connu pour guider le livreur.',
+      });
+    }
+  } else {
+    if (!data.agencyId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['agencyId'],
+        message:
+          'Choisissez l’agence de transport où récupérer votre colis.',
+      });
+    }
+    if (data.recipientType === 'other') {
+      if (data.recipientName.length < 2) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['recipientName'],
+          message:
+            'Indiquez le nom complet de la personne qui récupérera le colis.',
+        });
+      }
+      if (!isValidCmPhone(data.recipientPhone)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['recipientPhone'],
+          message:
+            'Entrez un numéro mobile camerounais valide (9 chiffres commençant par 6).',
+        });
+      }
+    }
+  }
+}
+
 
 export interface ReservationAmountInput {
   subtotal: number;

@@ -49,7 +49,7 @@ export function validateEnv(rawEnv: Record<string, unknown> = import.meta.env): 
     isDev,
     // HYPOTHÈSE: Activation de /_dev en développement ou en prévisualisation si VITE_ENABLE_DEV_PAGE=true ou VITE_API_MOCK=true
     enableDevPage: isDev || enableDevPageRaw === 'true' || apiMockRaw === 'true',
-    appVersion: '0.1.0-m0',
+    appVersion: '0.5.0',
   });
 }
 

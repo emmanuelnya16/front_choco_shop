@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { AlertCircle, ArrowLeft, Copy, SearchX } from 'lucide-react';
+import { AlertCircle, ArrowLeft, Copy, Download, SearchX } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router';
 import { Button } from '@/components/ui/Button';
@@ -20,8 +20,14 @@ import {
   PaymentSection,
   ReceptionSection,
 } from '@/features/tracking/detail/DetailSections';
+import { PackagePhotos } from '@/features/tracking/detail/PackagePhotos';
 import { TrackingTimeline } from '@/features/tracking/detail/TrackingTimeline';
 import { formatHour, formatShortDate } from '@/features/tracking/format';
+import {
+  savePackagePhoto,
+  toLightboxImages,
+  useSignedUrlRefresh,
+} from '@/features/tracking/packagePhotos';
 import { useSeenStore } from '@/features/tracking/seenStore';
 import {
   buildTimelineSteps,
@@ -35,7 +41,7 @@ import { useDocumentTitle } from '@/lib/utils/useDocumentTitle';
 import { useAuthStore } from '@/stores/authStore';
 import { useToastStore } from '@/stores/toastStore';
 import { useUiStore } from '@/stores/uiStore';
-import type { PublicSettings, Reservation } from '@/types/domain';
+import { hasPackagePhotos, type PublicSettings, type Reservation } from '@/types/domain';
 
 const FALLBACK_WHATSAPP = '+237690000000';
 
@@ -155,7 +161,13 @@ function DetailContent({ reservationRef }: { reservationRef: string }) {
   const settingsQuery = usePublicSettings();
 
   if (query.data) {
-    return <DetailView reservation={query.data} settings={settingsQuery.data} />;
+    return (
+      <DetailView
+        reservation={query.data}
+        settings={settingsQuery.data}
+        onRefresh={query.refetch}
+      />
+    );
   }
 
   if (query.isError) {
@@ -198,12 +210,26 @@ interface ViewerState {
   images: LightboxImage[];
   index: number;
   label: string;
+  /** Nom de fichier de base pour « Enregistrer la photo » (photos du colis uniquement). */
+  saveBaseName?: string;
 }
 
-function DetailView({ reservation, settings }: { reservation: Reservation; settings?: PublicSettings }) {
+function DetailView({
+  reservation,
+  settings,
+  onRefresh,
+}: {
+  reservation: Reservation;
+  settings?: PublicSettings;
+  onRefresh: () => unknown;
+}) {
   const ref = reservation.ref;
   const showToast = useToastStore((s) => s.show);
   const markSeen = useSeenStore((s) => s.markSeen);
+  const markPhotosRevealed = useSeenStore((s) => s.markPhotosRevealed);
+  const photosRevealed = useSeenStore((s) => Boolean(s.byRef[reservation.ref]?.photosRevealed));
+  const location = useLocation();
+  const refreshSignedUrls = useSignedUrlRefresh(onRefresh);
   const activeTransitionRef = useUiStore((s) => s.activeReservationTransitionRef);
   const setActiveTransitionRef = useUiStore((s) => s.setActiveReservationTransitionRef);
 
@@ -273,6 +299,31 @@ function DetailView({ reservation, settings }: { reservation: Reservation; setti
   }, [ref, setActiveTransitionRef]);
 
   const [viewer, setViewer] = useState<ViewerState | null>(null);
+  const photos = reservation.packagePhotos;
+  const showPackage = hasPackagePhotos(reservation);
+
+  const openPackagePhoto = (index: number) =>
+    setViewer({
+      label: 'Photos de votre colis',
+      index,
+      images: toLightboxImages(photos),
+      saveBaseName: `colis-${ref}`,
+    });
+
+  const savePhoto = async (url: string, index: number, baseName: string) => {
+    const outcome = await savePackagePhoto(url, `${baseName}-${index + 1}`);
+    if (outcome === 'downloaded') showToast({ message: 'Photo enregistrée' });
+    if (outcome === 'opened') showToast({ message: 'Photo ouverte dans un nouvel onglet' });
+  };
+
+  // « Voir mon colis » (#colis) : défile jusqu'au bloc photo une fois affiché
+  useEffect(() => {
+    if (location.hash !== '#colis' || !showPackage) return;
+    const id = window.requestAnimationFrame(() =>
+      document.getElementById('colis')?.scrollIntoView({ block: 'start' }),
+    );
+    return () => window.cancelAnimationFrame(id);
+  }, [location.hash, showPackage]);
   const [cancelOpen, setCancelOpen] = useState(false);
   const whatsappNumber = settings?.whatsappNumber ?? FALLBACK_WHATSAPP;
 
@@ -336,12 +387,28 @@ function DetailView({ reservation, settings }: { reservation: Reservation; setti
         <div className="min-w-0 space-y-6">
           <ActionBlock reservation={reservation} settings={settings} animateChange={liveChanged} />
 
+          {showPackage && (
+            <PackagePhotos
+              photos={photos}
+              packageReadyAt={reservation.packageReadyAt}
+              alreadyRevealed={photosRevealed}
+              onRevealed={() => markPhotosRevealed(ref, reservation.status, reservation.updatedAt)}
+              onOpenViewer={openPackagePhoto}
+              onPhotoFailure={refreshSignedUrls}
+            />
+          )}
+
           <section aria-labelledby="suivi-titre" className="rounded-[var(--radius-md)] border border-silver/70 bg-white p-5 sm:p-6">
             <h2 id="suivi-titre" className="text-label text-text-2">
               Suivi
             </h2>
             <div className="mt-4">
-              <TrackingTimeline steps={steps} animateFromIndex={animateFrom} />
+              <TrackingTimeline
+                steps={steps}
+                animateFromIndex={animateFrom}
+                packageThumbUrl={photos[0]?.thumbnailUrl}
+                onOpenPackagePhoto={() => openPackagePhoto(0)}
+              />
             </div>
           </section>
         </div>
@@ -378,6 +445,20 @@ function DetailView({ reservation, settings }: { reservation: Reservation; setti
         initialIndex={viewer?.index ?? 0}
         productName={ref}
         label={viewer?.label}
+        renderActions={
+          viewer?.saveBaseName
+            ? (image, index) => (
+                <button
+                  type="button"
+                  onClick={() => void savePhoto(image.url, index, viewer.saveBaseName!)}
+                  className="inline-flex h-11 items-center gap-2 rounded-[var(--radius-full)] bg-ink-2 px-4 text-small font-semibold text-white hover:bg-white/20"
+                >
+                  <Download className="h-4 w-4" aria-hidden="true" />
+                  Enregistrer la photo
+                </button>
+              )
+            : undefined
+        }
       />
     </PageFrame>
   );

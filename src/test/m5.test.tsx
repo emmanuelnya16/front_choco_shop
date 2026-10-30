@@ -1,13 +1,14 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, renderHook, screen, waitFor, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { RouterProvider } from 'react-router';
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppProviders } from '@/app/providers';
 import { createTestRouter } from '@/app/router';
 import { applyDefaultAddress, removeAddress } from '@/features/profile/api/useAddressMutations';
 import { rebookToastMessage } from '@/features/tracking/api/useRebook';
 import { getCardAction } from '@/features/tracking/cardAction';
+import { packagePhotoRatio, useSignedUrlRefresh } from '@/features/tracking/packagePhotos';
 import { createAppQueryClient } from '@/lib/api/queryClient';
 import { qk } from '@/lib/api/queryKeys';
 import { env } from '@/lib/env';
@@ -520,5 +521,86 @@ describe('Module M5 — 6. Détail d’une réservation', () => {
     await waitFor(() =>
       expect(useSeenStore.getState().byRef['RES-000106']?.status).toBe('handed_to_agency'),
     );
+  });
+});
+
+describe('Module M5 — 7. Photo du colis prêt', () => {
+  const originalMatchMedia = window.matchMedia;
+
+  function emulateReducedMotion() {
+    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+      matches: query.includes('prefers-reduced-motion'),
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })) as unknown as typeof window.matchMedia;
+  }
+
+  beforeEach(() => {
+    resetMockM3State();
+    useSeenStore.setState({ initializedAt: new Date().toISOString(), byRef: {}, packageToastShown: [] });
+    loginAsJunior();
+  });
+
+  afterEach(() => {
+    window.matchMedia = originalMatchMedia;
+    useAuthStore.getState().clearSession();
+  });
+
+  it('choisit le format d’affichage au plus proche de la photo (4:3, carré, 4:5 au maximum)', () => {
+    expect(packagePhotoRatio({ width: 800, height: 600 })).toBe('4/3');
+    expect(packagePhotoRatio({ width: 800, height: 800 })).toBe('1/1');
+    expect(packagePhotoRatio({ width: 800, height: 1000 })).toBe('4/5');
+    expect(packagePhotoRatio({ width: 600, height: 1200 })).toBe('4/5');
+  });
+
+  it('recharge la réservation une seule fois quand un lien de photo a expiré', () => {
+    const refetch = vi.fn();
+    const { result } = renderHook(() => useSignedUrlRefresh(refetch));
+    expect(result.current()).toBe(true);
+    expect(result.current()).toBe(false);
+    expect(refetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('dévoile la photo une seule fois, puis l’affiche directement aux visites suivantes', async () => {
+    emulateReducedMotion(); // le dévoilement se termine immédiatement (affichage direct)
+    renderRoute('/reservations/RES-000102');
+
+    expect(await screen.findByRole('heading', { name: /Votre colis est prêt.*photos du colis/, level: 2 })).toBeInTheDocument();
+    expect(screen.getByText('Vérifiez votre colis à la réception : il doit correspondre à cette photo.')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Photo de votre colis emballé, 1 sur 2' })).toBeInTheDocument();
+    await waitFor(() => expect(useSeenStore.getState().byRef['RES-000102']?.photosRevealed).toBe(true));
+    expect(document.querySelector('[data-reveal-badge]')).not.toBeNull();
+  });
+
+  it('n’anime plus la photo une fois dévoilée et l’ouvre dans la visionneuse avec « Enregistrer la photo »', async () => {
+    useSeenStore.getState().markPhotosRevealed('RES-000102', 'ready_for_pickup', new Date().toISOString());
+    renderRoute('/reservations/RES-000102');
+
+    await screen.findByRole('heading', { name: /Votre colis est prêt.*photos du colis/, level: 2 });
+    expect(document.querySelector('[data-reveal-badge]')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: /Agrandir : photo de votre colis emballé, 1 sur 2/ }));
+    const viewer = await screen.findByRole('dialog', { name: 'Photos de votre colis' });
+    expect(within(viewer).getByRole('button', { name: /Enregistrer la photo/ })).toBeInTheDocument();
+  });
+
+  it('signale à l’ouverture de l’app les colis prêts dont les photos n’ont pas été vues, une seule fois', async () => {
+    renderRoute('/');
+    expect(await screen.findByText('3 colis sont prêts : leurs photos vous attendent')).toBeInTheDocument();
+    expect(useSeenStore.getState().packageToastShown).toEqual(
+      expect.arrayContaining(['RES-000102', 'RES-000107', 'RES-000108']),
+    );
+  });
+
+  it('renvoie vers la photo depuis la carte de « Mes réservations »', async () => {
+    renderRoute('/reservations');
+    const links = await screen.findAllByRole('link', { name: /Voir mon colis/ });
+    expect(links.map((l) => l.getAttribute('href'))).toContain('/reservations/RES-000102#colis');
+    await act(async () => undefined);
   });
 });

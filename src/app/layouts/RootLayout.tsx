@@ -9,6 +9,7 @@ import { SizePicker } from '@/components/ui/SizePicker';
 import { Toaster } from '@/components/ui/Toast';
 import { FlyToCartLayer } from '@/features/catalog/cart-fly/FlyToCartLayer';
 import { PendingReservationBanner } from '@/features/reservation/components/PendingReservationBanner';
+import { PackageReadyNotifier } from '@/features/tracking/components/PackageReadyNotifier';
 import { api } from '@/lib/api/client';
 import { endpoints } from '@/lib/api/endpoints';
 import { useNetworkRecoveryToast } from '@/lib/hooks/useOnlineStatus';
@@ -116,6 +117,7 @@ export function RootLayout() {
       <BottomNav />
       <FloatingWhatsApp />
       <Toaster />
+      <PackageReadyNotifier />
       <FlyToCartLayer />
 
       <SizePicker

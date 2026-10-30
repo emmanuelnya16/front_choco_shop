@@ -43,7 +43,8 @@ export function ActionBlock({ reservation, settings, animateChange = false }: Ac
   const { tone, content } = getActionBlockContent(reservation, settings);
 
   return (
-    <div className="grid" aria-live="polite">
+    // Pas d'aria-live ici : le compte à rebours serait annoncé sans fin ; la page annonce les changements de statut.
+    <div className="grid">
       <AnimatePresence initial={false}>
         <m.section
           key={reservation.status}

@@ -6,7 +6,7 @@ import {
   type InfiniteData,
   type QueryClient,
 } from '@tanstack/react-query';
-import { api } from '@/lib/api/client';
+import { api, ApiError } from '@/lib/api/client';
 import { endpoints } from '@/lib/api/endpoints';
 import { qk } from '@/lib/api/queryKeys';
 import { useAuthStore } from '@/stores/authStore';
@@ -100,6 +100,13 @@ export function useCancelReservation(ref: string) {
       }
       // Liste (la réservation passe dans « Terminées »), résumé et bandeau des réservations en attente
       queryClient.invalidateQueries({ queryKey: qk.reservations() });
+    },
+    onError: (error) => {
+      // 422 : la boutique a déjà avancé la commande ; on recharge pour afficher le vrai statut
+      if (error instanceof ApiError && error.status === 422) {
+        queryClient.invalidateQueries({ queryKey: qk.reservation(ref.toUpperCase()) });
+        queryClient.invalidateQueries({ queryKey: qk.reservations() });
+      }
     },
   });
 }

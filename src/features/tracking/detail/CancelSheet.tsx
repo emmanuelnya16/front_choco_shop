@@ -19,11 +19,23 @@ export interface CancelSheetProps {
   onClose: () => void;
   reservation: Reservation;
   whatsappNumber: string;
+  /** Appelé juste avant l'envoi : le parent sait que le changement vient du client. */
+  onConfirm?: () => void;
   onCancelled: () => void;
+  /** Appelé si l'annulation échoue (422 ou réseau). */
+  onFailed?: () => void;
 }
 
 /** Feuille de confirmation d'annulation (§5.4 M5). */
-export function CancelSheet({ open, onClose, reservation, whatsappNumber, onCancelled }: CancelSheetProps) {
+export function CancelSheet({
+  open,
+  onClose,
+  reservation,
+  whatsappNumber,
+  onConfirm,
+  onCancelled,
+  onFailed,
+}: CancelSheetProps) {
   const [reason, setReason] = useState<string | null>(null);
   const cancel = useCancelReservation(reservation.ref);
   const notAllowed = cancel.error instanceof ApiError && cancel.error.status === 422;
@@ -36,11 +48,13 @@ export function CancelSheet({ open, onClose, reservation, whatsappNumber, onCanc
   };
 
   const confirm = () => {
+    onConfirm?.();
     cancel.mutate(reason ? { reason } : {}, {
       onSuccess: () => {
         setReason(null);
         onCancelled();
       },
+      onError: () => onFailed?.(),
     });
   };
 

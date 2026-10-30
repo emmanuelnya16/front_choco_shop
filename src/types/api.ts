@@ -132,7 +132,8 @@ export interface SaveAddressPayload {
   district: string;
   landmark: string;
   receptionMode: ReceptionMode;
-  agencyId?: string;
+  /** `null` efface l'agence (adresse passée d'une agence à une livraison locale). */
+  agencyId?: string | null;
   recipientName?: string;
   recipientPhone?: string;
   isDefault?: boolean;

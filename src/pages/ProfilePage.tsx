@@ -21,7 +21,6 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { Link, useLocation, useSearchParams } from 'react-router';
 import { Button } from '@/components/ui/Button';
 import { Logo } from '@/components/ui/Logo';
-import { Skeleton } from '@/components/ui/Primitives';
 import { Sheet } from '@/components/ui/Sheet';
 import { useLogout } from '@/features/auth/api/useAuthQueries';
 import { usePublicSettings } from '@/features/catalog/api/useCatalogQueries';
@@ -59,18 +58,9 @@ export function ProfilePage() {
   const status = useAuthStore((s) => s.status);
   const user = useAuthStore((s) => s.user);
 
-  if (status === 'authenticated' && user) return <ProfileConnected user={user} />;
-  if (status === 'unknown' && user) {
-    return (
-      <ProfileShell>
-        <Skeleton className="h-40 w-full lg:rounded-[var(--radius-md)]" />
-        <div className="mt-6 space-y-3 px-page lg:px-0">
-          <Skeleton className="h-24 w-full" />
-          <Skeleton className="h-56 w-full" />
-        </div>
-      </ProfileShell>
-    );
-  }
+  // Profil déjà connu sur le téléphone : affiché tout de suite pendant le rafraîchissement de la session
+  // (pas de squelette remplacé par un contenu de hauteur différente, CLS). Les nombres arrivent ensuite.
+  if (user && status !== 'guest') return <ProfileConnected user={user} />;
   return <ProfileGuest />;
 }
 
@@ -368,14 +358,12 @@ function ProfileConnected({ user }: { user: User }) {
             size="lg"
             fullWidth
             loading={logout.isPending}
-            onClick={() =>
-              logout.mutate(undefined, {
-                onSettled: () => {
-                  setLogoutOpen(false);
-                  showToast({ message: 'Vous êtes déconnecté. À bientôt !' });
-                },
-              })
-            }
+            onClick={async () => {
+              // mutateAsync : la promesse se résout même si ce composant est démonté par la déconnexion
+              await logout.mutateAsync().catch(() => undefined);
+              setLogoutOpen(false);
+              showToast({ message: 'Vous êtes déconnecté. À bientôt !' });
+            }}
           >
             Me déconnecter
           </Button>

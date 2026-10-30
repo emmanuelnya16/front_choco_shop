@@ -109,7 +109,8 @@ export function formValuesToAddressPayload(
       ? values.landmark.trim()
       : (options.agencies?.find((a) => a.id === values.agencyId)?.name ?? 'Agence de transport'),
     receptionMode: 'delivery',
-    agencyId: local ? undefined : values.agencyId,
+    // `null` (et non `undefined`, retiré par JSON) pour effacer une ancienne agence lors d'un PATCH
+    agencyId: local ? null : values.agencyId,
     recipientName: other ? values.recipientName.trim() : fullName(options.user) || undefined,
     recipientPhone,
   };

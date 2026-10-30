@@ -1,5 +1,6 @@
-import { AnimatePresence } from 'motion/react';
+import { AnimatePresence, useAnimate } from 'motion/react';
 import * as m from 'motion/react-m';
+import { useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils/cn';
 import { duration, ease } from '@/motion/tokens';
 import { useReducedMotionPref } from '@/motion/useReducedMotionPref';
@@ -36,13 +37,21 @@ export function ReservationStatusBadge({
   const meta = STATUS_META[status];
   const Icon = meta.Icon;
   const animated = animateChange && !reducedMotion;
+  const [scope, animate] = useAnimate<HTMLSpanElement>();
+  const previousStatus = useRef(status);
+
+  // Pulsation après l'échange des libellés. L'élément extérieur ne change jamais de clé : l'AnimatePresence
+  // intérieur reste monté, l'ancien libellé peut sortir vers le haut et le nouveau entrer par le bas.
+  useEffect(() => {
+    if (previousStatus.current === status) return;
+    previousStatus.current = status;
+    if (!animated || !scope.current) return;
+    animate(scope.current, { scale: [1, 1.06, 1] }, { duration: 0.45, delay: 0.25, ease: ease.out });
+  }, [status, animated, animate, scope]);
 
   return (
-    <m.span
-      key={animated ? `pulse-${status}` : 'static'}
-      initial={animated ? { scale: 1 } : false}
-      animate={animated ? { scale: [1, 1.06, 1] } : undefined}
-      transition={{ duration: 0.45, delay: 0.25, ease: ease.out }}
+    <span
+      ref={scope}
       className={cn(
         'relative inline-flex items-center overflow-hidden rounded-[var(--radius-full)] border',
         size === 'sm' ? 'h-6 px-2.5' : 'h-8 px-3',
@@ -72,6 +81,6 @@ export function ReservationStatusBadge({
           </span>
         </m.span>
       </AnimatePresence>
-    </m.span>
+    </span>
   );
 }

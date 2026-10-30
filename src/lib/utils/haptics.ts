@@ -18,6 +18,11 @@ export function haptic(pattern: HapticPattern = 'light'): boolean {
       return false;
     }
     if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+      // Chrome refuse (et signale en console) une vibration avant tout geste de l'utilisateur sur la page,
+      // par exemple au dévoilement automatique de la photo du colis : on s'abstient dans ce cas.
+      if (navigator.userActivation && !navigator.userActivation.hasBeenActive) {
+        return false;
+      }
       return navigator.vibrate(PATTERNS[pattern]);
     }
   } catch {

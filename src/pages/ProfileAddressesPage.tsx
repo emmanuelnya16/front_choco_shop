@@ -63,16 +63,22 @@ function AddressesContent() {
   const [confirmDelete, setConfirmDelete] = useState<Address | null>(null);
   const [hiddenIds, setHiddenIds] = useState<string[]>([]);
   const timersRef = useRef(new Map<string, number>());
+  const toastIdsRef = useRef(new Map<string, string>());
 
   // Quitter la page valide tout de suite les suppressions encore annulables
   useEffect(() => {
     const timers = timersRef.current;
+    const toastIds = toastIdsRef.current;
     return () => {
       timers.forEach((timer, id) => {
         window.clearTimeout(timer);
+        // Plus d'« Annuler » possible une fois la page quittée : on retire le message
+        const toastId = toastIds.get(id);
+        if (toastId) useToastStore.getState().dismiss(toastId);
         deleteAddress.mutate(id);
       });
       timers.clear();
+      toastIds.clear();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -84,6 +90,7 @@ function AddressesContent() {
     setHiddenIds((ids) => [...ids, address.id]);
     const timer = window.setTimeout(() => {
       timersRef.current.delete(address.id);
+      toastIdsRef.current.delete(address.id);
       deleteAddress.mutate(address.id, {
         onSettled: () => setHiddenIds((ids) => ids.filter((id) => id !== address.id)),
       });
@@ -97,10 +104,12 @@ function AddressesContent() {
       onAction: () => {
         window.clearTimeout(timersRef.current.get(address.id));
         timersRef.current.delete(address.id);
+        toastIdsRef.current.delete(address.id);
         setHiddenIds((ids) => ids.filter((id) => id !== address.id));
         dismissToast(toastId);
       },
     });
+    toastIdsRef.current.set(address.id, toastId);
   };
 
   if (isPending) {

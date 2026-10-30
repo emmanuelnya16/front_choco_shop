@@ -57,7 +57,7 @@ export function ReservationCard({ item, className }: ReservationCardProps) {
       )}
     >
       <div className="flex items-start justify-between gap-3">
-        <h3 className="min-w-0">
+        <h2 className="min-w-0">
           <Link
             to={`/reservations/${item.ref}`}
             viewTransition
@@ -71,7 +71,7 @@ export function ReservationCard({ item, className }: ReservationCardProps) {
           >
             {item.ref}
           </Link>
-        </h3>
+        </h2>
         {isNew && (
           <span className="inline-flex shrink-0 items-center gap-1.5 text-label text-ink">
             <span className="h-2 w-2 rounded-[var(--radius-full)] bg-red" aria-hidden="true" />

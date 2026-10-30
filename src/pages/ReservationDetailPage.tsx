@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { AlertCircle, ArrowLeft, Copy, Download, SearchX } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router';
 import { Button } from '@/components/ui/Button';
 import { Price, Skeleton } from '@/components/ui/Primitives';
@@ -299,6 +299,7 @@ function DetailView({
   }, [ref, setActiveTransitionRef]);
 
   const [viewer, setViewer] = useState<ViewerState | null>(null);
+  const closeViewer = useCallback(() => setViewer(null), []);
   const photos = reservation.packagePhotos;
   const showPackage = hasPackagePhotos(reservation);
 
@@ -430,8 +431,9 @@ function DetailView({
         onClose={() => setCancelOpen(false)}
         reservation={reservation}
         whatsappNumber={whatsappNumber}
+        onConfirm={() => setSelfChangeStatus('cancelled')}
+        onFailed={() => setSelfChangeStatus(null)}
         onCancelled={() => {
-          setSelfChangeStatus('cancelled');
           setCancelOpen(false);
           haptic('success');
           showToast({ message: `Réservation ${ref} annulée` });
@@ -440,7 +442,7 @@ function DetailView({
 
       <ProductLightbox
         open={Boolean(viewer)}
-        onClose={() => setViewer(null)}
+        onClose={closeViewer}
         images={viewer?.images ?? []}
         initialIndex={viewer?.index ?? 0}
         productName={ref}

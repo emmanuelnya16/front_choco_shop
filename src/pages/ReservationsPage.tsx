@@ -92,7 +92,15 @@ function ReservationsContent() {
   const [direction, setDirection] = useState(1);
 
   const query = useReservationsInfinite(scope);
-  const items = useMemo(() => query.data?.pages.flatMap((page) => page.items) ?? [], [query.data]);
+  const items = useMemo(() => {
+    // Une réservation qui vient de changer peut glisser d'une page à l'autre entre deux chargements
+    const seen = new Set<string>();
+    return (query.data?.pages.flatMap((page) => page.items) ?? []).filter((item) => {
+      if (seen.has(item.ref)) return false;
+      seen.add(item.ref);
+      return true;
+    });
+  }, [query.data]);
   const counts = query.data?.pages[0]?.counts;
 
   const selectTab = (next: ReservationScope) => {

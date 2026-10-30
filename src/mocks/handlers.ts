@@ -228,8 +228,15 @@ mockSyncChannel?.addEventListener('message', (event: MessageEvent<MockSyncMessag
   const message = event.data;
   if (message?.type === 'upsert') {
     mockReservations[message.reservation.ref] = message.reservation;
+    // Une réservation créée dans un autre onglet réserve aussi sa référence ici
+    const num = Number(message.reservation.ref.replace('RES-', ''));
+    if (Number.isFinite(num) && num >= reservationSeqCounter) {
+      reservationSeqCounter = num + 1;
+    }
   } else if (message?.type === 'reset') {
     resetMockReservations();
+    seenProofHashes.clear();
+    idempotencyCache.clear();
   }
   persistSessionReservations();
 });
@@ -283,6 +290,39 @@ const addressesByUserId = new Map<string, Address[]>([
   [JUNIOR_USER.id, mockJuniorAddresses.map((a) => ({ ...a }))],
 ]);
 const favoritesByUserId = new Map<string, Set<string>>();
+
+// Session mock conservée dans l'onglet : après un rechargement (ou Android qui recharge l'onglet pendant le
+// paiement USSD), le client connecté reste le même et retrouve ses réservations (contrôle de propriétaire M5).
+const MOCK_SESSION_USER_KEY = 'drc_mock_session_user_v1';
+
+function persistSessionUser(): void {
+  if (typeof window === 'undefined' || import.meta.env.MODE === 'test') return;
+  try {
+    if (currentSessionUser) {
+      window.sessionStorage.setItem(MOCK_SESSION_USER_KEY, JSON.stringify(currentSessionUser));
+    } else {
+      window.sessionStorage.removeItem(MOCK_SESSION_USER_KEY);
+    }
+  } catch {
+    // Ignore sessionStorage errors
+  }
+}
+
+function loadSessionUser(): void {
+  if (typeof window === 'undefined' || import.meta.env.MODE === 'test') return;
+  try {
+    const raw = window.sessionStorage.getItem(MOCK_SESSION_USER_KEY);
+    if (!raw) return;
+    const user = JSON.parse(raw) as User;
+    currentSessionUser = user;
+    persistSessionUser();
+    usersByPhone.set(user.phone, user);
+  } catch {
+    // Ignore sessionStorage errors
+  }
+}
+
+loadSessionUser();
 
 export function resetMockM3State(): void {
   otpTrackByPhone.clear();
@@ -1018,6 +1058,7 @@ export const handlers = [
   http.post(apiUrl('/auth/logout'), async () => {
     await delay(randomMobileLatency());
     currentSessionUser = null;
+    persistSessionUser();
     return new HttpResponse(null, { status: 204 });
   }),
 
@@ -1045,6 +1086,7 @@ export const handlers = [
       city: body.city?.trim() || baseUser.city,
     };
     currentSessionUser = updated;
+    persistSessionUser();
     usersByPhone.set(updated.phone, updated);
     return HttpResponse.json(updated);
   }),
@@ -1073,7 +1115,7 @@ export const handlers = [
       landmark: body.landmark,
       details: body.landmark,
       receptionMode: body.receptionMode ?? 'delivery',
-      agencyId: body.agencyId,
+      agencyId: body.agencyId ?? undefined,
       recipientName:
         body.recipientName ??
         ([currentSessionUser?.firstName, currentSessionUser?.lastName]
@@ -1115,6 +1157,7 @@ export const handlers = [
     const updated: Address = {
       ...current,
       ...patch,
+      agencyId: patch.agencyId === null ? undefined : (patch.agencyId ?? current.agencyId),
       quarter: patch.district ?? current.quarter,
       details: patch.landmark ?? current.details,
       phone: patch.recipientPhone ?? current.phone,
@@ -1656,6 +1699,9 @@ export const handlers = [
   http.post(apiUrl('/_mock/reservations/reset'), async () => {
     await delay(100);
     resetMockReservations();
+    // Les captures déjà envoyées redeviennent acceptées (sinon 409 DUPLICATE_PROOF après remise à zéro)
+    seenProofHashes.clear();
+    idempotencyCache.clear();
     persistSessionReservations();
     mockSyncChannel?.postMessage({ type: 'reset' } satisfies MockSyncMessage);
     return HttpResponse.json({ ok: true, count: Object.keys(mockReservations).length });

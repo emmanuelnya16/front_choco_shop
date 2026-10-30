@@ -6,6 +6,8 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { AppProviders } from '@/app/providers';
 import { createTestRouter } from '@/app/router';
 import { applyDefaultAddress, removeAddress } from '@/features/profile/api/useAddressMutations';
+import { formValuesToAddressPayload } from '@/features/profile/schema/profileSchemas';
+import { restoreReservationItemsToCart } from '@/features/cart/restoreReservationItems';
 import { rebookToastMessage } from '@/features/tracking/api/useRebook';
 import { getCardAction } from '@/features/tracking/cardAction';
 import { packagePhotoRatio, useSignedUrlRefresh } from '@/features/tracking/packagePhotos';
@@ -15,6 +17,7 @@ import { env } from '@/lib/env';
 import { CANCEL_NOT_ALLOWED_MESSAGE } from '@/features/tracking/cancel';
 import { useAuthStore } from '@/stores/authStore';
 import { useCartStore } from '@/stores/cartStore';
+import { useToastStore } from '@/stores/toastStore';
 import {
   hasUnseenChange,
   needsAttention,
@@ -694,6 +697,7 @@ describe('Module M5 — 8. Profil, adresses et informations', () => {
     expect(await screen.findByRole('button', { name: 'Me connecter avec mon numéro' })).toBeInTheDocument();
     expect(useAuthStore.getState().status).toBe('guest');
     expect(useCartStore.getState().items).toHaveLength(1);
+    expect(await screen.findByText('Vous êtes déconnecté. À bientôt !')).toBeInTheDocument();
   });
 
   it('ouvre la feuille des notifications depuis le profil', async () => {
@@ -737,5 +741,107 @@ describe('Module M5 — 9. Repère de l’onglet Réservations', () => {
     await api.post(endpoints.mock.advanceReservation('RES-000105'));
     await client.invalidateQueries({ queryKey: qk.reservationsSummary() });
     await waitFor(() => expect(attentionLabel().length).toBeGreaterThan(0));
+  });
+});
+
+describe('Module M5 — 10. « Réserver à nouveau »', () => {
+  beforeEach(() => {
+    resetMockM3State();
+    useCartStore.getState().clear();
+  });
+
+  it('remet au panier seulement les articles encore disponibles (RES-000109 contient un article épuisé)', async () => {
+    const reservation = mockReservations['RES-000109']!;
+    const result = await restoreReservationItemsToCart(reservation.items);
+
+    expect(result).toEqual({ added: 2, unavailable: 1 });
+    expect(rebookToastMessage(result)).toBe('2 articles ajoutés · 1 n’est plus disponible');
+    const slugs = useCartStore.getState().items.map((i) => i.slug);
+    expect(slugs).toEqual(['pantalon-large-atelier', 'tshirt-essentiel-lourd']);
+    expect(slugs).not.toContain('tshirt-archive-01');
+  });
+
+  it('depuis le détail d’une réservation livrée : bilan, puis ouverture du panier', async () => {
+    loginAsJunior();
+    const router = renderRoute('/reservations/RES-000109');
+    const region = await screen.findByRole('region', { name: 'Où en est ma réservation' });
+    fireEvent.click(within(region).getByRole('button', { name: /Réserver à nouveau/ }));
+
+    expect((await screen.findAllByText('2 articles ajoutés · 1 n’est plus disponible')).length).toBeGreaterThan(0);
+    await waitFor(() => expect(router.state.location.pathname).toBe('/panier'));
+    useAuthStore.getState().clearSession();
+  });
+});
+
+describe('Module M5 — 11. Correctifs issus de la revue de code', () => {
+  beforeEach(() => {
+    resetMockM3State();
+    useSeenStore.setState({ initializedAt: new Date().toISOString(), byRef: {}, packageToastShown: [] });
+    useToastStore.getState().clear();
+    loginAsJunior();
+  });
+
+  afterEach(() => {
+    useAuthStore.getState().clearSession();
+  });
+
+  it('quitter la page des adresses valide la suppression et retire le « Annuler » devenu inutile', async () => {
+    renderRoute('/profil/adresses');
+    const bureau = (await screen.findByRole('heading', { name: 'Bureau', level: 2 })).closest('article') as HTMLElement;
+    fireEvent.click(within(bureau).getByRole('button', { name: /Actions pour l’adresse Bureau/ }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Supprimer' }));
+    fireEvent.click(within(await screen.findByRole('dialog', { name: /Supprimer « Bureau »/ })).getByRole('button', { name: 'Supprimer' }));
+    expect(await screen.findByRole('button', { name: 'Annuler' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getAllByRole('link', { name: /Profil/ })[0]!);
+    await screen.findByRole('heading', { name: /Junior Mbarga/, level: 1 });
+
+    expect(useToastStore.getState().toasts.some((t) => t.actionLabel === 'Annuler')).toBe(false);
+    await waitFor(async () => {
+      const list = await api.get<Address[]>(endpoints.me.addresses);
+      expect(list.map((a) => a.label)).toEqual(['Maison']);
+    });
+  });
+
+  it('efface l’agence quand une adresse d’agence devient une adresse à Douala', async () => {
+    const payload = formValuesToAddressPayload(
+      {
+        label: 'Autre',
+        city: 'Douala',
+        district: 'Akwa',
+        landmark: 'Face à la boulangerie',
+        agencyId: '',
+        recipientType: 'self',
+        recipientName: '',
+        recipientPhone: '',
+      },
+      { user: JUNIOR_SESSION_USER },
+    );
+    expect(payload.agencyId).toBeNull();
+
+    const created = await api.post<Address>(endpoints.me.addresses, {
+      label: 'Autre',
+      city: 'Yaoundé',
+      district: 'Yaoundé',
+      landmark: 'Agence Express Centre',
+      receptionMode: 'delivery',
+      agencyId: 'ag-yde-1',
+    });
+    const updated = await api.patch<Address>(endpoints.me.address(created.id), payload);
+    expect(updated.agencyId).toBeUndefined();
+    expect(updated.city).toBe('Douala');
+  });
+
+  it('annuler soi-même n’affiche qu’un message, sans « Nouvelle étape »', async () => {
+    renderRoute('/reservations/RES-000101');
+    fireEvent.click(await screen.findByRole('button', { name: 'Annuler la réservation' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Annuler RES-000101 ?' });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Oui, annuler' }));
+
+    expect(await screen.findByRole('heading', { name: /Réservation annulée/ })).toBeInTheDocument();
+    await waitFor(() =>
+      expect(useToastStore.getState().toasts.map((t) => t.message)).toContain('Réservation RES-000101 annulée'),
+    );
+    expect(useToastStore.getState().toasts.some((t) => t.message.startsWith('Nouvelle étape'))).toBe(false);
   });
 });

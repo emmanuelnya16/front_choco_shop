@@ -11,7 +11,8 @@ export type ButtonVariant =
   | 'light'
   | 'outline'
   | 'outline-light'
-  | 'ghost';
+  | 'ghost'
+  | 'danger';
 
 export type ButtonSize = 'sm' | 'md' | 'lg';
 
@@ -37,6 +38,9 @@ const VARIANT_CLASSES: Record<ButtonVariant, string> = {
     'bg-transparent text-white border-[1.5px] border-white [@media(hover:hover)]:hover:bg-glass-light',
   ghost:
     'bg-transparent text-ink border border-transparent [@media(hover:hover)]:hover:bg-surface',
+  // Action destructive confirmée (« Oui, annuler », §5.4 M5) : même rouge que `primary`, sens distinct
+  danger:
+    'bg-danger text-white border border-transparent [@media(hover:hover)]:hover:brightness-92',
 };
 
 const SIZE_CLASSES: Record<ButtonSize, string> = {

@@ -7,18 +7,26 @@ import {
   useState,
   type MouseEvent,
   type PointerEvent,
+  type ReactNode,
 } from 'react';
 import { createPortal } from 'react-dom';
-import { SmartImage } from '@/components/ui/SmartImage';
+import { SmartImage, type ImageAspectRatio } from '@/components/ui/SmartImage';
 import { duration, ease } from '@/motion/tokens';
 import type { ProductImageEntry } from '@/types/domain';
+
+/** Photo de la visionneuse : `ratio` permet d'afficher une photo au format d'origine (photos du colis, M5). */
+export type LightboxImage = ProductImageEntry & { ratio?: ImageAspectRatio; fit?: 'cover' | 'contain' };
 
 export interface ProductLightboxProps {
   open: boolean;
   onClose: () => void;
-  images: ProductImageEntry[];
+  images: LightboxImage[];
   initialIndex: number;
   productName: string;
+  /** Libellé accessible de la visionneuse (par défaut « Visionneuse photo : <productName> »). */
+  label?: string;
+  /** Actions supplémentaires de la barre du haut (ex. « Enregistrer la photo », M5). */
+  renderActions?: (image: LightboxImage, index: number) => ReactNode;
 }
 
 /**
@@ -34,6 +42,8 @@ export function ProductLightbox({
   images,
   initialIndex,
   productName,
+  label,
+  renderActions,
 }: ProductLightboxProps) {
   if (!open || typeof document === 'undefined' || images.length === 0) {
     return null;
@@ -45,6 +55,8 @@ export function ProductLightbox({
       images={images}
       initialIndex={initialIndex}
       productName={productName}
+      label={label}
+      renderActions={renderActions}
       onClose={onClose}
     />,
     document.body,
@@ -55,11 +67,15 @@ function LightboxDialog({
   images,
   initialIndex,
   productName,
+  label,
+  renderActions,
   onClose,
 }: {
-  images: ProductImageEntry[];
+  images: LightboxImage[];
   initialIndex: number;
   productName: string;
+  label?: string;
+  renderActions?: (image: LightboxImage, index: number) => ReactNode;
   onClose: () => void;
 }) {
   const [currentIndex, setCurrentIndex] = useState(
@@ -201,7 +217,7 @@ function LightboxDialog({
       <m.div
         role="dialog"
         aria-modal="true"
-        aria-label={`Visionneuse photo : ${productName}`}
+        aria-label={label ?? `Visionneuse photo : ${productName}`}
         initial={{ opacity: 0 }}
         animate={{ opacity: backdropOpacity }}
         exit={{ opacity: 0 }}
@@ -215,6 +231,7 @@ function LightboxDialog({
           </span>
 
           <div className="flex items-center gap-2">
+            {renderActions?.(activeEntry, currentIndex)}
             <button
               type="button"
               onClick={() => handleToggleZoom()}
@@ -277,7 +294,8 @@ function LightboxDialog({
               src={activeEntry.url}
               fallback={activeEntry.fallbackUrl}
               alt={activeEntry.alt ?? productName}
-              ratio="4/5"
+              ratio={activeEntry.ratio ?? '4/5'}
+              imgClassName={activeEntry.fit === 'contain' ? 'object-contain' : undefined}
               priority
               className="h-full w-full"
             />

@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { RouterProvider } from 'react-router';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -8,6 +9,9 @@ import { applyDefaultAddress, removeAddress } from '@/features/profile/api/useAd
 import { rebookToastMessage } from '@/features/tracking/api/useRebook';
 import { getCardAction } from '@/features/tracking/cardAction';
 import { createAppQueryClient } from '@/lib/api/queryClient';
+import { qk } from '@/lib/api/queryKeys';
+import { env } from '@/lib/env';
+import { CANCEL_NOT_ALLOWED_MESSAGE } from '@/features/tracking/cancel';
 import { useAuthStore } from '@/stores/authStore';
 import {
   hasUnseenChange,
@@ -312,10 +316,10 @@ function loginAsJunior() {
   useAuthStore.getState().setSession('mock-token-m5', JUNIOR_SESSION_USER);
 }
 
-function renderRoute(path: string) {
+function renderRoute(path: string, client = createAppQueryClient()) {
   const router = createTestRouter([path]);
   render(
-    <AppProviders client={createAppQueryClient()}>
+    <AppProviders client={client}>
       <RouterProvider router={router} />
     </AppProviders>,
   );
@@ -398,5 +402,123 @@ describe('Module M5 — 5. Mes réservations (cartes et page)', () => {
     fireEvent.click(screen.getByRole('tab', { name: /Terminées/ }));
     expect(await screen.findByText('RES-000109')).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: 'Réserver à nouveau' }).length).toBeGreaterThan(0);
+  });
+});
+
+describe('Module M5 — 6. Détail d’une réservation', () => {
+  beforeEach(() => {
+    resetMockM3State();
+    useSeenStore.setState({ initializedAt: new Date().toISOString(), byRef: {}, packageToastShown: [] });
+    loginAsJunior();
+  });
+
+  afterEach(() => {
+    useAuthStore.getState().clearSession();
+  });
+
+  const actionRegion = () => screen.findByRole('region', { name: 'Où en est ma réservation' });
+
+  it.each([
+    ['RES-000101', /Paiement attendu/],
+    ['RES-000103', /Paiement non validé/],
+    ['RES-000104', /Nous vérifions votre paiement/],
+    ['RES-000105', /Paiement validé/],
+    ['RES-000106', /En préparation/],
+    ['RES-000107', /Votre colis est prêt/],
+    ['RES-000102', /Votre colis est prêt/],
+    ['RES-000108', /En route/],
+    ['RES-000109', /Livrée le/],
+    ['RES-000110', /Retirée le/],
+    ['RES-000111', /Réservation expirée/],
+    ['RES-000112', /Réservation annulée/],
+  ])('bloc d’action adapté au statut de %s', async (ref, title) => {
+    renderRoute(`/reservations/${ref}`);
+    const region = await actionRegion();
+    expect(within(region).getByRole('heading', { name: title })).toBeInTheDocument();
+
+    if (ref === 'RES-000101') {
+      expect(within(region).getByRole('link', { name: /Payer maintenant/ })).toHaveAttribute(
+        'href',
+        '/reservation/RES-000101/paiement',
+      );
+    }
+    if (ref === 'RES-000103') {
+      expect(within(region).getByText('Montant incorrect')).toBeInTheDocument();
+    }
+    if (ref === 'RES-000102') {
+      expect(within(region).getByText('Code de retrait')).toBeInTheDocument();
+    }
+    if (ref === 'RES-000112') {
+      expect(within(region).getAllByText(/Annulée par vous/).length).toBeGreaterThan(0);
+    }
+  });
+
+  it('frise lisible comme une liste ordonnée, étape en cours marquée `aria-current="step"`', async () => {
+    renderRoute('/reservations/RES-000105');
+    const list = await screen.findByRole('list', { name: 'Suivi de la réservation' });
+    const steps = within(list).getAllByRole('listitem');
+    expect(steps).toHaveLength(6);
+    expect(steps[2]).toHaveAttribute('aria-current', 'step');
+    expect(steps[2]).toHaveTextContent(/Étape 3 sur 6, Confirmée, le .+ à .+, en cours/);
+  });
+
+  it('annule une réservation payée avec motif : message de remboursement puis statut « Annulée »', async () => {
+    renderRoute('/reservations/RES-000105');
+    fireEvent.click(await screen.findByRole('button', { name: 'Annuler la réservation' }));
+
+    const dialog = await screen.findByRole('dialog', { name: 'Annuler RES-000105 ?' });
+    expect(within(dialog).getByText(/Vous avez déjà payé/)).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Erreur de taille' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Oui, annuler' }));
+
+    expect(await screen.findByRole('heading', { name: /Réservation annulée/ })).toBeInTheDocument();
+    expect(screen.getAllByText(/Erreur de taille/).length).toBeGreaterThan(0);
+  });
+
+  it('gère le refus 422 : message et contact WhatsApp', async () => {
+    server.use(
+      http.post(`${env.apiBaseUrl}/reservations/:ref/cancel`, () =>
+        HttpResponse.json(
+          { code: 'CANCEL_NOT_ALLOWED', message: CANCEL_NOT_ALLOWED_MESSAGE },
+          { status: 422 },
+        ),
+      ),
+    );
+    renderRoute('/reservations/RES-000101');
+    fireEvent.click(await screen.findByRole('button', { name: 'Annuler la réservation' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Annuler RES-000101 ?' });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Oui, annuler' }));
+
+    expect(await within(dialog).findByText(CANCEL_NOT_ALLOWED_MESSAGE)).toBeInTheDocument();
+    expect(within(dialog).getByRole('link', { name: /WhatsApp/ })).toHaveAttribute(
+      'href',
+      expect.stringContaining('https://wa.me/'),
+    );
+  });
+
+  it('n’affiche pas l’annulation à partir de la préparation (`cancellable` faux)', async () => {
+    renderRoute('/reservations/RES-000106');
+    await actionRegion();
+    expect(screen.queryByRole('button', { name: 'Annuler la réservation' })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: /Contacter la boutique sur WhatsApp/ }).length).toBeGreaterThan(0);
+  });
+
+  it('signale la nouvelle étape depuis la dernière visite, puis un changement détecté en direct', async () => {
+    useSeenStore.getState().markSeen('RES-000106', 'confirmed', '2026-10-29T10:00:00.000Z');
+    const client = createAppQueryClient();
+    renderRoute('/reservations/RES-000106', client);
+
+    expect((await screen.findAllByText('Nouvelle étape : En préparation')).length).toBeGreaterThan(0);
+    await waitFor(() => expect(useSeenStore.getState().byRef['RES-000106']?.status).toBe('preparing'));
+
+    // La boutique avance la réservation pendant que l'écran est ouvert
+    await api.post(endpoints.mock.advanceReservation('RES-000106'));
+    await client.invalidateQueries({ queryKey: qk.reservation('RES-000106') });
+
+    expect(await screen.findByRole('heading', { name: /Votre colis est parti/ })).toBeInTheDocument();
+    expect((await screen.findAllByText('Nouvelle étape : Remise à l’agence')).length).toBeGreaterThan(0);
+    await waitFor(() =>
+      expect(useSeenStore.getState().byRef['RES-000106']?.status).toBe('handed_to_agency'),
+    );
   });
 });

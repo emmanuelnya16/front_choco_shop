@@ -139,3 +139,14 @@ export function buildWhatsAppExpiredPaidUrl(
   ].join('\n');
   return `https://wa.me/${digits}?text=${encodeURIComponent(text)}`;
 }
+
+/**
+ * Lien WhatsApp « question sur ma réservation » (aide du détail et du profil, §5.1 M5).
+ */
+export function buildWhatsAppQuestionUrl(whatsappNumber: string, ref?: string): string {
+  const digits = whatsappNumber.replace(/\D/g, '') || '237690000000';
+  const text = ref
+    ? `Bonjour DR Choco, j’ai une question sur ma réservation ${ref}.`
+    : 'Bonjour DR Choco, j’ai une question.';
+  return `https://wa.me/${digits}?text=${encodeURIComponent(text)}`;
+}

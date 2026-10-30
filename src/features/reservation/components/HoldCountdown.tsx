@@ -11,6 +11,8 @@ export interface HoldCountdownProps {
   variant?: HoldCountdownVariant;
   onExpire?: () => void;
   className?: string;
+  /** Fond sur lequel le compte à rebours est posé : sur `dark` (ink), le texte reste blanc et seul l'anneau change de couleur. */
+  surface?: 'light' | 'dark';
 }
 
 const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
@@ -47,6 +49,7 @@ export function HoldCountdown({
   variant = 'inline',
   onExpire,
   className,
+  surface = 'light',
 }: HoldCountdownProps) {
   const storeOffsetMs = useReservationStore((s) => s.serverTimeOffsetMs);
 
@@ -136,8 +139,12 @@ export function HoldCountdown({
         ? 'warning'
         : 'ink';
 
-  const textColorClass =
-    tone === 'red'
+  const onDark = surface === 'dark';
+
+  // Règle de contraste M0 : jamais de texte rouge sur fond ink
+  const textColorClass = onDark
+    ? 'text-white'
+    : tone === 'red'
       ? 'text-red'
       : tone === 'warning'
         ? 'text-warning'
@@ -148,7 +155,9 @@ export function HoldCountdown({
       ? 'stroke-red'
       : tone === 'warning'
         ? 'stroke-warning'
-        : 'stroke-ink';
+        : onDark
+          ? 'stroke-white'
+          : 'stroke-ink';
 
   if (isExpired) {
     return (
@@ -156,7 +165,7 @@ export function HoldCountdown({
         role="status"
         data-testid="hold-countdown"
         data-tone="red"
-        className={cn('font-bold text-danger', className)}
+        className={cn('font-bold', onDark ? 'text-white' : 'text-danger', className)}
       >
         Réservation expirée
       </span>
@@ -235,7 +244,7 @@ export function HoldCountdown({
             cy="36"
             r={radius}
             fill="none"
-            className="stroke-silver/40"
+            className={onDark ? 'stroke-white/20' : 'stroke-silver/40'}
             strokeWidth="4.5"
           />
           <circle
@@ -259,7 +268,7 @@ export function HoldCountdown({
           {ringCenterLabel}
         </span>
       </div>
-      <span className="mt-1.5 text-xs font-semibold text-text-2">
+      <span className={cn('mt-1.5 text-xs font-semibold', onDark ? 'text-silver' : 'text-text-2')}>
         Articles réservés pour vous
       </span>
     </div>

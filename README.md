@@ -45,6 +45,10 @@ npm run dev
 | `npm run test` | `vitest run` | Exécution de la suite de tests unitaires et d'intégration |
 | `npm run test:watch` | `vitest` | Mode interactif Vitest |
 | `npm run analyze` | `vite build --mode analyze` | Génère le rapport `stats.html` du poids des bundles |
+| `npm run mock:api` | `tsx server/mock-api.ts` | Serveur de mocks Node sur le port 8787 (mêmes gestionnaires MSW, simulateur boutique compris) |
+| `npm run preview:pwa` | `tsc -b && vite build --mode pwa && vite preview --mode pwa …` | Build de l'application installable (sans MSW) et prévisualisation sur http://127.0.0.1:4173 |
+| `npm run icons` | `pwa-assets-generator && node scripts/generate-extra-icons.mjs` | Icônes, écrans de démarrage iPhone, pastille et raccourcis |
+| `npm run screenshots` | `node scripts/capture-manifest-screenshots.mjs` | Captures du manifeste (fenêtre d'installation Android) |
 
 ---
 
@@ -59,6 +63,9 @@ VITE_CLOUDINARY_CLOUD_NAME=demo
 VITE_APP_NAME="DR Choco L'Incompris"
 VITE_SHOP_WHATSAPP=+237600000000
 VITE_ENABLE_DEV_PAGE=true
+# M6 : application installable et notifications
+VITE_PWA_ENABLED=          # vide = vrai pour un build de production, faux en développement
+VITE_VAPID_PUBLIC_KEY=     # clé publique VAPID du back-end (clé de démonstration par défaut)
 ```
 
 - En **prévisualisation** (Vercel / Netlify), conserver `VITE_API_MOCK=true` et `VITE_ENABLE_DEV_PAGE=true` permet d'utiliser les mocks MSW et d'inspecter `/_dev`.
@@ -149,6 +156,25 @@ drchoco-app/
 
 ---
 
+## 6 bis. Tester la PWA (M6)
+
+Le service worker de MSW et celui de l'application ne peuvent pas contrôler la même page. D'où deux modes :
+
+| Mode | Commande | MSW | Service worker de l'app |
+| --- | --- | --- | --- |
+| Développement avec mocks | `npm run dev` | Dans le navigateur | Désactivé (et désinscrit au démarrage s'il en reste un) |
+| Test de la PWA | `npm run mock:api` puis `npm run preview:pwa` | Serveur Node (port 8787) | Actif |
+
+1. Terminal 1 : `npm run mock:api`. Le serveur charge `src/mocks/handlers.ts` et répond sur `http://127.0.0.1:8787/api`. Remise à zéro complète : `POST /api/_mock/reset` (ou bouton dans `/_dev`).
+2. Terminal 2 : `npm run preview:pwa`. Le build utilise `.env.pwa` (`VITE_API_MOCK=false`, `VITE_API_BASE_URL=http://127.0.0.1:8787/api`, `VITE_PWA_ENABLED=true`).
+3. Ouvrez **http://127.0.0.1:4173** (et non `localhost` : les mocks comparent l'origine exacte).
+4. Chrome DevTools, onglet Application : manifeste, service worker, caches (`api-catalog`, `api-user`, `images`, `pages`, `fonts`). Le mode avion se simule avec « Offline » dans l'onglet Network.
+5. Le simulateur boutique de `/_dev` fonctionne avec ce serveur et déclenche aussi la notification locale correspondante.
+
+Le service worker et les notifications exigent un contexte sécurisé : `127.0.0.1`, `localhost` ou HTTPS. Sur un téléphone, passez par une prévisualisation déployée en HTTPS ou un tunnel HTTPS (une adresse `http://192.168.x.x` ne permet ni l'installation ni les notifications).
+
+---
+
 ## 7. Tester sur un vrai téléphone Android / iOS
 
 1. Connectez votre téléphone et votre ordinateur au **même réseau Wi-Fi**.
@@ -161,16 +187,13 @@ drchoco-app/
 
 ---
 
-## 8. Feuille de route des modules suivants
+## 8. Feuille de route des modules
 
-- **M0 — Fondations** *(ce module)* : socle technique, jetons Tailwind v4, police Archivo Variable, Motion + GSAP, routeur lazy, couche API, mocks MSW, stores Zustand, tests.
-- **M1 — Design system** : kit de composants d'interface (boutons, cartes produits, sélecteurs de taille/couleur, champs, badges, squelettes).
-- **M2 — Mouvement** : composants animés réutilisables (`Reveal`, `Sheet`, `Toast`, transitions de page).
-- **M3 — Coquille PWA** : en-tête, barre de navigation basse à 4 onglets, manifeste Web App, Service Worker hors-ligne, invite d'installation.
-- **M4 — Catalogue** : accueil, exploration par catégorie, recherche plein écran, fiche produit et favoris.
-- **M5 — Compte** : feuille de connexion par numéro camerounais (+237) + code OTP par SMS, profil et carnet d'adresses.
-- **M6 — Réservation** : panier, choix livraison / retrait en boutique Akwa, blocage du stock pendant 24 h.
-- **M7 — Paiement** : instructions Mobile Money (Orange Money / MTN MoMo), envoi de la capture avec progression XHR, écran de succès.
-- **M8 — Suivi** : liste et détail des réservations, frise chronologique animée, dévoilement des photos du colis prêt.
-- **M9 — Notifications** : abonnement Web Push et alertes de changement de statut.
-- **M10 — Finitions et recette** : optimisation finale, audit d'accessibilité et recette de bout en bout sur appareils réels.
+- **M0 — Fondations** : socle technique, jetons Tailwind v4, Motion et GSAP, routeur, couche API, mocks MSW, stores, tests.
+- **M1 — Accueil et design system**.
+- **M2 — Catalogue** : exploration, recherche, fiche produit, favoris.
+- **M3 — Panier et réservation** : connexion OTP, formulaire, blocage du stock 24 h.
+- **M4 — Paiement** : Mobile Money, envoi de la preuve, écran Merci.
+- **M5 — Suivi, photo du colis et profil**.
+- **M6 — PWA, hors connexion et notifications** : installation, service worker, cache, hors connexion, Web Push, pastille.
+- **M7 — Finitions** : pages légales, recette générale, mise en ligne.

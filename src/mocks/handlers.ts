@@ -324,8 +324,22 @@ function loadSessionUser(): void {
 
 loadSessionUser();
 
+interface MockPushSubscription {
+  endpoint: string;
+  ownerPhone: string;
+  platform: string;
+  subscribedAt: string;
+}
+const pushSubscriptions = new Map<string, MockPushSubscription>();
+
+function countOwnerSubscriptions(): number {
+  const owner = currentOwnerPhone();
+  return [...pushSubscriptions.values()].filter((sub) => sub.ownerPhone === owner).length;
+}
+
 export function resetMockM3State(): void {
   otpTrackByPhone.clear();
+  pushSubscriptions.clear();
   idempotencyCache.clear();
   seenProofHashes.clear();
   reservationSeqCounter = 124;
@@ -1025,6 +1039,7 @@ export const handlers = [
 
     usersByPhone.set(normalizedPhone, user);
     currentSessionUser = user;
+    persistSessionUser();
 
     return HttpResponse.json({
       accessToken: `mock-jwt-access-token-${user.id}-${Date.now()}`,
@@ -1694,6 +1709,50 @@ export const handlers = [
   // Simulateur boutique (mocks uniquement, §3.3 M4 et §3.3 M5)
   // Chaque action met à jour `updatedAt` et ajoute une entrée datée au journal.
   // ==========================================================================
+
+  // POST /push/subscribe et /push/unsubscribe (M6 §7.1) : abonnements gardés en mémoire.
+  // Un client peut avoir plusieurs appareils : un abonnement par point de terminaison.
+  http.post(apiUrl('/push/subscribe'), async ({ request }) => {
+    await delay(100);
+    const body = (await request.json().catch(() => null)) as {
+      subscription?: { endpoint?: unknown };
+      oldEndpoint?: unknown;
+      platform?: unknown;
+    } | null;
+    const endpoint = body?.subscription?.endpoint;
+    if (typeof endpoint !== 'string' || !endpoint.startsWith('https://')) {
+      return HttpResponse.json(
+        { code: 'INVALID_SUBSCRIPTION', message: 'Abonnement aux notifications invalide.' },
+        { status: 422 },
+      );
+    }
+    if (typeof body?.oldEndpoint === 'string') pushSubscriptions.delete(body.oldEndpoint);
+    pushSubscriptions.set(endpoint, {
+      endpoint,
+      ownerPhone: currentOwnerPhone(),
+      platform: typeof body?.platform === 'string' ? body.platform : 'web',
+      subscribedAt: new Date().toISOString(),
+    });
+    return HttpResponse.json({ ok: true, devices: countOwnerSubscriptions() }, { status: 201 });
+  }),
+
+  http.post(apiUrl('/push/unsubscribe'), async ({ request }) => {
+    await delay(100);
+    const body = (await request.json().catch(() => null)) as { endpoint?: unknown } | null;
+    if (typeof body?.endpoint === 'string') pushSubscriptions.delete(body.endpoint);
+    return new HttpResponse(null, { status: 204 });
+  }),
+
+  // POST /_mock/reset — remet TOUT à zéro (session, OTP, adresses, favoris, réservations) :
+  // utile avec le serveur de mocks Node, dont l'état survit aux rechargements de page.
+  http.post(apiUrl('/_mock/reset'), async () => {
+    await delay(100);
+    resetMockM3State();
+    persistSessionUser();
+    persistSessionReservations();
+    mockSyncChannel?.postMessage({ type: 'reset' } satisfies MockSyncMessage);
+    return HttpResponse.json({ ok: true, count: Object.keys(mockReservations).length });
+  }),
 
   // POST /_mock/reservations/reset — remet toutes les réservations de démonstration à zéro
   http.post(apiUrl('/_mock/reservations/reset'), async () => {

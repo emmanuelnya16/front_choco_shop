@@ -76,6 +76,7 @@ export const endpoints = {
   },
   push: {
     subscribe: '/push/subscribe',
+    unsubscribe: '/push/unsubscribe',
   },
   mock: {
     validateReservation: (ref: string) =>
@@ -96,5 +97,7 @@ export const endpoints = {
     shopCancelReservation: (ref: string) =>
       `/_mock/reservations/${encodeURIComponent(ref)}/shop-cancel`,
     resetReservations: '/_mock/reservations/reset',
+    // Remise à zéro complète (serveur de mocks Node, M6 §3.2)
+    resetAll: '/_mock/reset',
   },
 } as const;

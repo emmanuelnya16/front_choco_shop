@@ -75,12 +75,13 @@ export function NewArrivalsSection() {
         />
       </Container>
 
-      {/* Horizontal Carousel aligned left on Container, overflowing right to screen edge */}
+      {/* Horizontal Carousel aligned left on Container, overflowing right to screen edge.
+          scroll-padding = padding : l'aimantation cale la première carte sur le conteneur, pas sur le bord de l'écran */}
       <div className="mt-6 lg:mt-8">
         <div
           ref={scrollerRef}
           onScroll={updateScrollButtons}
-          className="no-scrollbar flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-smooth pr-page pl-[max(var(--spacing-page),calc((100vw-var(--container-content))/2+var(--spacing-page)))]"
+          className="no-scrollbar flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-smooth pr-page [--carousel-inset:max(var(--spacing-page),calc((100%-var(--container-content))/2+var(--spacing-page)))] pl-(--carousel-inset) scroll-pl-(--carousel-inset)"
         >
           {isLoading ? (
             Array.from({ length: 5 }).map((_, idx) => (
@@ -100,13 +101,15 @@ export function NewArrivalsSection() {
               className="flex gap-4"
             >
               {products.map((product) => (
-                <m.div
+                // Le glissement est porté par l'enfant : un décalage sur l'élément aimanté fausserait la position de départ
+                <div
                   key={product.id}
-                  variants={slideInRight}
                   className="w-[72vw] max-w-[290px] shrink-0 snap-start sm:w-[270px] lg:w-[290px]"
                 >
-                  <ProductCard product={product} />
-                </m.div>
+                  <m.div variants={slideInRight}>
+                    <ProductCard product={product} />
+                  </m.div>
+                </div>
               ))}
             </m.div>
           )}

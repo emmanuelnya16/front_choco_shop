@@ -2,7 +2,7 @@ import { useScroll, useTransform } from 'motion/react';
 import * as m from 'motion/react-m';
 import { Camera, MapPin, PackageCheck, Smartphone } from 'lucide-react';
 import { useRef } from 'react';
-import { Section } from '@/components/ui/Primitives';
+import { Container, Section } from '@/components/ui/Primitives';
 import { SmartImage } from '@/components/ui/SmartImage';
 import { fadeUp } from '@/motion/presets';
 import { useReducedMotionPref } from '@/motion/useReducedMotionPref';
@@ -139,31 +139,65 @@ export function EngagementsSection() {
 
   return (
     <Section ref={sectionRef} className="bg-surface/40">
-      <div className="mx-auto max-w-2xl text-center">
-        <span className="text-label text-red">Transparence &amp; service</span>
-        <h2 className="mt-2 text-h2 text-ink">
-          POURQUOI NOUS FAIRE CONFIANCE
-        </h2>
-      </div>
+      <Container>
+        <div className="mx-auto max-w-2xl text-center">
+          <span className="text-label text-red">Transparence &amp; service</span>
+          <h2 className="mt-2 text-h2 text-ink">
+            POURQUOI NOUS FAIRE CONFIANCE
+          </h2>
+        </div>
 
-      {/* Desktop 3-column staggered mosaic with subtle parallax */}
-      <div className="mt-10 hidden grid-cols-3 items-start gap-6 lg:grid">
-        {/* Column 1: Card 0 + Photo 0 */}
-        <m.div style={{ y: colLeftY }} className="space-y-6">
+        {/* Desktop 3-column staggered mosaic with subtle parallax */}
+        <div className="mt-10 hidden grid-cols-3 items-start gap-6 lg:grid">
+          {/* Column 1: Card 0 + Photo 0 */}
+          <m.div style={{ y: colLeftY }} className="space-y-6">
+            <EngagementCard
+              card={ENGAGEMENT_CARDS[0]}
+              reducedMotion={reducedMotion}
+            />
+            <EngagementPhoto
+              photo={ENGAGEMENT_PHOTOS[0]}
+              reducedMotion={reducedMotion}
+            />
+          </m.div>
+
+          {/* Column 2 (offset 48px downward): Photo 1 + Card 1 + Card 2 */}
+          <m.div style={{ y: colCenterY }} className="mt-12 space-y-6">
+            <EngagementPhoto
+              photo={ENGAGEMENT_PHOTOS[1]}
+              reducedMotion={reducedMotion}
+            />
+            <EngagementCard
+              card={ENGAGEMENT_CARDS[1]}
+              reducedMotion={reducedMotion}
+            />
+            <EngagementCard
+              card={ENGAGEMENT_CARDS[2]}
+              reducedMotion={reducedMotion}
+            />
+          </m.div>
+
+          {/* Column 3: Photo 2 + Card 3 */}
+          <m.div style={{ y: colRightY }} className="space-y-6">
+            <EngagementPhoto
+              photo={ENGAGEMENT_PHOTOS[2]}
+              reducedMotion={reducedMotion}
+            />
+            <EngagementCard
+              card={ENGAGEMENT_CARDS[3]}
+              reducedMotion={reducedMotion}
+            />
+          </m.div>
+        </div>
+
+        {/* Mobile single column alternating: card, photo, card, card, photo, card */}
+        <div className="mt-8 space-y-4 lg:hidden">
           <EngagementCard
             card={ENGAGEMENT_CARDS[0]}
             reducedMotion={reducedMotion}
           />
           <EngagementPhoto
             photo={ENGAGEMENT_PHOTOS[0]}
-            reducedMotion={reducedMotion}
-          />
-        </m.div>
-
-        {/* Column 2 (offset 48px downward): Photo 1 + Card 1 + Card 2 */}
-        <m.div style={{ y: colCenterY }} className="mt-12 space-y-6">
-          <EngagementPhoto
-            photo={ENGAGEMENT_PHOTOS[1]}
             reducedMotion={reducedMotion}
           />
           <EngagementCard
@@ -174,48 +208,16 @@ export function EngagementsSection() {
             card={ENGAGEMENT_CARDS[2]}
             reducedMotion={reducedMotion}
           />
-        </m.div>
-
-        {/* Column 3: Photo 2 + Card 3 */}
-        <m.div style={{ y: colRightY }} className="space-y-6">
           <EngagementPhoto
-            photo={ENGAGEMENT_PHOTOS[2]}
+            photo={ENGAGEMENT_PHOTOS[1]}
             reducedMotion={reducedMotion}
           />
           <EngagementCard
             card={ENGAGEMENT_CARDS[3]}
             reducedMotion={reducedMotion}
           />
-        </m.div>
-      </div>
-
-      {/* Mobile single column alternating: card, photo, card, card, photo, card */}
-      <div className="mt-8 space-y-4 lg:hidden">
-        <EngagementCard
-          card={ENGAGEMENT_CARDS[0]}
-          reducedMotion={reducedMotion}
-        />
-        <EngagementPhoto
-          photo={ENGAGEMENT_PHOTOS[0]}
-          reducedMotion={reducedMotion}
-        />
-        <EngagementCard
-          card={ENGAGEMENT_CARDS[1]}
-          reducedMotion={reducedMotion}
-        />
-        <EngagementCard
-          card={ENGAGEMENT_CARDS[2]}
-          reducedMotion={reducedMotion}
-        />
-        <EngagementPhoto
-          photo={ENGAGEMENT_PHOTOS[1]}
-          reducedMotion={reducedMotion}
-        />
-        <EngagementCard
-          card={ENGAGEMENT_CARDS[3]}
-          reducedMotion={reducedMotion}
-        />
-      </div>
+        </div>
+      </Container>
     </Section>
   );
 }

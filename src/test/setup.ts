@@ -1,7 +1,11 @@
 import '@testing-library/jest-dom/vitest';
-import { cleanup } from '@testing-library/react';
+import { cleanup, configure } from '@testing-library/react';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { afterEach, beforeEach, vi } from 'vitest';
+
+// Les pages sont chargées à la demande (lazy) : au premier lancement, sans cache de transformation,
+// leur import peut dépasser 1 s (délai par défaut de findBy* / waitFor). 4 s reste sous les 5 s par test.
+configure({ asyncUtilTimeout: 4000 });
 
 // Simulation de window.matchMedia
 Object.defineProperty(window, 'matchMedia', {

@@ -14,6 +14,8 @@ export interface AuthState {
   setSession: (accessToken: string, user: User) => void;
   setAccessToken: (accessToken: string) => void;
   clearSession: () => void;
+  /** Serveur injoignable au rafraîchissement : le profil connu reste connecté (lecture hors connexion). */
+  keepOfflineSession: () => void;
   getToken: () => string | null;
 }
 
@@ -45,6 +47,12 @@ export const useAuthStore = create<AuthState>()(
           user: null,
           status: 'guest',
         });
+      },
+
+      // HYPOTHÈSE: sans réseau, le profil persisté est considéré comme connecté pour afficher les
+      // données enregistrées ; le serveur revérifie la session à la première requête en ligne.
+      keepOfflineSession: () => {
+        set((state) => ({ status: state.user ? 'authenticated' : 'guest' }));
       },
 
       getToken: () => get().accessToken,

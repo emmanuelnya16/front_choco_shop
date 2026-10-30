@@ -10,12 +10,9 @@ import { Toaster } from '@/components/ui/Toast';
 import { FlyToCartLayer } from '@/features/catalog/cart-fly/FlyToCartLayer';
 import { PendingReservationBanner } from '@/features/reservation/components/PendingReservationBanner';
 import { PackageReadyNotifier } from '@/features/tracking/components/PackageReadyNotifier';
-import { api } from '@/lib/api/client';
-import { endpoints } from '@/lib/api/endpoints';
+import { refreshSessionSilently } from '@/lib/api/client';
 import { useNetworkRecoveryToast } from '@/lib/hooks/useOnlineStatus';
-import { useAuthStore } from '@/stores/authStore';
 import { useUiStore } from '@/stores/uiStore';
-import type { RefreshTokenResponse } from '@/types/api';
 
 const LazyCartDrawer = lazy(() =>
   import('@/features/cart/components/CartDrawer').then((m) => ({
@@ -78,21 +75,23 @@ export function RootLayout() {
 
   useNetworkRecoveryToast();
 
-  // Rafraîchissement silencieux de la session au démarrage (§5.5)
+  // Rafraîchissement silencieux de la session (§5.5) : au démarrage, au retour du réseau et au
+  // retour sur l'app. Une coupure garde le client connecté (M6 §6) ; seul un refus du serveur
+  // l'efface.
   useEffect(() => {
-    const { user, accessToken, setSession, clearSession } = useAuthStore.getState();
-    if (user && !accessToken) {
-      api
-        .post<RefreshTokenResponse>(endpoints.auth.refresh, undefined, {
-          skipAuthRefresh: true,
-        })
-        .then((res) => {
-          setSession(res.accessToken, res.user ?? user);
-        })
-        .catch(() => {
-          clearSession();
-        });
-    }
+    const run = () => {
+      void refreshSessionSilently();
+    };
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') run();
+    };
+    run();
+    window.addEventListener('online', run);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.removeEventListener('online', run);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, []);
 
   return (

@@ -81,18 +81,29 @@ function getDefaultErrorMessage(status: number): { code: string; message: string
   };
 }
 
-let refreshPromise: Promise<string | null> | null = null;
+/**
+ * Issue d'un rafraîchissement de session :
+ * - `ok` : nouveau jeton reçu ;
+ * - `rejected` : le serveur refuse la session (seul cas où elle est effacée) ;
+ * - `unreachable` : coupure réseau, délai dépassé ou erreur serveur : on garde le profil,
+ *   pour que l'app reste utilisable hors connexion (M6 §6) ; on réessaiera au retour du réseau.
+ */
+export type RefreshOutcome =
+  | { kind: 'ok'; token: string }
+  | { kind: 'rejected' }
+  | { kind: 'unreachable'; timedOut: boolean };
 
-async function attemptTokenRefresh(): Promise<string | null> {
+let refreshPromise: Promise<RefreshOutcome> | null = null;
+
+async function attemptTokenRefresh(): Promise<RefreshOutcome> {
   if (refreshPromise) {
     return refreshPromise;
   }
 
-  refreshPromise = (async () => {
+  refreshPromise = (async (): Promise<RefreshOutcome> => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
     try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
-
       const response = await fetch(buildUrl(endpoints.auth.refresh), {
         method: 'POST',
         headers: {
@@ -103,11 +114,14 @@ async function attemptTokenRefresh(): Promise<string | null> {
         signal: controller.signal,
       });
 
-      clearTimeout(timer);
-
-      if (!response.ok) {
+      // HYPOTHÈSE: 401 et 403 sur /auth/refresh signifient « jeton de rafraîchissement refusé » ;
+      // les erreurs 5xx sont momentanées et ne doivent pas déconnecter le client.
+      if (response.status === 401 || response.status === 403) {
         useAuthStore.getState().clearSession();
-        return null;
+        return { kind: 'rejected' };
+      }
+      if (!response.ok) {
+        return { kind: 'unreachable', timedOut: false };
       }
 
       const data = (await response.json()) as RefreshTokenResponse;
@@ -117,20 +131,35 @@ async function attemptTokenRefresh(): Promise<string | null> {
         } else {
           useAuthStore.getState().setAccessToken(data.accessToken);
         }
-        return data.accessToken;
+        return { kind: 'ok', token: data.accessToken };
       }
 
       useAuthStore.getState().clearSession();
-      return null;
-    } catch {
-      useAuthStore.getState().clearSession();
-      return null;
+      return { kind: 'rejected' };
+    } catch (error) {
+      const timedOut = error instanceof Error && error.name === 'AbortError';
+      return { kind: 'unreachable', timedOut };
     } finally {
+      clearTimeout(timer);
       refreshPromise = null;
     }
   })();
 
   return refreshPromise;
+}
+
+/**
+ * Rafraîchissement silencieux de la session (démarrage, retour du réseau, retour sur l'app).
+ * Hors connexion, le profil connu est conservé : les écrans affichent le dernier état enregistré.
+ */
+export async function refreshSessionSilently(): Promise<RefreshOutcome['kind'] | 'skipped'> {
+  const { user, accessToken } = useAuthStore.getState();
+  if (!user || accessToken) return 'skipped';
+  const outcome = await attemptTokenRefresh();
+  if (outcome.kind === 'unreachable') {
+    useAuthStore.getState().keepOfflineSession();
+  }
+  return outcome.kind;
 }
 
 async function request<T>(
@@ -167,9 +196,15 @@ async function request<T>(
 
     if (response.status === 401 && !options.skipAuthRefresh && path !== endpoints.auth.refresh) {
       clearTimeout(timeoutId);
-      const newToken = await attemptTokenRefresh();
-      if (newToken) {
+      const outcome = await attemptTokenRefresh();
+      if (outcome.kind === 'ok') {
         return request<T>(method, path, body, { ...options, skipAuthRefresh: true });
+      }
+      if (outcome.kind === 'unreachable') {
+        // Coupure pendant le rafraîchissement : erreur réseau, pas une session expirée
+        throw outcome.timedOut
+          ? new ApiError(408, 'TIMEOUT', 'Le délai de connexion est dépassé. Vérifiez votre réseau 3G/4G et réessayez.')
+          : new ApiError(0, 'NETWORK_ERROR', 'Réseau indisponible. Vérifiez votre connexion Internet et réessayez.');
       }
       throw new ApiError(
         401,

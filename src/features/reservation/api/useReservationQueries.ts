@@ -148,6 +148,8 @@ export function usePendingReservations() {
 export interface UseReservationOptions {
   /** Active l'interrogation périodique toutes les 20 s lorsque l'onglet est visible (§7.1 M4) */
   live?: boolean;
+  /** Intervalle de l'interrogation en direct (20 s par défaut ; 30 s sur le détail M5, §8.1). */
+  intervalMs?: number;
 }
 
 export function useReservation(
@@ -180,7 +182,7 @@ export function useReservation(
     staleTime: options?.live ? 0 : 30 * 1000,
     // HYPOTHÈSE: Simple interrogation périodique toutes les 20 s sur les écrans de paiement, preuve et Merci (§7.1).
     // Les notifications push (M6) prendront le relais en arrière-plan.
-    refetchInterval: options?.live ? 20_000 : false,
+    refetchInterval: options?.live ? (options.intervalMs ?? 20_000) : false,
     refetchIntervalInBackground: false,
     refetchOnWindowFocus: options?.live ? 'always' : true,
   });

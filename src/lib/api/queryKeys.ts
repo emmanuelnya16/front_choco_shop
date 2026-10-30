@@ -14,6 +14,9 @@ export const qk = {
   addresses: () => ['me', 'addresses'] as const,
   reservations: () => ['reservations'] as const,
   pendingReservations: () => ['reservations', 'pending'] as const,
+  // Préfixe commun ['reservations'] : invalider qk.reservations() rafraîchit liste, résumé et réservations en attente.
+  reservationsList: (scope: 'active' | 'done') => ['reservations', 'list', scope] as const,
+  reservationsSummary: () => ['reservations', 'summary'] as const,
   reservation: (ref: string) => ['reservation', ref] as const,
   favorites: () => ['favorites'] as const,
   cities: () => ['delivery', 'cities'] as const,

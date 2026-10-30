@@ -41,6 +41,7 @@ import {
 } from '@/types/reservationStatus';
 
 import { M1KitShowcase } from './M1KitShowcase';
+import { ShopSimulatorM5 } from './ShopSimulatorM5';
 
 const LazyGsapSandbox = lazy(() => import('./GsapTestSandbox'));
 
@@ -54,7 +55,7 @@ const TONE_STYLES: Record<StatusTone, string> = {
 const HERO_LINES = ["L'INCOMPRIS", 'NE SE PLIE', 'À PERSONNE.'] as const;
 
 export function DevPage() {
-  useDocumentTitle('Contrôle M0–M4 (/_dev)');
+  useDocumentTitle('Contrôle M0–M5 (/_dev)');
   const reducedMotion = useReducedMotionPref();
   const queryClient = useQueryClient();
   const activeReservation = useReservationStore((s) => s.activeReservation);
@@ -978,6 +979,9 @@ export function DevPage() {
             ) : null}
           </div>
         </section>
+
+        {/* 9 ter. SIMULATEUR BOUTIQUE ENRICHI (M5) */}
+        <ShopSimulatorM5 />
 
         {/* 10. KIT VISUEL M1 */}
         <M1KitShowcase />

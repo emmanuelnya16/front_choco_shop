@@ -228,17 +228,27 @@ export interface ReservationItem {
   variantId: string;
   size: string;
   colorName: string;
+  // HYPOTHÈSE: code et teinte de la couleur renvoyés par l'API pour remettre l'article au panier (« Réserver à nouveau »).
+  colorCode?: string;
+  colorHex?: string;
   unitPrice: number;
   quantity: number;
 }
 
-export interface ReservationTimelineStep {
+/** Qui a déclenché une étape (sert à afficher « Annulée par vous » ou « par la boutique »). */
+export type ReservationActor = 'client' | 'shop' | 'system';
+
+/**
+ * Entrée datée du journal de suivi (§3.1 M5) : une entrée par changement de statut, dans l'ordre chronologique.
+ * Un rejet suivi d'une nouvelle preuve produit donc deux entrées `payment_rejected` puis `pending_validation`.
+ * Les étapes à venir ne figurent pas dans le journal : elles sont déduites de `TIMELINE_ORDER(receptionMode)`.
+ */
+export interface ReservationTimelineEvent {
   status: ReservationStatusCode;
-  timestamp: string | null;
-  completed: boolean;
-  current: boolean;
+  at: string; // ISO 8601
   note?: string;
-  photos?: PackagePhoto[];
+  // HYPOTHÈSE: champ `actor` ajouté au contrat pour savoir qui a annulé ou fait avancer la réservation.
+  actor?: ReservationActor;
 }
 
 export interface ReservationProof {
@@ -277,17 +287,26 @@ export interface Reservation {
     id?: string;
     name: string;
     address?: string;
+    city?: string;
+    phone?: string;
+    openingHours?: string;
   };
   proof?: ReservationProof;
   rejection?: ReservationRejection;
   createdAt: string;
+  /** Date du dernier changement (statut, photos…) : sert au tri des listes et au repère « Nouveau ». */
+  updatedAt: string;
   expiresAt: string;
   serverTime?: string;
   rejectionReason?: string;
   notes?: string;
   packagePhotos: PackagePhoto[];
   packageReadyAt: string | null;
-  timeline: ReservationTimelineStep[];
+  /** Journal daté des changements de statut, du plus ancien au plus récent (§3.1 M5). */
+  timeline: ReservationTimelineEvent[];
+  /** Calculé par le serveur : le front suit toujours cette valeur (§3.2 M5). */
+  cancellable: boolean;
+  cancelDeadline?: string | null;
   customer?: {
     firstName: string;
     lastName: string;

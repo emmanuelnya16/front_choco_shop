@@ -1,9 +1,63 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600">
-  <rect width="800" height="600" fill="#F4F4F3" />
-  <polygon points="400,90 650,200 650,430 400,520 150,430 150,200" fill="#1A1A18" />
-  <polygon points="400,90 650,200 400,300 150,200" fill="#2A2A27" />
-  <line x1="275" y1="145" x2="525" y2="245" stroke="#E31E24" stroke-width="16" />
-  <rect x="310" y="340" width="180" height="80" rx="6" fill="#FFFFFF" />
-  <text x="400" y="375" text-anchor="middle" fill="#1A1A18" font-family="sans-serif" font-weight="800" font-size="16">RES-000102</text>
-  <text x="400" y="400" text-anchor="middle" fill="#6B6C6E" font-family="sans-serif" font-weight="600" font-size="13">PRÊT EN BOUTIQUE · VUE 2/2</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600" role="img" aria-label="Colis kraft vu de trois-quarts, ruban noir et étiquette DR CHOCO">
+  <!-- Photo fictive de colis (vue de trois-quarts, 4:3) — à remplacer par les vraies photos de la boutique -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#F4F4F3" />
+      <stop offset="1" stop-color="#E2E1DE" />
+    </linearGradient>
+    <linearGradient id="top" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#DDB383" />
+      <stop offset="1" stop-color="#CFA371" />
+    </linearGradient>
+    <linearGradient id="left" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#BE8F5D" />
+      <stop offset="1" stop-color="#AE8051" />
+    </linearGradient>
+    <linearGradient id="right" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#A97B4C" />
+      <stop offset="1" stop-color="#966A3F" />
+    </linearGradient>
+    <filter id="grain" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.95" numOctaves="2" seed="7" result="n" />
+      <feColorMatrix in="n" type="matrix" values="0 0 0 0 0.3  0 0 0 0 0.2  0 0 0 0 0.1  0 0 0 0.14 0" />
+      <feComposite in2="SourceGraphic" operator="in" />
+    </filter>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="16" />
+    </filter>
+  </defs>
+  <rect width="800" height="600" fill="url(#bg)" />
+  <ellipse cx="410" cy="520" rx="250" ry="34" fill="#1A1A18" opacity="0.22" filter="url(#shadow)" />
+  <!-- Faces -->
+  <polygon points="180,255 400,360 400,510 180,405" fill="url(#left)" />
+  <polygon points="400,360 620,255 620,405 400,510" fill="url(#right)" />
+  <polygon points="400,150 620,255 400,360 180,255" fill="url(#top)" />
+  <g filter="url(#grain)">
+    <polygon points="180,255 400,360 400,510 180,405" fill="#B8895A" />
+    <polygon points="400,360 620,255 620,405 400,510" fill="#A27547" />
+    <polygon points="400,150 620,255 400,360 180,255" fill="#D4A874" />
+  </g>
+  <path d="M180 255 L400 360 L620 255 M400 360 V510" fill="none" stroke="#8E6439" stroke-width="1.5" />
+  <!-- Jointure des rabats -->
+  <line x1="290" y1="202.5" x2="510" y2="307.5" stroke="#9E7246" stroke-width="2" />
+  <!-- Ruban adhésif noir (dessus puis face avant droite) -->
+  <polygon points="272,211.1 308,193.9 528,298.9 492,316.1" fill="#1A1A18" />
+  <polygon points="492,316.1 528,298.9 528,373.9 492,391.1" fill="#121211" />
+  <line x1="283" y1="211.5" x2="503" y2="316.5" stroke="#FFFFFF" stroke-width="4" opacity="0.08" />
+  <!-- Étiquette sur la face gauche -->
+  <g transform="matrix(0.902 0.431 0 1 180 255)">
+    <rect x="42" y="34" width="122" height="78" rx="3" fill="#FFFFFF" />
+    <rect x="42" y="34" width="122" height="20" rx="3" fill="#1A1A18" />
+    <rect x="42" y="48" width="122" height="6" fill="#1A1A18" />
+    <circle cx="53" cy="44" r="3.5" fill="#E31E24" />
+    <text x="61" y="48.5" fill="#FFFFFF" font-family="Arial, Helvetica, sans-serif" font-weight="800" font-size="11" letter-spacing="0.5">DR CHOCO</text>
+    <text x="52" y="72" fill="#1A1A18" font-family="Arial, Helvetica, sans-serif" font-weight="700" font-size="8.5" letter-spacing="1.2">L’INCOMPRIS</text>
+    <text x="52" y="86" fill="#6B6C6E" font-family="Arial, Helvetica, sans-serif" font-size="8">Akwa · Douala</text>
+    <g fill="#1A1A18">
+      <rect x="52" y="92" width="2" height="14" /><rect x="56" y="92" width="1" height="14" /><rect x="59" y="92" width="3" height="14" />
+      <rect x="64" y="92" width="1" height="14" /><rect x="67" y="92" width="2" height="14" /><rect x="71" y="92" width="1" height="14" />
+      <rect x="74" y="92" width="3" height="14" /><rect x="79" y="92" width="1" height="14" /><rect x="82" y="92" width="2" height="14" />
+    </g>
+    <text x="156" y="104" text-anchor="end" fill="#6B6C6E" font-family="Arial, Helvetica, sans-serif" font-weight="700" font-size="7.5">VUE 2</text>
+  </g>
 </svg>

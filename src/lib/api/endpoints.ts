@@ -60,6 +60,10 @@ export const endpoints = {
   },
   reservations: {
     list: '/reservations',
+    // HYPOTHÈSE: liste paginée par onglet (10 par page) pour « Mes réservations » (§3.1 M5).
+    listScoped: (scope: 'active' | 'done', page: number) =>
+      `/reservations?scope=${scope}&page=${page}`,
+    summary: '/reservations/summary',
     pending: '/reservations?status=reserved',
     create: '/reservations',
     detail: (ref: string) => `/reservations/${encodeURIComponent(ref)}`,
@@ -82,5 +86,15 @@ export const endpoints = {
       `/_mock/reservations/${encodeURIComponent(ref)}/expire-soon`,
     expireReservation: (ref: string) =>
       `/_mock/reservations/${encodeURIComponent(ref)}/expire`,
+    // Simulateur boutique enrichi (§3.3 M5)
+    advanceReservation: (ref: string) =>
+      `/_mock/reservations/${encodeURIComponent(ref)}/advance`,
+    packageReady: (ref: string) =>
+      `/_mock/reservations/${encodeURIComponent(ref)}/package-ready`,
+    completeReservation: (ref: string) =>
+      `/_mock/reservations/${encodeURIComponent(ref)}/complete`,
+    shopCancelReservation: (ref: string) =>
+      `/_mock/reservations/${encodeURIComponent(ref)}/shop-cancel`,
+    resetReservations: '/_mock/reservations/reset',
   },
 } as const;

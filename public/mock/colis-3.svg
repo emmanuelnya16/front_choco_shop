@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 1000" width="800" height="1000" role="img" aria-label="Colis kraft vu de trois-quarts, format portrait, ruban noir et étiquette DR CHOCO">
+  <!-- Photo fictive de colis (vue de trois-quarts, 4:5) — à remplacer par les vraies photos de la boutique -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#F4F4F3" />
+      <stop offset="0.7" stop-color="#ECEBE8" />
+      <stop offset="1" stop-color="#DEDDDA" />
+    </linearGradient>
+    <linearGradient id="top" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#DFB585" />
+      <stop offset="1" stop-color="#CDA170" />
+    </linearGradient>
+    <linearGradient id="left" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#C19260" />
+      <stop offset="1" stop-color="#AB7D4F" />
+    </linearGradient>
+    <linearGradient id="right" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#AA7C4D" />
+      <stop offset="1" stop-color="#93683E" />
+    </linearGradient>
+    <filter id="grain" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.92" numOctaves="2" seed="11" result="n" />
+      <feColorMatrix in="n" type="matrix" values="0 0 0 0 0.3  0 0 0 0 0.2  0 0 0 0 0.1  0 0 0 0.14 0" />
+      <feComposite in2="SourceGraphic" operator="in" />
+    </filter>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="20" />
+    </filter>
+  </defs>
+  <rect width="800" height="1000" fill="url(#bg)" />
+  <ellipse cx="410" cy="800" rx="270" ry="40" fill="#1A1A18" opacity="0.22" filter="url(#shadow)" />
+  <!-- Faces -->
+  <polygon points="160,375 400,490 400,790 160,675" fill="url(#left)" />
+  <polygon points="400,490 640,375 640,675 400,790" fill="url(#right)" />
+  <polygon points="400,260 640,375 400,490 160,375" fill="url(#top)" />
+  <g filter="url(#grain)">
+    <polygon points="160,375 400,490 400,790 160,675" fill="#B88958" />
+    <polygon points="400,490 640,375 640,675 400,790" fill="#A07446" />
+    <polygon points="400,260 640,375 400,490 160,375" fill="#D4A874" />
+  </g>
+  <path d="M160 375 L400 490 L640 375 M400 490 V790" fill="none" stroke="#8B6238" stroke-width="1.5" />
+  <line x1="280" y1="317.5" x2="520" y2="432.5" stroke="#9E7246" stroke-width="2" />
+  <!-- Ruban adhésif noir -->
+  <polygon points="260.2,327 299.8,308 539.8,423 500.2,442" fill="#1A1A18" />
+  <polygon points="500.2,442 539.8,423 539.8,523 500.2,542" fill="#121211" />
+  <line x1="272" y1="327" x2="512" y2="442" stroke="#FFFFFF" stroke-width="4" opacity="0.08" />
+  <!-- Bande de ruban horizontale sur la face gauche (fermeture du fond) -->
+  <polygon points="160,640 400,755 400,775 160,660" fill="#151514" opacity="0.9" />
+  <!-- Étiquette sur la face gauche -->
+  <g transform="matrix(0.902 0.432 0 1 160 375)">
+    <rect x="48" y="70" width="150" height="104" rx="4" fill="#FFFFFF" />
+    <rect x="48" y="70" width="150" height="26" rx="4" fill="#1A1A18" />
+    <rect x="48" y="88" width="150" height="8" fill="#1A1A18" />
+    <circle cx="62" cy="83" r="4" fill="#E31E24" />
+    <text x="72" y="88" fill="#FFFFFF" font-family="Arial, Helvetica, sans-serif" font-weight="800" font-size="13" letter-spacing="0.5">DR CHOCO</text>
+    <text x="60" y="117" fill="#1A1A18" font-family="Arial, Helvetica, sans-serif" font-weight="700" font-size="10" letter-spacing="1.5">L’INCOMPRIS</text>
+    <text x="60" y="134" fill="#6B6C6E" font-family="Arial, Helvetica, sans-serif" font-size="9">Akwa · Douala</text>
+    <g fill="#1A1A18">
+      <rect x="60" y="142" width="2" height="22" /><rect x="65" y="142" width="1" height="22" /><rect x="69" y="142" width="3" height="22" />
+      <rect x="75" y="142" width="1" height="22" /><rect x="79" y="142" width="2" height="22" /><rect x="84" y="142" width="1" height="22" />
+      <rect x="88" y="142" width="3" height="22" /><rect x="94" y="142" width="1" height="22" /><rect x="98" y="142" width="2" height="22" />
+      <rect x="103" y="142" width="1" height="22" /><rect x="107" y="142" width="3" height="22" />
+    </g>
+    <text x="188" y="162" text-anchor="end" fill="#6B6C6E" font-family="Arial, Helvetica, sans-serif" font-weight="700" font-size="9">VUE 3</text>
+  </g>
+</svg>

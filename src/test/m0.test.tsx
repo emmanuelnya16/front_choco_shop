@@ -11,7 +11,7 @@ import { haptic } from '@/lib/utils/haptics';
 import { formatCmPhone, isValidCmPhone, normalizeCmPhone } from '@/lib/utils/phone';
 import { formatPrice } from '@/lib/utils/price';
 import { createSafeStorage } from '@/lib/utils/storage';
-import { mockReservations } from '@/mocks/fixtures/products';
+import { mockReservations } from '@/mocks/fixtures/reservations';
 import { useAuthStore } from '@/stores/authStore';
 import { useCartStore } from '@/stores/cartStore';
 import { hasPackagePhotos } from '@/types/domain';

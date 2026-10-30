@@ -32,7 +32,8 @@ import {
 } from '@/features/payment/whatsapp';
 import { api, ApiError } from '@/lib/api/client';
 import { endpoints } from '@/lib/api/endpoints';
-import { mockProducts, mockReservations } from '@/mocks/fixtures/products';
+import { mockProducts } from '@/mocks/fixtures/products';
+import { mockReservations } from '@/mocks/fixtures/reservations';
 import { handlers, resetMockM3State } from '@/mocks/handlers';
 import loadMotionFeatures from '@/motion/features';
 import { SuccessPage } from '@/pages/SuccessPage';

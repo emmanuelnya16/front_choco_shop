@@ -1,7 +1,9 @@
 import { delay, http, HttpResponse } from 'msw';
+import { reachedStatusFromTimeline } from '@/features/tracking/timeline';
 import { env } from '@/lib/env';
 import { normalizeCmPhone } from '@/lib/utils/phone';
 import type {
+  CancelReservationPayload,
   CartValidatePayload,
   CartValidationItemResult,
   CreateReservationPayload,
@@ -10,13 +12,36 @@ import type {
   PriceRangeKey,
   ProductFacets,
   ReservationCreated,
+  ReservationListItem,
+  ReservationScope,
+  ReservationsListPage,
+  ReservationsSummary,
   SaveAddressPayload,
+  UpdateAddressPayload,
   UpdateProfilePayload,
 } from '@/types/api';
-import type { Address, Product, User } from '@/types/domain';
+import type {
+  Address,
+  Product,
+  Reservation,
+  ReservationActor,
+  User,
+} from '@/types/domain';
+import {
+  isFinalStatus,
+  TIMELINE_ORDER,
+  type ReservationStatusCode,
+} from '@/types/reservationStatus';
 import { mockCategories } from './fixtures/categories';
 import { mockLooks } from './fixtures/looks';
-import { mockProducts, mockReservations } from './fixtures/products';
+import { mockProducts } from './fixtures/products';
+import {
+  buildPackagePhoto,
+  computeCancellable,
+  JUNIOR_CUSTOMER,
+  mockReservations,
+  resetMockReservations,
+} from './fixtures/reservations';
 import {
   mockAgencies,
   mockDeliveryCities,
@@ -153,14 +178,15 @@ const idempotencyCache = new Map<string, ReservationCreated>();
 const seenProofHashes = new Map<string, string>();
 let reservationSeqCounter = 124; // Démarre à RES-000124 (§3.2)
 
-const MOCK_RESERVATIONS_SESSION_KEY = 'drc_mock_reservations_v1';
+// v2 : journal daté `{ status, at }` (M5). Les données v1 de M4 sont ignorées car incompatibles.
+const MOCK_RESERVATIONS_SESSION_KEY = 'drc_mock_reservations_v2';
 
 function loadSessionReservations(): void {
   if (typeof window === 'undefined' || import.meta.env.MODE === 'test') return;
   try {
     const raw = window.sessionStorage.getItem(MOCK_RESERVATIONS_SESSION_KEY);
     if (!raw) return;
-    const parsed = JSON.parse(raw) as Record<string, ReservationCreated>;
+    const parsed = JSON.parse(raw) as Record<string, Reservation>;
     for (const [ref, res] of Object.entries(parsed)) {
       mockReservations[ref] = res;
       const num = Number(ref.replace('RES-', ''));
@@ -186,6 +212,61 @@ function persistSessionReservations(): void {
 }
 
 loadSessionReservations();
+
+// Synchronisation entre onglets : MSW exécute les gestionnaires dans chaque onglet (mémoire séparée).
+// Le simulateur boutique de /_dev, ouvert dans un autre onglet, diffuse ses changements ici (§3.3 M5).
+type MockSyncMessage = { type: 'upsert'; reservation: Reservation } | { type: 'reset' };
+
+const mockSyncChannel: BroadcastChannel | null =
+  typeof window !== 'undefined' &&
+  typeof BroadcastChannel !== 'undefined' &&
+  import.meta.env.MODE !== 'test'
+    ? new BroadcastChannel('drc-mock-reservations')
+    : null;
+
+mockSyncChannel?.addEventListener('message', (event: MessageEvent<MockSyncMessage>) => {
+  const message = event.data;
+  if (message?.type === 'upsert') {
+    mockReservations[message.reservation.ref] = message.reservation;
+  } else if (message?.type === 'reset') {
+    resetMockReservations();
+  }
+  persistSessionReservations();
+});
+
+/** Enregistre une réservation modifiée dans la session de l'onglet et la diffuse aux autres onglets. */
+function commitReservation(reservation: Reservation): void {
+  persistSessionReservations();
+  mockSyncChannel?.postMessage({ type: 'upsert', reservation } satisfies MockSyncMessage);
+}
+
+/** Ajoute une entrée datée au journal et met à jour statut, `updatedAt` et `cancellable`. */
+function pushTimelineEvent(
+  reservation: Reservation,
+  status: ReservationStatusCode,
+  note?: string,
+  actor?: ReservationActor,
+): string {
+  const at = new Date().toISOString();
+  reservation.status = status;
+  reservation.timeline = [
+    ...reservation.timeline,
+    { status, at, ...(note ? { note } : {}), ...(actor ? { actor } : {}) },
+  ];
+  reservation.updatedAt = at;
+  reservation.cancellable = computeCancellable(status);
+  return at;
+}
+
+function reservationNotFound(ref: string) {
+  return HttpResponse.json(
+    {
+      code: 'RESERVATION_NOT_FOUND',
+      message: `Aucune réservation trouvée avec la référence ${ref}.`,
+    },
+    { status: 404 },
+  );
+}
 
 const JUNIOR_USER: User = {
   id: 'usr-junior-01',
@@ -217,35 +298,153 @@ export function resetMockM3State(): void {
     mockJuniorAddresses.map((a) => ({ ...a })),
   );
   favoritesByUserId.clear();
-  // Supprime les réservations créées dynamiquement (>= RES-000124)
-  for (const key of Object.keys(mockReservations)) {
-    const num = Number(key.replace('RES-', ''));
-    if (Number.isFinite(num) && num >= 124) {
-      delete mockReservations[key];
-    }
+  // Recrée toutes les réservations de démonstration (supprime aussi celles créées à partir de RES-000124) :
+  // RES-000101 redevient « reserved » et RES-000103 « payment_rejected », avec des échéances dans le futur.
+  resetMockReservations();
+}
+
+/** Téléphone du client « connecté » côté mocks (Junior par défaut, comme pour les adresses). */
+function currentOwnerPhone(): string {
+  return currentSessionUser?.phone ?? JUNIOR_CUSTOMER.phone;
+}
+
+function isOwnedByCurrentUser(reservation: Reservation): boolean {
+  return (reservation.customer?.phone ?? JUNIOR_CUSTOMER.phone) === currentOwnerPhone();
+}
+
+function ownedReservations(): Reservation[] {
+  return Object.values(mockReservations).filter(isOwnedByCurrentUser);
+}
+
+/** Réponse détaillée `GET /reservations/:ref` : champs dérivés et `cancellable` calculé par le « serveur ». */
+function serializeReservation(reservation: Reservation): Reservation & { serverTime: string } {
+  const agencyRef = reservation.agency?.id ?? reservation.deliveryAddress?.agencyId;
+  const agencyFixture = agencyRef ? mockAgencies.find((a) => a.id === agencyRef) : undefined;
+
+  return {
+    ...reservation,
+    serverTime: new Date().toISOString(),
+    updatedAt: reservation.updatedAt ?? reservation.createdAt,
+    cancellable: computeCancellable(reservation.status),
+    amount: reservation.amount ?? {
+      subtotal: reservation.subtotal,
+      deliveryFee: reservation.deliveryFee,
+      total: reservation.total,
+    },
+    city: reservation.city ?? reservation.deliveryAddress?.city,
+    address:
+      reservation.address ??
+      (reservation.deliveryAddress
+        ? {
+            district: reservation.deliveryAddress.district ?? reservation.deliveryAddress.quarter,
+            landmark: reservation.deliveryAddress.landmark,
+          }
+        : undefined),
+    agency:
+      reservation.agency || reservation.deliveryAddress?.agencyName
+        ? {
+            id: agencyRef,
+            name: reservation.agency?.name ?? reservation.deliveryAddress?.agencyName ?? '',
+            address: reservation.agency?.address ?? agencyFixture?.address,
+            city: reservation.agency?.city ?? agencyFixture?.city,
+            phone: reservation.agency?.phone ?? agencyFixture?.phone,
+            openingHours: reservation.agency?.openingHours ?? agencyFixture?.openingHours,
+          }
+        : undefined,
+    rejection:
+      reservation.rejection ??
+      (reservation.rejectionReason
+        ? { reason: reservation.rejectionReason, rejectedAt: reservation.updatedAt ?? reservation.createdAt }
+        : undefined),
+  };
+}
+
+function isScopeMatch(reservation: Reservation, scope: ReservationScope): boolean {
+  return scope === 'done' ? isFinalStatus(reservation.status) : !isFinalStatus(reservation.status);
+}
+
+function toListItem(reservation: Reservation, serverTime: string): ReservationListItem {
+  const awaitingPayment =
+    reservation.status === 'reserved' || reservation.status === 'payment_rejected';
+  return {
+    ref: reservation.ref,
+    status: reservation.status,
+    createdAt: reservation.createdAt,
+    updatedAt: reservation.updatedAt ?? reservation.createdAt,
+    expiresAt: awaitingPayment ? reservation.expiresAt : undefined,
+    serverTime,
+    amount: { total: reservation.amount?.total ?? reservation.total },
+    itemsCount: reservation.items.reduce((sum, item) => sum + item.quantity, 0),
+    itemsPreview: reservation.items.slice(0, 3).map((item) => ({ image: item.image, name: item.name })),
+    packagePhotoThumb: reservation.packagePhotos[0]?.thumbnailUrl ?? null,
+    receptionMode: reservation.receptionMode,
+    city:
+      reservation.city ??
+      reservation.deliveryAddress?.city ??
+      (reservation.receptionMode === 'pickup' ? mockPublicSettings.shop.city : undefined),
+    reachedStatus:
+      reservation.status === 'expired' || reservation.status === 'cancelled'
+        ? reachedStatusFromTimeline(reservation.timeline, reservation.receptionMode)
+        : undefined,
+  };
+}
+
+// HYPOTHÈSE: statuts qui demandent une action du client (payer, renvoyer une preuve, venir retirer le colis).
+const NEEDS_ACTION_STATUSES: ReadonlySet<ReservationStatusCode> = new Set([
+  'reserved',
+  'payment_rejected',
+  'ready_for_pickup',
+]);
+
+const RESERVATIONS_PAGE_SIZE = 10;
+
+/** Statut suivant dans le parcours (simulateur « Étape suivante »), ou `null` si la réservation est terminée. */
+function nextSimulatedStatus(reservation: Reservation): ReservationStatusCode | null {
+  if (reservation.status === 'reserved' || reservation.status === 'payment_rejected') {
+    return 'pending_validation';
   }
-  // Réinitialise RES-000101 (réservation en attente de paiement)
-  if (mockReservations['RES-000101']) {
-    mockReservations['RES-000101'].status = 'reserved';
-    mockReservations['RES-000101'].expiresAt = new Date(
-      Date.now() + 24 * 3600 * 1000,
-    ).toISOString();
-    mockReservations['RES-000101'].proof = undefined;
-    mockReservations['RES-000101'].rejection = undefined;
-    mockReservations['RES-000101'].rejectionReason = undefined;
+  const order = TIMELINE_ORDER(reservation.receptionMode);
+  const index = order.indexOf(reservation.status);
+  if (index < 0 || index >= order.length - 1) return null;
+  return order[index + 1] ?? null;
+}
+
+/** Note datée par défaut pour chaque étape avancée par la boutique (simulateur). */
+function defaultStepNote(reservation: Reservation, status: ReservationStatusCode): string | undefined {
+  const agencyName = reservation.agency?.name ?? reservation.deliveryAddress?.agencyName;
+  switch (status) {
+    case 'pending_validation':
+      return reservation.timeline.some((e) => e.status === 'payment_rejected')
+        ? 'Nouvelle preuve envoyée.'
+        : 'Capture Orange Money reçue.';
+    case 'confirmed':
+      return 'Paiement validé par la boutique.';
+    case 'handed_to_agency':
+      return agencyName ? `Colis remis à ${agencyName}.` : 'Colis prêt, en attente du livreur.';
+    case 'ready_for_pickup':
+      return 'Colis prêt à la boutique d’Akwa.';
+    case 'in_delivery':
+      return agencyName ? `En route vers ${reservation.city ?? 'votre ville'}.` : 'Le livreur est en route.';
+    case 'delivered':
+      return 'Colis remis en main propre.';
+    case 'picked_up':
+      return 'Colis retiré à la boutique.';
+    default:
+      return undefined;
   }
-  // Réinitialise RES-000103 pour les tests de rejet
-  if (mockReservations['RES-000103']) {
-    mockReservations['RES-000103'].status = 'payment_rejected';
-    mockReservations['RES-000103'].expiresAt = new Date(
-      Date.now() + 18 * 3600 * 1000,
-    ).toISOString();
-    mockReservations['RES-000103'].rejection = {
-      reason:
-        "La capture d'écran envoyée est floue et ne laisse pas apparaître l'identifiant de transaction Mobile Money.",
-      rejectedAt: '2026-10-29T08:40:00.000Z',
-    };
-  }
+}
+
+/** Passe en « pending_validation » en simulant l'envoi d'une capture si besoin (rejet → nouvelle preuve). */
+function simulateProofReceived(reservation: Reservation): void {
+  const at = pushTimelineEvent(
+    reservation,
+    'pending_validation',
+    defaultStepNote(reservation, 'pending_validation'),
+    'client',
+  );
+  reservation.proof = { thumbnailUrl: '/mock/preuve-1.svg', uploadedAt: at, operator: 'orange' };
+  reservation.rejection = undefined;
+  reservation.rejectionReason = undefined;
 }
 
 function getOrCreatePhoneTrack(phone: string): OtpPhoneTrack {
@@ -894,6 +1093,64 @@ export const handlers = [
     return HttpResponse.json(newAddress, { status: 201 });
   }),
 
+  // PATCH /me/addresses/:id (§3.1 M5) : `isDefault: true` retire le défaut des autres adresses
+  http.patch(apiUrl('/me/addresses/:id'), async ({ params, request }) => {
+    await delay(randomMobileLatency());
+    const id = String(params.id ?? '');
+    const userId = currentSessionUser?.id ?? JUNIOR_USER.id;
+    const list = addressesByUserId.get(userId) ?? [];
+    const current = list.find((a) => a.id === id);
+    if (!current) {
+      return HttpResponse.json(
+        { code: 'ADDRESS_NOT_FOUND', message: 'Cette adresse est introuvable.' },
+        { status: 404 },
+      );
+    }
+
+    const body = (await request.json()) as UpdateAddressPayload;
+    const patch = Object.fromEntries(
+      Object.entries(body ?? {}).filter(([, value]) => value !== undefined),
+    ) as UpdateAddressPayload;
+
+    const updated: Address = {
+      ...current,
+      ...patch,
+      quarter: patch.district ?? current.quarter,
+      details: patch.landmark ?? current.details,
+      phone: patch.recipientPhone ?? current.phone,
+      isDefault: patch.isDefault ?? current.isDefault,
+    };
+
+    const nextList = updated.isDefault
+      ? [updated, ...list.filter((a) => a.id !== id).map((a) => ({ ...a, isDefault: false }))]
+      : list.map((a) => (a.id === id ? updated : a));
+
+    addressesByUserId.set(userId, nextList);
+    return HttpResponse.json(updated);
+  }),
+
+  // DELETE /me/addresses/:id (§3.1 M5)
+  http.delete(apiUrl('/me/addresses/:id'), async ({ params }) => {
+    await delay(randomMobileLatency());
+    const id = String(params.id ?? '');
+    const userId = currentSessionUser?.id ?? JUNIOR_USER.id;
+    const list = addressesByUserId.get(userId) ?? [];
+    const removed = list.find((a) => a.id === id);
+    if (!removed) {
+      return HttpResponse.json(
+        { code: 'ADDRESS_NOT_FOUND', message: 'Cette adresse est introuvable.' },
+        { status: 404 },
+      );
+    }
+    let nextList = list.filter((a) => a.id !== id);
+    // HYPOTHÈSE: si l'adresse par défaut est supprimée, la première restante devient l'adresse par défaut.
+    if (removed.isDefault && nextList.length > 0 && !nextList.some((a) => a.isDefault)) {
+      nextList = nextList.map((a, index) => ({ ...a, isDefault: index === 0 }));
+    }
+    addressesByUserId.set(userId, nextList);
+    return new HttpResponse(null, { status: 204 });
+  }),
+
   // GET /favorites & POST /favorites (§5.5)
   http.get(apiUrl('/favorites'), async () => {
     await delay(randomMobileLatency());
@@ -919,12 +1176,44 @@ export const handlers = [
     return HttpResponse.json(Array.from(set));
   }),
 
-  // GET /reservations (§3.1, §7.4 M3 & §7.2 M4)
+  // GET /reservations (§3.1, §7.4 M3 & §7.2 M4) — avec `scope`, liste paginée de « Mes réservations » (§3.1 M5)
   http.get(apiUrl('/reservations'), async ({ request }) => {
     await delay(randomMobileLatency());
     const url = new URL(request.url);
+    const scopeParam = url.searchParams.get('scope');
+
+    if (scopeParam === 'active' || scopeParam === 'done') {
+      const page = Math.max(1, Number(url.searchParams.get('page') ?? '1') || 1);
+      const owned = ownedReservations();
+      // Les réservations modifiées récemment remontent en tête de leur onglet (§8.1 M5)
+      const scoped = owned
+        .filter((r) => isScopeMatch(r, scopeParam))
+        .sort(
+          (a, b) =>
+            new Date(b.updatedAt ?? b.createdAt).getTime() -
+            new Date(a.updatedAt ?? a.createdAt).getTime(),
+        );
+      const total = scoped.length;
+      const totalPages = Math.max(1, Math.ceil(total / RESERVATIONS_PAGE_SIZE));
+      const serverTime = new Date().toISOString();
+      const body: ReservationsListPage = {
+        items: scoped
+          .slice((page - 1) * RESERVATIONS_PAGE_SIZE, page * RESERVATIONS_PAGE_SIZE)
+          .map((r) => toListItem(r, serverTime)),
+        page,
+        pageSize: RESERVATIONS_PAGE_SIZE,
+        total,
+        totalPages,
+        counts: {
+          active: owned.filter((r) => isScopeMatch(r, 'active')).length,
+          done: owned.filter((r) => isScopeMatch(r, 'done')).length,
+        },
+      };
+      return HttpResponse.json(body);
+    }
+
     const statusFilter = url.searchParams.get('status')?.trim();
-    const all = Object.values(mockReservations).sort(
+    const all = ownedReservations().sort(
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
     );
     if (statusFilter === 'reserved') {
@@ -1075,7 +1364,11 @@ export const handlers = [
       customer: {
         firstName: body.firstName ?? currentSessionUser?.firstName ?? 'Client',
         lastName: body.lastName ?? currentSessionUser?.lastName ?? '',
-        phone: body.phone ?? currentSessionUser?.phone ?? '+237690000001',
+        // Le propriétaire est le compte connecté (le numéro du formulaire peut être saisi sans +237).
+        phone:
+          currentSessionUser?.phone ??
+          (body.phone ? safeNormalizePhone(body.phone) : null) ??
+          JUNIOR_CUSTOMER.phone,
       },
       deliveryAddress:
         body.receptionMode === 'delivery'
@@ -1099,31 +1392,21 @@ export const handlers = [
                   : body.phone) ?? '+237690000001',
             }
           : undefined,
+      updatedAt: serverTime,
       timeline: [
         {
           status: 'reserved',
-          timestamp: serverTime,
-          completed: true,
-          current: true,
-          note: 'Articles bloqués pendant 24 h. En attente du paiement Mobile Money.',
-        },
-        {
-          status: 'pending_validation',
-          timestamp: null,
-          completed: false,
-          current: false,
-        },
-        {
-          status: 'confirmed',
-          timestamp: null,
-          completed: false,
-          current: false,
+          at: serverTime,
+          note: 'Articles mis de côté pendant 24 h.',
+          actor: 'client',
         },
       ],
+      cancellable: true,
+      cancelDeadline: null,
     };
 
     mockReservations[ref] = created;
-    persistSessionReservations();
+    commitReservation(created);
     if (idempotencyKey) {
       idempotencyCache.set(idempotencyKey, created);
     }
@@ -1131,59 +1414,39 @@ export const handlers = [
     return HttpResponse.json(created, { status: 201 });
   }),
 
-  // GET /reservations/:ref
+  // GET /reservations/summary (§3.1 M5) — déclaré avant /reservations/:ref pour ne pas être pris pour une référence
+  http.get(apiUrl('/reservations/summary'), async () => {
+    await delay(randomMobileLatency());
+    const active = ownedReservations().filter((r) => !isFinalStatus(r.status));
+    const lastUpdatedAt =
+      ownedReservations()
+        .map((r) => r.updatedAt ?? r.createdAt)
+        .sort()
+        .at(-1) ?? null;
+    const body: ReservationsSummary = {
+      needsAction: active.filter((r) => NEEDS_ACTION_STATUSES.has(r.status)).length,
+      lastUpdatedAt,
+      items: active.map((r) => ({
+        ref: r.ref,
+        status: r.status,
+        updatedAt: r.updatedAt ?? r.createdAt,
+        hasPackagePhotos: r.packagePhotos.length > 0,
+      })),
+    };
+    return HttpResponse.json(body);
+  }),
+
+  // GET /reservations/:ref — 404 aussi si la réservation appartient à un autre client (§5.5 M5)
   http.get(apiUrl('/reservations/:ref'), async ({ params }) => {
     await delay(randomMobileLatency());
     const ref = String(params.ref ?? '').toUpperCase();
     const reservation = mockReservations[ref];
 
-    if (!reservation) {
-      return HttpResponse.json(
-        {
-          code: 'RESERVATION_NOT_FOUND',
-          message: `Aucune réservation trouvée avec la référence ${ref}.`,
-        },
-        { status: 404 },
-      );
+    if (!reservation || !isOwnedByCurrentUser(reservation)) {
+      return reservationNotFound(ref);
     }
 
-    const nowIso = new Date().toISOString();
-    return HttpResponse.json({
-      ...reservation,
-      serverTime: nowIso,
-      amount: reservation.amount ?? {
-        subtotal: reservation.subtotal,
-        deliveryFee: reservation.deliveryFee,
-        total: reservation.total,
-      },
-      city: reservation.city ?? reservation.deliveryAddress?.city,
-      address:
-        reservation.address ??
-        (reservation.deliveryAddress
-          ? {
-              district:
-                reservation.deliveryAddress.district ??
-                reservation.deliveryAddress.quarter,
-              landmark: reservation.deliveryAddress.landmark,
-            }
-          : undefined),
-      agency:
-        reservation.agency ??
-        (reservation.deliveryAddress?.agencyName
-          ? {
-              id: reservation.deliveryAddress.agencyId,
-              name: reservation.deliveryAddress.agencyName,
-            }
-          : undefined),
-      rejection:
-        reservation.rejection ??
-        (reservation.rejectionReason
-          ? {
-              reason: reservation.rejectionReason,
-              rejectedAt: reservation.createdAt,
-            }
-          : undefined),
-    });
+    return HttpResponse.json(serializeReservation(reservation));
   }),
 
   // POST /reservations/:ref/proof (§3.2 & §3.3 M4)
@@ -1211,8 +1474,15 @@ export const handlers = [
     const isExpiredByTime =
       new Date(reservation.expiresAt).getTime() <= Date.now();
     if (reservation.status === 'expired' || isExpiredByTime) {
-      reservation.status = 'expired';
-      persistSessionReservations();
+      if (reservation.status !== 'expired') {
+        pushTimelineEvent(
+          reservation,
+          'expired',
+          'Délai de 24 h dépassé : articles remis en vente.',
+          'system',
+        );
+        commitReservation(reservation);
+      }
       return HttpResponse.json(
         {
           code: 'RESERVATION_EXPIRED',
@@ -1307,9 +1577,17 @@ export const handlers = [
       seenProofHashes.set(sha256, ref);
     }
 
-    const uploadedAt = new Date().toISOString();
+    const wasRejected = reservation.status === 'payment_rejected';
+    const uploadedAt = pushTimelineEvent(
+      reservation,
+      'pending_validation',
+      wasRejected
+        ? 'Nouvelle preuve envoyée.'
+        : `Capture ${operator === 'mtn' ? 'MTN MoMo' : 'Orange Money'} reçue.`,
+      'client',
+    );
     const proof = {
-      thumbnailUrl: '/mock/colis-1.svg',
+      thumbnailUrl: '/mock/preuve-1.svg',
       uploadedAt,
       sha256: sha256 || undefined,
       operator,
@@ -1317,33 +1595,11 @@ export const handlers = [
       transactionId,
     };
 
-    reservation.status = 'pending_validation';
     reservation.proof = proof;
     reservation.rejection = undefined;
     reservation.rejectionReason = undefined;
-    reservation.timeline = [
-      {
-        status: 'reserved',
-        timestamp: reservation.createdAt,
-        completed: true,
-        current: false,
-      },
-      {
-        status: 'pending_validation',
-        timestamp: uploadedAt,
-        completed: true,
-        current: true,
-        note: 'Preuve de paiement reçue. Vérification en cours par la boutique.',
-      },
-      {
-        status: 'confirmed',
-        timestamp: null,
-        completed: false,
-        current: false,
-      },
-    ];
 
-    persistSessionReservations();
+    commitReservation(reservation);
 
     return HttpResponse.json({
       status: 'pending_validation' as const,
@@ -1352,46 +1608,58 @@ export const handlers = [
     });
   }),
 
-  // POST /reservations/:ref/cancel (§3.2 & §4.1 M4)
-  http.post(apiUrl('/reservations/:ref/cancel'), async ({ params }) => {
+  // POST /reservations/:ref/cancel (§3.2 & §4.1 M4, §3.1 & §5.4 M5) — 422 si l'annulation n'est plus possible
+  http.post(apiUrl('/reservations/:ref/cancel'), async ({ params, request }) => {
     await delay(randomMobileLatency());
     const ref = String(params.ref ?? '').toUpperCase();
     const reservation = mockReservations[ref];
 
-    if (!reservation) {
+    if (!reservation || !isOwnedByCurrentUser(reservation)) {
+      return reservationNotFound(ref);
+    }
+
+    if (!computeCancellable(reservation.status)) {
       return HttpResponse.json(
         {
-          code: 'RESERVATION_NOT_FOUND',
-          message: `Aucune réservation trouvée avec la référence ${ref}.`,
+          code: 'CANCEL_NOT_ALLOWED',
+          message:
+            'Votre commande est déjà en préparation et ne peut plus être annulée ici.',
+          details: { status: reservation.status },
         },
-        { status: 404 },
+        { status: 422 },
       );
     }
 
-    const nowIso = new Date().toISOString();
-    reservation.status = 'cancelled';
-    reservation.timeline = [
-      ...reservation.timeline.map((step) => ({ ...step, current: false })),
-      {
-        status: 'cancelled',
-        timestamp: nowIso,
-        completed: true,
-        current: true,
-        note: 'Réservation annulée à la demande du client.',
-      },
-    ];
+    let reason: string | undefined;
+    try {
+      const body = (await request.json()) as CancelReservationPayload | null;
+      reason = body?.reason?.trim() || undefined;
+    } catch {
+      // Corps vide : motif facultatif
+    }
 
-    persistSessionReservations();
+    pushTimelineEvent(reservation, 'cancelled', reason, 'client');
+    commitReservation(reservation);
 
     return HttpResponse.json({
       status: 'cancelled' as const,
-      reservation,
+      reservation: serializeReservation(reservation),
     });
   }),
 
   // ==========================================================================
-  // Outils de simulation boutique (mocks uniquement, §3.3 M4)
+  // Simulateur boutique (mocks uniquement, §3.3 M4 et §3.3 M5)
+  // Chaque action met à jour `updatedAt` et ajoute une entrée datée au journal.
   // ==========================================================================
+
+  // POST /_mock/reservations/reset — remet toutes les réservations de démonstration à zéro
+  http.post(apiUrl('/_mock/reservations/reset'), async () => {
+    await delay(100);
+    resetMockReservations();
+    persistSessionReservations();
+    mockSyncChannel?.postMessage({ type: 'reset' } satisfies MockSyncMessage);
+    return HttpResponse.json({ ok: true, count: Object.keys(mockReservations).length });
+  }),
 
   // POST /_mock/reservations/:ref/validate
   http.post(apiUrl('/_mock/reservations/:ref/validate'), async ({ params }) => {
@@ -1405,34 +1673,15 @@ export const handlers = [
       );
     }
 
-    const nowIso = new Date().toISOString();
-    reservation.status = 'confirmed';
+    if (reservation.status === 'reserved' || reservation.status === 'payment_rejected') {
+      simulateProofReceived(reservation);
+    }
+    pushTimelineEvent(reservation, 'confirmed', 'Paiement validé par la boutique.', 'shop');
     reservation.rejection = undefined;
     reservation.rejectionReason = undefined;
-    reservation.timeline = [
-      {
-        status: 'reserved',
-        timestamp: reservation.createdAt,
-        completed: true,
-        current: false,
-      },
-      {
-        status: 'pending_validation',
-        timestamp: reservation.proof?.uploadedAt ?? nowIso,
-        completed: true,
-        current: false,
-      },
-      {
-        status: 'confirmed',
-        timestamp: nowIso,
-        completed: true,
-        current: true,
-        note: 'Paiement Mobile Money validé par la boutique DR Choco.',
-      },
-    ];
 
-    persistSessionReservations();
-    return HttpResponse.json(reservation);
+    commitReservation(reservation);
+    return HttpResponse.json(serializeReservation(reservation));
   }),
 
   // POST /_mock/reservations/:ref/reject
@@ -1459,41 +1708,22 @@ export const handlers = [
         // Garde le motif par défaut
       }
 
-      const nowIso = new Date().toISOString();
-      reservation.status = 'payment_rejected';
-      reservation.rejectionReason = reason;
-      reservation.rejection = {
-        reason,
-        rejectedAt: nowIso,
-      };
-      if (!reservation.proof) {
-        reservation.proof = {
-          thumbnailUrl: '/mock/colis-1.svg',
-          uploadedAt: nowIso,
-        };
+      if (reservation.status === 'reserved') {
+        simulateProofReceived(reservation);
       }
-      reservation.timeline = [
-        {
-          status: 'reserved',
-          timestamp: reservation.createdAt,
-          completed: true,
-          current: false,
-        },
-        {
-          status: 'payment_rejected',
-          timestamp: nowIso,
-          completed: false,
-          current: true,
-          note: reason,
-        },
-      ];
+      const rejectedAt = pushTimelineEvent(reservation, 'payment_rejected', reason, 'shop');
+      reservation.rejectionReason = reason;
+      reservation.rejection = { reason, rejectedAt };
+      if (!reservation.proof) {
+        reservation.proof = { thumbnailUrl: '/mock/preuve-1.svg', uploadedAt: rejectedAt };
+      }
 
-      persistSessionReservations();
-      return HttpResponse.json(reservation);
+      commitReservation(reservation);
+      return HttpResponse.json(serializeReservation(reservation));
     },
   ),
 
-  // POST /_mock/reservations/:ref/expire-soon
+  // POST /_mock/reservations/:ref/expire-soon (2 minutes restantes)
   http.post(
     apiUrl('/_mock/reservations/:ref/expire-soon'),
     async ({ params }) => {
@@ -1508,12 +1738,15 @@ export const handlers = [
       }
 
       const now = Date.now();
-      reservation.status = 'reserved';
+      if (reservation.status !== 'reserved' && reservation.status !== 'payment_rejected') {
+        pushTimelineEvent(reservation, 'reserved', 'Articles mis de côté pendant 24 h.', 'client');
+      }
       reservation.serverTime = new Date(now).toISOString();
       reservation.expiresAt = new Date(now + 2 * 60 * 1000).toISOString();
+      reservation.updatedAt = new Date(now).toISOString();
 
-      persistSessionReservations();
-      return HttpResponse.json(reservation);
+      commitReservation(reservation);
+      return HttpResponse.json(serializeReservation(reservation));
     },
   ),
 
@@ -1530,22 +1763,160 @@ export const handlers = [
     }
 
     const now = Date.now();
-    reservation.status = 'expired';
+    pushTimelineEvent(
+      reservation,
+      'expired',
+      'Délai de 24 h dépassé : articles remis en vente.',
+      'system',
+    );
     reservation.serverTime = new Date(now).toISOString();
     reservation.expiresAt = new Date(now - 1000).toISOString();
-    reservation.timeline = [
-      ...reservation.timeline.map((s) => ({ ...s, current: false })),
-      {
-        status: 'expired',
-        timestamp: new Date(now).toISOString(),
-        completed: true,
-        current: true,
-        note: 'Le délai de 24 h est dépassé. Les articles ont été remis en vente.',
-      },
-    ];
 
-    persistSessionReservations();
-    return HttpResponse.json(reservation);
+    commitReservation(reservation);
+    return HttpResponse.json(serializeReservation(reservation));
+  }),
+
+  // POST /_mock/reservations/:ref/advance — « Étape suivante » selon TIMELINE_ORDER et le mode de réception
+  http.post(apiUrl('/_mock/reservations/:ref/advance'), async ({ params }) => {
+    await delay(100);
+    const ref = String(params.ref ?? '').toUpperCase();
+    const reservation = mockReservations[ref];
+    if (!reservation) {
+      return HttpResponse.json(
+        { code: 'NOT_FOUND', message: `Réservation ${ref} introuvable.` },
+        { status: 404 },
+      );
+    }
+
+    const next = nextSimulatedStatus(reservation);
+    if (!next) {
+      return HttpResponse.json(
+        { code: 'NO_NEXT_STEP', message: 'Cette réservation est déjà terminée.' },
+        { status: 409 },
+      );
+    }
+
+    if (next === 'pending_validation') {
+      simulateProofReceived(reservation);
+    } else {
+      pushTimelineEvent(reservation, next, defaultStepNote(reservation, next), 'shop');
+    }
+
+    commitReservation(reservation);
+    return HttpResponse.json(serializeReservation(reservation));
+  }),
+
+  // POST /_mock/reservations/:ref/package-ready — joint 1 à 3 photos et passe à « remise à l'agence » ou « prête »
+  http.post(
+    apiUrl('/_mock/reservations/:ref/package-ready'),
+    async ({ params, request }) => {
+      await delay(100);
+      const ref = String(params.ref ?? '').toUpperCase();
+      const reservation = mockReservations[ref];
+      if (!reservation) {
+        return HttpResponse.json(
+          { code: 'NOT_FOUND', message: `Réservation ${ref} introuvable.` },
+          { status: 404 },
+        );
+      }
+
+      if (reservation.status !== 'confirmed' && reservation.status !== 'preparing') {
+        return HttpResponse.json(
+          {
+            code: 'INVALID_STATUS',
+            message:
+              'Le colis ne peut être déclaré prêt qu’après la confirmation du paiement, avant l’envoi.',
+          },
+          { status: 422 },
+        );
+      }
+
+      let count = 2;
+      try {
+        const body = (await request.json()) as { count?: number } | null;
+        if (typeof body?.count === 'number') count = body.count;
+      } catch {
+        // Nombre de photos par défaut
+      }
+      count = Math.min(3, Math.max(1, Math.round(count)));
+
+      if (reservation.status === 'confirmed') {
+        pushTimelineEvent(reservation, 'preparing', undefined, 'shop');
+      }
+
+      const target: ReservationStatusCode =
+        reservation.receptionMode === 'pickup' ? 'ready_for_pickup' : 'handed_to_agency';
+      const takenAt = new Date().toISOString();
+      const indices: Array<1 | 2 | 3 | 4> = [3, 1, 4, 2];
+      reservation.packagePhotos = indices
+        .slice(0, count)
+        .map((index) => buildPackagePhoto(ref, index, takenAt));
+      reservation.packageReadyAt = takenAt;
+      pushTimelineEvent(reservation, target, defaultStepNote(reservation, target), 'shop');
+
+      commitReservation(reservation);
+      return HttpResponse.json(serializeReservation(reservation));
+    },
+  ),
+
+  // POST /_mock/reservations/:ref/complete — « Marquer livrée / retirée »
+  http.post(apiUrl('/_mock/reservations/:ref/complete'), async ({ params }) => {
+    await delay(100);
+    const ref = String(params.ref ?? '').toUpperCase();
+    const reservation = mockReservations[ref];
+    if (!reservation) {
+      return HttpResponse.json(
+        { code: 'NOT_FOUND', message: `Réservation ${ref} introuvable.` },
+        { status: 404 },
+      );
+    }
+
+    const paidAndOpen: ReservationStatusCode[] = [
+      'confirmed',
+      'preparing',
+      'handed_to_agency',
+      'ready_for_pickup',
+      'in_delivery',
+    ];
+    if (!paidAndOpen.includes(reservation.status)) {
+      return HttpResponse.json(
+        {
+          code: 'INVALID_STATUS',
+          message: 'Seule une réservation payée et en cours peut être marquée livrée ou retirée.',
+        },
+        { status: 422 },
+      );
+    }
+
+    const final: ReservationStatusCode =
+      reservation.receptionMode === 'pickup' ? 'picked_up' : 'delivered';
+    pushTimelineEvent(reservation, final, defaultStepNote(reservation, final), 'shop');
+
+    commitReservation(reservation);
+    return HttpResponse.json(serializeReservation(reservation));
+  }),
+
+  // POST /_mock/reservations/:ref/shop-cancel — « Annuler côté boutique »
+  http.post(apiUrl('/_mock/reservations/:ref/shop-cancel'), async ({ params }) => {
+    await delay(100);
+    const ref = String(params.ref ?? '').toUpperCase();
+    const reservation = mockReservations[ref];
+    if (!reservation) {
+      return HttpResponse.json(
+        { code: 'NOT_FOUND', message: `Réservation ${ref} introuvable.` },
+        { status: 404 },
+      );
+    }
+
+    if (isFinalStatus(reservation.status)) {
+      return HttpResponse.json(
+        { code: 'NO_NEXT_STEP', message: 'Cette réservation est déjà terminée.' },
+        { status: 409 },
+      );
+    }
+
+    pushTimelineEvent(reservation, 'cancelled', 'Annulée par la boutique.', 'shop');
+    commitReservation(reservation);
+    return HttpResponse.json(serializeReservation(reservation));
   }),
 ];
-

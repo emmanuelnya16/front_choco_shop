@@ -11,6 +11,7 @@ import type {
   Reservation,
   User,
 } from './domain';
+import type { ReservationStatusCode } from './reservationStatus';
 
 // HYPOTHÈSE: Formes des requêtes et réponses de l'API REST Symfony 6.4/7 à faire valider par l'équipe back-end.
 
@@ -197,10 +198,69 @@ export interface UploadProofResponse {
   reservation?: Reservation;
 }
 
+export interface CancelReservationPayload {
+  reason?: string;
+}
+
 export interface CancelReservationResponse {
   status: 'cancelled';
   reservation: Reservation;
 }
+
+/** Onglets de « Mes réservations » : `active` = statuts non finaux, `done` = livrée, retirée, expirée, annulée. */
+export type ReservationScope = 'active' | 'done';
+
+/**
+ * Élément léger de la liste paginée `GET /reservations?scope=&page=` (§3.1 M5).
+ * HYPOTHÈSE: contrat à faire valider par le back-end.
+ */
+export interface ReservationListItem {
+  ref: string;
+  status: ReservationStatusCode;
+  createdAt: string;
+  updatedAt: string;
+  expiresAt?: string;
+  serverTime?: string;
+  amount: { total: number };
+  itemsCount: number;
+  itemsPreview: Array<{ image: string; name: string }>;
+  packagePhotoThumb?: string | null;
+  receptionMode: ReceptionMode;
+  city?: string;
+  /**
+   * HYPOTHÈSE: pour une réservation expirée ou annulée, dernier statut du parcours atteint avant l'arrêt
+   * (barre d'avancement rouge « au point atteint », §4.2 M5).
+   */
+  reachedStatus?: ReservationStatusCode;
+}
+
+/**
+ * HYPOTHÈSE: chaque page renvoie aussi le nombre total de réservations par onglet,
+ * pour afficher « En cours (8) · Terminées (11) » sans charger les deux listes.
+ */
+export type ReservationsListPage = Paginated<ReservationListItem> & {
+  counts: Record<ReservationScope, number>;
+};
+
+/** Entrée légère du résumé : permet de calculer le repère de l'onglet sans charger chaque détail. */
+export interface ReservationSummaryEntry {
+  ref: string;
+  status: ReservationStatusCode;
+  updatedAt: string;
+  hasPackagePhotos: boolean;
+}
+
+/**
+ * Résumé `GET /reservations/summary` (§3.1 M5).
+ * HYPOTHÈSE: `items` (réservations en cours) est un ajout au contrat `{ needsAction, lastUpdatedAt }`.
+ */
+export interface ReservationsSummary {
+  needsAction: number;
+  lastUpdatedAt: string | null;
+  items: ReservationSummaryEntry[];
+}
+
+export type UpdateAddressPayload = Partial<Omit<SaveAddressPayload, 'id'>>;
 
 export interface ApiErrorPayload {
   code?: string;

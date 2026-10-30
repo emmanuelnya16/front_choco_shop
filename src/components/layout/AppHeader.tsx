@@ -17,6 +17,8 @@ import { Logo } from '@/components/ui/Logo';
 import { Container } from '@/components/ui/Primitives';
 import { DesktopSearchDropdown } from '@/features/catalog/search/DesktopSearchDropdown';
 import { addRecentSearch } from '@/features/catalog/search/recentSearches';
+import { AttentionDot } from '@/features/tracking/components/AttentionDot';
+import { useReservationsAttention } from '@/features/tracking/useReservationsAttention';
 import { cn } from '@/lib/utils/cn';
 import { duration, ease, spring } from '@/motion/tokens';
 import { useReducedMotionPref } from '@/motion/useReducedMotionPref';
@@ -40,6 +42,7 @@ export function AppHeader() {
 
   const cartCount = useCartStore(selectCartCount);
   const favoritesCount = useFavoritesStore(selectFavoritesCount);
+  const { needsAttention: reservationsAttention } = useReservationsAttention();
   const authUser = useAuthStore((s) => s.user);
   const authStatus = useAuthStore((s) => s.status);
   const cartBounceTick = useUiStore((s) => s.cartBounceTick);
@@ -287,9 +290,15 @@ export function AppHeader() {
               })}
             </nav>
 
-            <Button variant="dark" size="sm" href="/reservations">
-              Mes réservations
-            </Button>
+            <span className="relative inline-flex">
+              <Button variant="dark" size="sm" href="/reservations">
+                Mes réservations
+                {reservationsAttention && (
+                  <span className="sr-only"> : une réservation demande votre attention</span>
+                )}
+              </Button>
+              <AttentionDot show={reservationsAttention} className="-top-1 -right-1" />
+            </span>
           </Container>
 
           <MegaMenu

@@ -8,6 +8,8 @@ import {
   User,
 } from 'lucide-react';
 import { Link, useLocation } from 'react-router';
+import { AttentionDot } from '@/features/tracking/components/AttentionDot';
+import { useReservationsAttention } from '@/features/tracking/useReservationsAttention';
 import { cn } from '@/lib/utils/cn';
 import { ease, spring } from '@/motion/tokens';
 import { useReducedMotionPref } from '@/motion/useReducedMotionPref';
@@ -54,6 +56,7 @@ export function BottomNav() {
   const cartCount = useCartStore(selectCartCount);
   const cartBounceTick = useUiStore((s) => s.cartBounceTick);
   const reducedMotion = useReducedMotionPref();
+  const { needsAttention } = useReservationsAttention();
 
   // Masqué sur la fiche produit, le parcours de réservation/paiement/preuve et le panier non vide pour laisser place à la barre d'action collante
   // `/reservation` et `/reservation/:ref/*` seulement : « Mes réservations » (`/reservations`) garde la barre (M5).
@@ -128,6 +131,10 @@ export function BottomNav() {
                 >
                   <Icon className="h-[22px] w-[22px]" aria-hidden="true" />
 
+                  {tab.id === 'reservations' && (
+                    <AttentionDot show={needsAttention} className="-top-0.5 -right-1" />
+                  )}
+
                   {tab.showCartBadge && (
                     <AnimatePresence mode="popLayout">
                       {cartCount > 0 && (
@@ -148,6 +155,9 @@ export function BottomNav() {
 
                 <span className="text-[11px] font-semibold leading-none">
                   {tab.label}
+                  {tab.id === 'reservations' && needsAttention && (
+                    <span className="sr-only"> : une réservation demande votre attention</span>
+                  )}
                 </span>
               </Link>
             </li>

@@ -704,3 +704,38 @@ describe('Module M5 — 8. Profil, adresses et informations', () => {
     expect(within(sheet).getByRole('status')).toHaveTextContent('Non disponibles');
   });
 });
+
+describe('Module M5 — 9. Repère de l’onglet Réservations', () => {
+  beforeEach(() => {
+    resetMockM3State();
+    useSeenStore.setState({ initializedAt: new Date().toISOString(), byRef: {}, packageToastShown: [] });
+    loginAsJunior();
+  });
+
+  afterEach(() => {
+    useAuthStore.getState().clearSession();
+  });
+
+  const attentionLabel = () => screen.queryAllByText(/une réservation demande votre attention/);
+
+  it('apparaît quand une action est attendue, disparaît une fois les réservations ouvertes, revient sur un changement', async () => {
+    const client = createAppQueryClient();
+    renderRoute('/explorer', client);
+
+    // Paiement attendu (RES-000101), paiement rejeté (RES-000103), colis à retirer (RES-000102)
+    await waitFor(() => expect(attentionLabel().length).toBeGreaterThan(0));
+
+    const summary = await api.get<ReservationsSummary>(endpoints.reservations.summary);
+    act(() => {
+      for (const item of summary.items) {
+        useSeenStore.getState().markSeen(item.ref, item.status, item.updatedAt);
+      }
+    });
+    await waitFor(() => expect(attentionLabel()).toHaveLength(0));
+
+    // La boutique fait avancer une réservation : le repère revient
+    await api.post(endpoints.mock.advanceReservation('RES-000105'));
+    await client.invalidateQueries({ queryKey: qk.reservationsSummary() });
+    await waitFor(() => expect(attentionLabel().length).toBeGreaterThan(0));
+  });
+});

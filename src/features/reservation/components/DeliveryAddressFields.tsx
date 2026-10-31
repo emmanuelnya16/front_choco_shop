@@ -222,8 +222,9 @@ export function DeliveryAddressFields({
             )}
           </div>
 
-          {/* Personne qui récupère le colis (§6.4.3) */}
-          <div>
+          {/* Personne qui récupère le colis (§6.4.3). Requête de conteneur : deux colonnes seulement si le
+              formulaire lui-même est assez large (pas dans une feuille de 440 à 512 px) */}
+          <div className="@container">
             <span className="block text-label text-ink">PERSONNE QUI RÉCUPÈRE LE COLIS</span>
             <div
               role="radiogroup"
@@ -261,7 +262,7 @@ export function DeliveryAddressFields({
             </div>
 
             {recipientType === 'other' && (
-              <div className="mt-4 grid grid-cols-1 gap-4 rounded-[var(--radius-md)] bg-surface p-4 sm:grid-cols-2">
+              <div className="mt-4 grid grid-cols-1 gap-4 rounded-[var(--radius-md)] bg-surface p-4 @lg:grid-cols-2">
                 <div data-field="recipientName">
                   <label htmlFor={`${idPrefix}-recipientName`} className="block text-label text-ink">
                     NOM COMPLET DU DESTINATAIRE *

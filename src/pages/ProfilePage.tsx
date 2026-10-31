@@ -235,7 +235,8 @@ function ProfileConnected({ user }: { user: User }) {
               {initial}
             </span>
             <div className="min-w-0 flex-1">
-              <h1 className="truncate text-h2 text-white">{name}</h1>
+              {/* Nom sur deux lignes au besoin (360 px) : coupé seulement s'il est vraiment très long */}
+              <h1 className="line-clamp-2 break-words text-h2 text-white">{name}</h1>
               <p className="mt-0.5 font-mono text-small text-silver">+237 {formatCmPhone(user.phone)}</p>
             </div>
             <Link

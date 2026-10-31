@@ -36,12 +36,17 @@ export function normalizeCmPhone(input: string): string {
   return `+237${digits}`;
 }
 
+/**
+ * Affichage « 6XX XX XX XX » avec des espaces insécables : le numéro ne se coupe jamais en fin de ligne.
+ * Ces espaces restent relisibles par isValidCmPhone, normalizeCmPhone et cleanCmPhoneDigits
+ * (numéro affiché puis recopié dans un champ).
+ */
 export function formatCmPhone(input: string): string {
   const digits = extractNineDigits(input);
   if (!digits) {
     return input.trim();
   }
-  return `${digits.slice(0, 3)} ${digits.slice(3, 5)} ${digits.slice(5, 7)} ${digits.slice(7, 9)}`;
+  return [digits.slice(0, 3), digits.slice(3, 5), digits.slice(5, 7), digits.slice(7, 9)].join('\u00a0');
 }
 
 /**

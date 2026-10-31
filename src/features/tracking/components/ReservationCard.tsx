@@ -18,6 +18,12 @@ import type { ReservationListItem } from '@/types/api';
 import { ReservationProgressBar } from './ReservationProgressBar';
 import { ReservationStatusBadge } from './ReservationStatusBadge';
 
+/**
+ * Bouton d'action d'une carte : 44 px de haut au toucher (sous 1024 px), 36 px (taille sm) sur ordinateur.
+ * Un appui à côté du bouton ouvrirait le détail (lien étendu à toute la carte).
+ */
+const ACTION_TARGET = 'max-lg:min-h-[44px]';
+
 export interface ReservationCardProps {
   item: ReservationListItem;
   className?: string;
@@ -52,7 +58,7 @@ export function ReservationCard({ item, className }: ReservationCardProps) {
       whileTap={{ scale: 0.98 }}
       transition={{ duration: duration.tap }}
       className={cn(
-        'relative flex flex-col rounded-[var(--radius-md)] border border-silver/70 bg-white p-4 transition-colors [@media(hover:hover)]:hover:border-silver',
+        'relative flex h-full flex-col rounded-[var(--radius-md)] border border-silver/70 bg-white p-4 transition-colors [@media(hover:hover)]:hover:border-silver',
         className,
       )}
     >
@@ -117,19 +123,21 @@ export function ReservationCard({ item, className }: ReservationCardProps) {
 
       <ReservationProgressBar progress={progress} className="mt-3.5" />
 
-      <div className="mt-3">
+      <div className="mt-3 mb-3">
         <ReservationStatusBadge status={item.status} />
       </div>
 
+      {/* Rangée d'action en bas de carte (mt-auto) et de hauteur fixe, avec ou sans bouton (box-content :
+          min-h = hauteur du bouton, hors filet et pt-3) : cartes et filets alignés sur une même rangée. */}
       <div
-        className="relative z-[1] mt-3 flex min-h-[36px] items-center justify-between gap-3 border-t border-silver/70 pt-3"
+        className="relative z-[1] mt-auto box-content flex min-h-[44px] items-center justify-between gap-3 border-t border-silver/70 pt-3 lg:min-h-[36px]"
         onPointerDown={(event) => {
           // Le bouton d'action ne déclenche pas l'effet d'appui de la carte
           if ((event.target as HTMLElement).closest('a,button')) event.stopPropagation();
         }}
       >
         {action.kind === 'pay' && (
-          <Button variant="primary" size="sm" href={action.href} iconRight={<ArrowRight className="h-4 w-4" />}>
+          <Button variant="primary" size="sm" className={ACTION_TARGET} href={action.href} iconRight={<ArrowRight className="h-4 w-4" />}>
             {action.label} ·{' '}
             {item.expiresAt ? (
               <HoldCountdown variant="compact" expiresAt={item.expiresAt} serverTime={item.serverTime} />
@@ -137,7 +145,7 @@ export function ReservationCard({ item, className }: ReservationCardProps) {
           </Button>
         )}
         {action.kind === 'resend-proof' && (
-          <Button variant="primary" size="sm" href={action.href} iconRight={<ArrowRight className="h-4 w-4" />}>
+          <Button variant="primary" size="sm" className={ACTION_TARGET} href={action.href} iconRight={<ArrowRight className="h-4 w-4" />}>
             {action.label}
           </Button>
         )}
@@ -145,6 +153,7 @@ export function ReservationCard({ item, className }: ReservationCardProps) {
           <Button
             variant="dark"
             size="sm"
+            className={ACTION_TARGET}
             href={action.href}
             iconLeft={<Camera className="h-4 w-4" />}
           >
@@ -157,6 +166,7 @@ export function ReservationCard({ item, className }: ReservationCardProps) {
             <Button
               variant="outline"
               size="sm"
+              className={ACTION_TARGET}
               loading={rebook.isPending}
               onClick={() => rebook.mutate(item.ref)}
             >
@@ -175,7 +185,7 @@ export function ReservationCardSkeleton() {
   return (
     <div
       aria-hidden="true"
-      className="flex flex-col rounded-[var(--radius-md)] border border-silver/70 bg-white p-4"
+      className="flex h-full flex-col rounded-[var(--radius-md)] border border-silver/70 bg-white p-4"
     >
       <Skeleton className="h-5 w-28" />
       <Skeleton className="mt-1.5 h-4 w-40" />
@@ -190,7 +200,7 @@ export function ReservationCardSkeleton() {
       <Skeleton className="mt-3.5 h-1 w-full" />
       <Skeleton className="mt-3 h-6 w-36 rounded-[var(--radius-full)]" />
       <div className="mt-3 border-t border-silver/70 pt-3">
-        <Skeleton className="h-9 w-40" />
+        <Skeleton className="h-11 w-40 lg:h-9" />
       </div>
     </div>
   );

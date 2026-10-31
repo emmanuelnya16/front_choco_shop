@@ -50,7 +50,7 @@ export function ReservationsPage() {
 
 function PageFrame({ children }: { children: ReactNode }) {
   return (
-    <div className="mx-auto w-full max-w-[840px] px-page pt-6 pb-10 lg:pt-10 xl:max-w-[1120px]">
+    <div className="mx-auto w-full max-w-content px-page pt-6 pb-10 lg:pt-10">
       {children}
     </div>
   );
@@ -80,7 +80,7 @@ function ReservationsLoadingShell() {
     <PageFrame>
       <h1 className="text-h1 text-ink">Mes réservations</h1>
       <Skeleton className="mt-6 h-11 w-full max-w-sm" />
-      <div className="mt-5 grid gap-3 xl:grid-cols-2">
+      <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         <ReservationCardSkeleton />
         <ReservationCardSkeleton />
       </div>
@@ -273,7 +273,7 @@ function ReservationsPanel({
 
   if (query.isPending) {
     return (
-      <div className="grid gap-3 xl:grid-cols-2">
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         <ReservationCardSkeleton />
         <ReservationCardSkeleton />
         <ReservationCardSkeleton />
@@ -329,7 +329,9 @@ function ReservationsPanel({
         </div>
       )}
 
-      <ul className="grid gap-3 xl:grid-cols-2">
+      {/* HYPOTHÈSE: trois colonnes dès 1280 px (cartes d'environ 400 px, comme les deux colonnes de la
+          tablette) plutôt que deux cartes de 600 px dans le conteneur de 1280 px. */}
+      <ul className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {items.map((item, index) => (
           <m.li
             key={item.ref}

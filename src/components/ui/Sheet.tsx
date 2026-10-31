@@ -1,7 +1,7 @@
 import { X } from 'lucide-react';
-import { AnimatePresence, type PanInfo } from 'motion/react';
+import { AnimatePresence, useDragControls, type PanInfo } from 'motion/react';
 import * as m from 'motion/react-m';
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import { useOverlayHistory } from '@/lib/hooks/useOverlayHistory';
 import { cn } from '@/lib/utils/cn';
 import { fade, sheetUp } from '@/motion/presets';
@@ -20,11 +20,31 @@ export interface SheetProps {
  * clic sur le fond ou touche Échap, piège du focus et blocage du défilement),
  * et fenêtre centrée de 440 px sur ordinateur (`lg:`).
  * Entrée d'historique à l'ouverture (M6 §8) : la touche retour d'Android ferme d'abord la feuille.
+ * Contenu long : le panneau est limité à 92 % de la hauteur et seul le corps défile ; la poignée,
+ * le titre et le bouton Fermer restent visibles.
  */
 export function Sheet({ open, onClose, title, children, className }: SheetProps) {
   const dialogRef = useRef<HTMLDivElement | null>(null);
+  const bodyRef = useRef<HTMLDivElement | null>(null);
+  const contentRef = useRef<HTMLDivElement | null>(null);
+  const dragControls = useDragControls();
+  const [bodyScrolls, setBodyScrolls] = useState(false);
 
   useOverlayHistory(open, onClose);
+
+  // Le corps dépasse-t-il ? Mesuré à l'ouverture puis à chaque changement de taille du contenu
+  // (ex. liste d'agences qui apparaît dans la feuille d'adresse).
+  useEffect(() => {
+    const body = bodyRef.current;
+    const content = contentRef.current;
+    if (!open || !body || !content || typeof ResizeObserver === 'undefined') return undefined;
+    const observer = new ResizeObserver(() => {
+      setBodyScrolls(body.scrollHeight > body.clientHeight + 1);
+    });
+    observer.observe(body);
+    observer.observe(content);
+    return () => observer.disconnect();
+  }, [open]);
 
   useEffect(() => {
     if (!open) {
@@ -72,6 +92,14 @@ export function Sheet({ open, onClose, title, children, className }: SheetProps)
     }
   };
 
+  // Glissement vers le bas depuis toute la feuille. Quand le corps défile, le doigt posé dessus le fait
+  // défiler (un geste rapide ne doit pas fermer la feuille) : on glisse alors par la poignée ou l'en-tête.
+  // HYPOTHÈSE: pas de fermeture par glissement depuis un corps qui défile, même remonté en haut (geste ambigu).
+  const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (bodyScrolls && bodyRef.current?.contains(event.target as Node)) return;
+    dragControls.start(event);
+  };
+
   return (
     <AnimatePresence>
       {open && (
@@ -99,21 +127,25 @@ export function Sheet({ open, onClose, title, children, className }: SheetProps)
             animate="visible"
             exit="exit"
             drag="y"
+            dragControls={dragControls}
+            dragListener={false}
+            onPointerDown={handlePointerDown}
             dragConstraints={{ top: 0, bottom: 0 }}
             dragElastic={{ top: 0, bottom: 0.35 }}
             onDragEnd={handleDragEnd}
             className={cn(
-              'relative z-10 w-full max-w-lg rounded-t-[var(--radius-sheet)] bg-white p-5 pb-[calc(20px+env(safe-area-inset-bottom,0px))] shadow-[var(--shadow-sheet)] lg:max-w-[440px] lg:rounded-[var(--radius-md)] lg:p-6',
+              // touch-pan-x : le glissement vertical revient à la feuille (comme le faisait l'écouteur de Motion)
+              'relative z-10 flex max-h-[92dvh] w-full max-w-lg touch-pan-x flex-col rounded-t-[var(--radius-sheet)] bg-white p-5 pb-[calc(20px+env(safe-area-inset-bottom,0px))] shadow-[var(--shadow-sheet)] lg:max-w-[440px] lg:rounded-[var(--radius-md)] lg:p-6',
               className,
             )}
           >
             {/* Poignée de glissement (mobile) */}
             <div
               aria-hidden="true"
-              className="mx-auto mb-3 h-1 w-9 rounded-[var(--radius-full)] bg-silver lg:hidden"
+              className="mx-auto mb-3 h-1 w-9 shrink-0 rounded-[var(--radius-full)] bg-silver lg:hidden"
             />
 
-            <div className="flex items-center justify-between gap-4 border-b border-silver pb-3.5">
+            <div className="flex shrink-0 items-center justify-between gap-4 border-b border-silver pb-3.5 select-none">
               <h2 className="text-h3 font-bold text-ink">{title}</h2>
               <button
                 type="button"
@@ -125,7 +157,20 @@ export function Sheet({ open, onClose, title, children, className }: SheetProps)
               </button>
             </div>
 
-            <div className="mt-4">{children}</div>
+            {/* Corps : seul à défiler. Il couvre toute la largeur du panneau (-mx-5 px-5, lg:-mx-6 lg:px-6,
+                comme le p-5 / lg:p-6 du panneau) : les contenus pleine largeur (carrousel en -mx-5) et les
+                contours de focus ne sont pas rognés ; pt-1 et pb-1 -mb-1 font de même en haut et en bas. */}
+            <div
+              ref={bodyRef}
+              data-sheet-body=""
+              className={cn(
+                '-mx-5 mt-3 -mb-1 min-h-0 overflow-y-auto overscroll-contain px-5 pt-1 pb-1 lg:-mx-6 lg:px-6',
+                // Contenu court : le corps ne défile pas, le glissement vertical ferme la feuille
+                !bodyScrolls && 'touch-pan-x',
+              )}
+            >
+              <div ref={contentRef}>{children}</div>
+            </div>
           </m.div>
         </div>
       )}

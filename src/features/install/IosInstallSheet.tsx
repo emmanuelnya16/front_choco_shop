@@ -115,7 +115,6 @@ export function IosInstallSheet({ open, onDone, onClose }: IosInstallSheetProps)
       open={open}
       onClose={onClose}
       title={context.device === 'ipad' ? 'Installer sur votre iPad' : 'Installer sur votre iPhone'}
-      className="max-h-[92dvh] overflow-y-auto"
     >
       <div className="pb-2">
         {context.shareLocation === 'top' && <ShareArrow direction="up" label={arrowLabel} />}

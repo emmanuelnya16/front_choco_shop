@@ -37,7 +37,6 @@ export function AddressSheet({ open, onClose, address, onSaved }: AddressSheetPr
       open={open}
       onClose={onClose}
       title={address ? 'Modifier l’adresse' : 'Nouvelle adresse'}
-      className="max-h-[92dvh] overflow-y-auto"
     >
       {/* Remonté à chaque ouverture : les valeurs initiales suivent l'adresse choisie */}
       {open && <AddressForm key={address?.id ?? 'new'} address={address} onSaved={onSaved} onCancel={onClose} />}

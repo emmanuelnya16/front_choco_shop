@@ -134,7 +134,7 @@ export function ReceptionSection({
               )}
               {agency.phone && (
                 <InfoLine icon={<Phone className="h-4 w-4" />}>
-                  <a href={telHref(agency.phone)} className="font-semibold underline">
+                  <a href={telHref(agency.phone)} className="font-semibold whitespace-nowrap underline">
                     {agency.phone}
                   </a>
                 </InfoLine>
@@ -145,7 +145,7 @@ export function ReceptionSection({
         {recipientDiffers && address && (
           <InfoLine icon={<User className="h-4 w-4" />}>
             Destinataire : {address.recipientName} ·{' '}
-            <a href={telHref(address.recipientPhone)} className="underline">
+            <a href={telHref(address.recipientPhone)} className="whitespace-nowrap underline">
               {formatCmPhone(address.recipientPhone)}
             </a>
           </InfoLine>

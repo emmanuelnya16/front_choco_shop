@@ -114,7 +114,11 @@ function getActionBlockContent(
               />
               <div>
                 <p className="text-small text-silver">Montant exact à envoyer</p>
-                <Price amount={total} className="mt-0.5 block text-[26px] leading-tight text-white" />
+                {/* Montant insécable : 22 px sous 390 px pour tenir à côté de l'anneau du compte à rebours */}
+                <Price
+                  amount={total}
+                  className="mt-0.5 block whitespace-nowrap text-[22px] leading-tight text-white min-[390px]:text-[26px]"
+                />
               </div>
             </div>
             <Button

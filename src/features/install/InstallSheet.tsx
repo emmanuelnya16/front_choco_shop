@@ -81,7 +81,7 @@ export function InstallSheet({ open, installing = false, onInstall, onLater }: I
   const reducedMotion = useReducedMotionPref();
 
   return (
-    <Sheet open={open} onClose={onLater} title="Installer l’application" className="max-h-[92dvh] overflow-y-auto">
+    <Sheet open={open} onClose={onLater} title="Installer l’application">
       <div className="pb-2">
         <div className="flex items-center gap-4">
           <m.div

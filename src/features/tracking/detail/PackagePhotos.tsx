@@ -210,8 +210,9 @@ export function PackagePhotos({
           data-reveal-mask
           className={cn(
             'overflow-hidden rounded-[var(--radius-md)]',
-            // Portrait 4:5 : largeur limitée sur ordinateur pour garder la photo entière à l'écran
-            ratio === '4/5' && 'lg:max-w-[480px]',
+            // Portrait 4:5 : largeur limitée dès la tablette (480 x 600 au plus) pour garder la photo entière
+            // à l'écran, y compris en paysage (1023 x 768)
+            ratio === '4/5' && 'sm:max-w-[480px]',
           )}
         >
           <div data-reveal-image className={ASPECT_CLASSES[ratio] ?? 'aspect-[4/3]'}>

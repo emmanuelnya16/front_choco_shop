@@ -19,11 +19,11 @@ import { isFinalStatus, STATUS_META, TIMELINE_ORDER } from '@/types/reservationS
 
 describe('Utilitaires : price.ts', () => {
   it('formate les prix en FCFA avec espaces insécables fines et sans décimales', () => {
-    expect(formatPrice(45000)).toBe('45\u202f000 FCFA');
-    expect(formatPrice(8000)).toBe('8\u202f000 FCFA');
-    expect(formatPrice(0)).toBe('0 FCFA');
-    expect(formatPrice(65000.4)).toBe('65\u202f000 FCFA');
-    expect(formatPrice(Number.NaN)).toBe('0 FCFA');
+    expect(formatPrice(45000)).toBe('45\u202f000\u00a0FCFA');
+    expect(formatPrice(8000)).toBe('8\u202f000\u00a0FCFA');
+    expect(formatPrice(0)).toBe('0\u00a0FCFA');
+    expect(formatPrice(65000.4)).toBe('65\u202f000\u00a0FCFA');
+    expect(formatPrice(Number.NaN)).toBe('0\u00a0FCFA');
   });
 });
 
@@ -67,8 +67,8 @@ describe('Utilitaires : phone.ts (au moins 8 cas dont formats invalides)', () =>
     expect(isValidCmPhone('')).toBe(false);
 
     // Format d'affichage
-    expect(formatCmPhone('+237691234567')).toBe('691 23 45 67');
-    expect(formatCmPhone('00237 677 88 99 00')).toBe('677 88 99 00');
+    expect(formatCmPhone('+237691234567')).toBe('691\u00a023\u00a045\u00a067');
+    expect(formatCmPhone('00237 677 88 99 00')).toBe('677\u00a088\u00a099\u00a000');
   });
 });
 

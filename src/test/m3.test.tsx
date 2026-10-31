@@ -192,7 +192,7 @@ describe('Module M3 — Panier, Connexion OTP et Réservation', () => {
     expect(isValidCmPhone('690123456')).toBe(true);
     expect(isValidCmPhone('590123456')).toBe(false);
 
-    expect(formatCmPhone('690123456')).toBe('690 12 34 56');
+    expect(formatCmPhone('690123456')).toBe('690\u00a012\u00a034\u00a056');
     expect(formatCmPhoneInput('690123456')).toBe('690 12 34 56');
 
     // Détection opérateur Orange (69, 655-659, 686-689) vs MTN (67, 650-654, 680-683)

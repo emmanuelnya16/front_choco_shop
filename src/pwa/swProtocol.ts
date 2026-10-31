@@ -1,5 +1,12 @@
 import type { PushPayload } from './pushPayload';
 
+/**
+ * En-tête posé par le service worker quand il répond avec une copie enregistrée faute de réseau
+ * (NetworkFirst en échec ou délai dépassé) : le client le compte comme un échec réseau (M6 §6.1),
+ * pour détecter un téléphone « en ligne » sans vraie connexion, tout en affichant les données.
+ */
+export const OFFLINE_FALLBACK_HEADER = 'X-DRC-Offline-Fallback';
+
 /** Messages échangés entre l'app et le service worker (M6 §4.6). */
 export const SW_MESSAGES = {
   skipWaiting: 'SKIP_WAITING',

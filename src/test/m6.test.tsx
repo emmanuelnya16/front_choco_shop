@@ -17,6 +17,8 @@ import {
   resolveNotificationUrl,
   samplePushPayload,
 } from '@/pwa/pushPayload';
+import { useNetworkStore } from '@/pwa/networkStore';
+import { OFFLINE_FALLBACK_HEADER } from '@/pwa/swProtocol';
 import { urlBase64ToUint8Array } from '@/pwa/vapid';
 import { useAuthStore } from '@/stores/authStore';
 import type { User } from '@/types/domain';
@@ -218,6 +220,24 @@ describe('M6 · 2. Règles de cache', () => {
     expect(isCacheableResponse(res(206))).toBe(false);
   });
 
+  it("chaque cache n'accepte que son type de contenu (index.html renvoyé pour une image manquante)", () => {
+    const res = (contentType: string) => ({
+      status: 200,
+      type: 'basic',
+      headers: new Headers({ 'Content-Type': contentType }),
+    });
+    expect(isCacheableResponse(res('text/html; charset=utf-8'), 'images')).toBe(false);
+    expect(isCacheableResponse(res('image/webp'), 'images')).toBe(true);
+    expect(isCacheableResponse(res('image/svg+xml'), 'images')).toBe(true);
+    expect(isCacheableResponse(res('text/html'), 'catalog')).toBe(false);
+    expect(isCacheableResponse(res('application/json'), 'catalog')).toBe(true);
+    expect(isCacheableResponse(res('application/json; charset=utf-8'), 'user')).toBe(true);
+    expect(isCacheableResponse(res('text/html; charset=utf-8'), 'pages')).toBe(true);
+    expect(isCacheableResponse(res('application/json'), 'pages')).toBe(false);
+    expect(isCacheableResponse(res('font/woff2'), 'fonts')).toBe(true);
+    expect(isCacheableResponse(res('text/html'), 'fonts')).toBe(false);
+  });
+
   it('mise à jour jamais proposée sur les écrans de réservation, paiement et preuve', () => {
     expect(isUpdateBlockedPath('/reservation')).toBe(true);
     expect(isUpdateBlockedPath('/reservation/RES-000124/paiement')).toBe(true);
@@ -324,5 +344,39 @@ describe('M6 · 4. Notifications push', () => {
 
   it("pastille de l'icône : action demandée ou nouveauté", () => {
     expect([...BADGE_PUSH_TYPES].sort()).toEqual(['expiring_soon', 'package_ready', 'payment_rejected']);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 5. Copie servie par le service worker faute de réseau (§6.1)
+// ---------------------------------------------------------------------------
+describe('M6 · 5. Téléphone « en ligne » sans vraie connexion', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    useNetworkStore.setState({ browserOnline: true, consecutiveFailures: 0, online: true, offlineSince: null });
+  });
+
+  it('une copie enregistrée renvoie les données mais compte comme un échec : 2 → hors connexion', async () => {
+    useNetworkStore.setState({ browserOnline: true, consecutiveFailures: 0, online: true, offlineSince: null });
+    const cached = () =>
+      new Response(JSON.stringify({ needsAction: 1 }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json', [OFFLINE_FALLBACK_HEADER]: '1' },
+      });
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(cached()).mockResolvedValueOnce(cached());
+
+    await expect(api.get('/reservations/summary')).resolves.toEqual({ needsAction: 1 });
+    expect(useNetworkStore.getState().online).toBe(true);
+    await expect(api.get('/reservations/summary')).resolves.toEqual({ needsAction: 1 });
+    expect(useNetworkStore.getState().online).toBe(false);
+  });
+
+  it('une vraie réponse du serveur remet en ligne', async () => {
+    useNetworkStore.setState({ browserOnline: true, consecutiveFailures: 2, online: false, offlineSince: 1 });
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ needsAction: 0 }), { status: 200, headers: { 'Content-Type': 'application/json' } }),
+    );
+    await api.get('/reservations/summary');
+    expect(useNetworkStore.getState().online).toBe(true);
   });
 });

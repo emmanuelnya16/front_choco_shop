@@ -11,7 +11,7 @@ import type { RouteHandlerCallbackOptions, WorkboxPlugin } from 'workbox-core/ty
 import { validateEnv } from './lib/env';
 import { CACHE_LIMITS, CACHE_NAMES, classifyRequest, isCacheableResponse, type CacheStrategy } from './pwa/cacheRules';
 import { BADGE_PUSH_TYPES, buildNotification, parsePushPayload, resolveNotificationUrl } from './pwa/pushPayload';
-import { SW_MESSAGES, type SwReply, type SwToAppMessage } from './pwa/swProtocol';
+import { OFFLINE_FALLBACK_HEADER, SW_MESSAGES, type SwReply, type SwToAppMessage } from './pwa/swProtocol';
 import { urlBase64ToUint8Array } from './pwa/vapid';
 
 declare const self: ServiceWorkerGlobalScope & {
@@ -30,26 +30,43 @@ cleanupOutdatedCaches();
 // ---------------------------------------------------------------------------
 // Stratégies d'exécution (§4.5) : règles pures dans src/pwa/cacheRules.ts
 // ---------------------------------------------------------------------------
-/** N'enregistre que les réponses 200 complètes, sans « Cache-Control: no-store ». */
-const cacheableOnly: WorkboxPlugin = {
-  cacheWillUpdate: async ({ response }) => (isCacheableResponse(response) ? response : null),
+/** N'enregistre que les réponses 200 complètes, sans « no-store », du type de contenu attendu. */
+function cacheableOnly(strategy: Exclude<CacheStrategy, 'network-only'>): WorkboxPlugin {
+  return {
+    cacheWillUpdate: async ({ response }) => (isCacheableResponse(response, strategy) ? response : null),
+  };
+}
+
+/** NetworkFirst : la copie enregistrée n'est utilisée qu'en cas d'échec du réseau, on le signale à l'app. */
+const markOfflineFallback: WorkboxPlugin = {
+  cachedResponseWillBeUsed: async ({ cachedResponse }) => {
+    if (!cachedResponse) return cachedResponse;
+    const headers = new Headers(cachedResponse.headers);
+    headers.set(OFFLINE_FALLBACK_HEADER, '1');
+    return new Response(await cachedResponse.blob(), {
+      status: cachedResponse.status,
+      statusText: cachedResponse.statusText,
+      headers,
+    });
+  },
 };
 
 const strategies = {
   pages: new NetworkFirst({
     cacheName: CACHE_NAMES.pages,
     networkTimeoutSeconds: CACHE_LIMITS.pages.networkTimeoutSeconds,
-    plugins: [cacheableOnly],
+    plugins: [cacheableOnly('pages')],
   }),
   catalog: new StaleWhileRevalidate({
     cacheName: CACHE_NAMES.catalog,
-    plugins: [cacheableOnly, new ExpirationPlugin({ ...CACHE_LIMITS.catalog, purgeOnQuotaError: true })],
+    plugins: [cacheableOnly('catalog'), new ExpirationPlugin({ ...CACHE_LIMITS.catalog, purgeOnQuotaError: true })],
   }),
   user: new NetworkFirst({
     cacheName: CACHE_NAMES.user,
     networkTimeoutSeconds: CACHE_LIMITS.user.networkTimeoutSeconds,
     plugins: [
-      cacheableOnly,
+      cacheableOnly('user'),
+      markOfflineFallback,
       new ExpirationPlugin({
         maxEntries: CACHE_LIMITS.user.maxEntries,
         maxAgeSeconds: CACHE_LIMITS.user.maxAgeSeconds,
@@ -59,11 +76,11 @@ const strategies = {
   }),
   images: new CacheFirst({
     cacheName: CACHE_NAMES.images,
-    plugins: [cacheableOnly, new ExpirationPlugin({ ...CACHE_LIMITS.images, purgeOnQuotaError: true })],
+    plugins: [cacheableOnly('images'), new ExpirationPlugin({ ...CACHE_LIMITS.images, purgeOnQuotaError: true })],
   }),
   fonts: new CacheFirst({
     cacheName: CACHE_NAMES.fonts,
-    plugins: [cacheableOnly, new ExpirationPlugin({ ...CACHE_LIMITS.fonts, purgeOnQuotaError: true })],
+    plugins: [cacheableOnly('fonts'), new ExpirationPlugin({ ...CACHE_LIMITS.fonts, purgeOnQuotaError: true })],
   }),
 };
 

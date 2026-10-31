@@ -151,12 +151,35 @@ export function classifyRequest(req: RequestDescriptor, ctx: CacheRulesContext):
   return 'network-only';
 }
 
-/** Une réponse ne s'enregistre que si elle est complète (200) et sans « Cache-Control: no-store ». */
-export function isCacheableResponse(response: { status: number; type?: string; headers: Headers }): boolean {
+/**
+ * Type de contenu attendu par stratégie. Indispensable pour une application d'une seule page : le
+ * serveur répond index.html (200, text/html) à toute adresse inconnue, y compris une image manquante,
+ * qui serait sinon enregistrée comme image.
+ */
+const EXPECTED_CONTENT_TYPE: Record<Exclude<CacheStrategy, 'network-only'>, RegExp> = {
+  pages: /^text\/html/i,
+  catalog: /json/i,
+  user: /json/i,
+  images: /^image\//i,
+  fonts: /^(font\/|application\/(font|x-font|octet-stream))/i,
+};
+
+/**
+ * Une réponse ne s'enregistre que si elle est complète (200), sans « Cache-Control: no-store », et,
+ * si la stratégie est donnée, du type de contenu attendu.
+ */
+export function isCacheableResponse(
+  response: { status: number; type?: string; headers: Headers },
+  strategy?: Exclude<CacheStrategy, 'network-only'>,
+): boolean {
   if (response.status !== 200) return false;
   if (response.type === 'opaque' || response.type === 'error') return false;
   const cacheControl = response.headers.get('Cache-Control') ?? '';
   if (/(^|,)\s*no-store\s*(,|$)/i.test(cacheControl)) return false;
+  if (strategy) {
+    const contentType = response.headers.get('Content-Type') ?? '';
+    if (!EXPECTED_CONTENT_TYPE[strategy].test(contentType)) return false;
+  }
   return true;
 }
 

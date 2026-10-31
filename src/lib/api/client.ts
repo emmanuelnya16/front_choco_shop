@@ -1,5 +1,6 @@
 import { env } from '@/lib/env';
 import { useNetworkStore, useSyncStore } from '@/pwa/networkStore';
+import { OFFLINE_FALLBACK_HEADER } from '@/pwa/swProtocol';
 import { useAuthStore } from '@/stores/authStore';
 import type { ApiErrorPayload, RefreshTokenResponse } from '@/types/api';
 import { endpoints } from './endpoints';
@@ -212,7 +213,11 @@ async function request<T>(
       signal: controller.signal,
     });
     responseReceived = true;
-    const fromServer = reportResponseReceived();
+    // Copie servie par le service worker faute de réseau : les données s'affichent, mais c'est un
+    // échec réseau (téléphone « en ligne » sans vraie connexion, M6 §6.1)
+    const servedFromCache = response.headers.get(OFFLINE_FALLBACK_HEADER) === '1';
+    if (servedFromCache) reportNetworkFailure();
+    const fromServer = !servedFromCache && reportResponseReceived();
     if (fromServer && method === 'GET' && response.ok) {
       // Date affichée hors connexion (« Mis à jour le … ») : seulement pour une vraie réponse du serveur
       useSyncStore.getState().recordSync(path);

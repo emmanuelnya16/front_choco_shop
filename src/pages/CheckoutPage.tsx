@@ -929,27 +929,29 @@ export function CheckoutPage() {
                                   disabled={isSending}
                                   onClick={() => applySavedAddress(addr, true)}
                                   className={cn(
-                                    'flex min-w-[180px] shrink-0 flex-col items-start rounded-[var(--radius-md)] border p-3 text-left transition-colors',
+                                    // Largeur bornée : le repère passe en points de suspension au lieu d'élargir la carte
+                                    // au-delà de l'écran ; la carte suivante dépasse, ce qui montre que la rangée défile.
+                                    'flex w-[220px] min-w-0 shrink-0 flex-col items-start rounded-[var(--radius-md)] border p-3 text-left transition-colors',
                                     isSelected
                                       ? 'border-2 border-ink bg-surface'
                                       : 'border-silver bg-white hover:border-ink',
                                   )}
                                 >
                                   <div className="flex w-full items-center justify-between gap-2">
-                                    <span className="text-xs font-extrabold uppercase text-ink">
+                                    <span className="min-w-0 truncate text-xs font-extrabold uppercase text-ink">
                                       {addr.label}
                                     </span>
                                     {isSelected && (
                                       <Check
-                                        className="h-3.5 w-3.5 text-red"
+                                        className="h-3.5 w-3.5 shrink-0 text-red"
                                         aria-hidden="true"
                                       />
                                     )}
                                   </div>
-                                  <span className="mt-1 text-xs font-bold text-ink">
+                                  <span className="mt-1 line-clamp-1 w-full text-xs font-bold text-ink">
                                     {addr.city} · {addr.district || addr.quarter}
                                   </span>
-                                  <span className="mt-0.5 line-clamp-1 text-[11px] text-text-2">
+                                  <span className="mt-0.5 line-clamp-1 w-full text-[11px] text-text-2">
                                     {addr.landmark || addr.details}
                                   </span>
                                 </button>
@@ -1280,9 +1282,11 @@ export function CheckoutPage() {
                 <span className="block text-xs font-semibold uppercase tracking-wider text-text-2">
                   Total
                 </span>
+                {/* Total sur une seule ligne : la barre garde sa hauteur sur les petits écrans (360 px) */}
+                {/* HYPOTHÈSE: total sous 1 000 000 FCFA ; au-delà, le bouton empiète de quelques pixels sur la marge de la barre sans sortir de l'écran */}
                 <AnimatedPriceCounter
                   amount={amounts.total}
-                  className="text-price text-ink"
+                  className="whitespace-nowrap text-price text-ink"
                 />
               </div>
               <div ref={mobileConfirmBtnRef}>
@@ -1291,6 +1295,7 @@ export function CheckoutPage() {
                   variant="primary"
                   size="lg"
                   disabled={!isOnline || isSending}
+                  className="px-4 min-[380px]:px-6"
                 >
                   {isSending ? (
                     <span className="inline-flex items-center gap-2">

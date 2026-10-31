@@ -62,6 +62,23 @@ function formatPayBeforeLabel(expiresAtIso: string): string {
   return `le ${dayMonth} à ${hours} h ${mins}`;
 }
 
+/**
+ * Code USSD avec un point de coupure possible après chaque « * » : sur un petit écran (360 px),
+ * il passe à la ligne entre deux segments au lieu d'être tronqué, et le montant reste entier.
+ */
+function UssdCodeSegments({ code }: { code: string }) {
+  const parts = code.split('*');
+  return parts.map((part, index) => {
+    const isLast = index === parts.length - 1;
+    return (
+      <span key={`${index}-${part}`}>
+        {isLast ? part : `${part}*`}
+        {!isLast && <wbr />}
+      </span>
+    );
+  });
+}
+
 async function copyTextToClipboard(text: string): Promise<boolean> {
   try {
     if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
@@ -259,7 +276,7 @@ export function PaymentPage() {
       <div>
         <CheckoutStepper currentStep={2} />
         <Container className="py-8">
-          <div className="mx-auto max-w-4xl grid grid-cols-1 gap-6 lg:grid-cols-12">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
             <div className="space-y-4 lg:col-span-7">
               <div className="h-32 w-full animate-pulse rounded-[var(--radius-md)] bg-ink/15" />
               <div className="h-36 w-full animate-pulse rounded-[var(--radius-md)] bg-surface" />
@@ -400,7 +417,7 @@ export function PaymentPage() {
 
       <Container className="py-6 lg:py-10">
         {/* Grille 2 colonnes sur ordinateur (§4.3) */}
-        <div className="mx-auto max-w-5xl grid grid-cols-1 gap-8 lg:grid-cols-12 lg:items-start">
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-12 lg:items-start">
           {/* Colonne principale (gauche sur ordinateur) */}
           <div className="space-y-6 lg:col-span-7">
             {/* 4.1.2 Carte de référence (fond ink, texte blanc, rayon 8, padding 20 px) */}
@@ -481,9 +498,10 @@ export function PaymentPage() {
                     data-testid="copy-amount-button"
                     onClick={() => void handleCopyAmount()}
                     aria-label={`${totalAmount} francs CFA. Appuyez pour copier le montant sans espaces`}
-                    className="mt-1 inline-flex min-h-[48px] items-center gap-3 text-left transition-opacity hover:opacity-85"
+                    className="mt-1 inline-flex min-h-[48px] flex-wrap items-center gap-x-3 gap-y-2 text-left transition-opacity hover:opacity-85"
                   >
-                    <span className="text-[36px] sm:text-[40px] font-extrabold leading-none tabular-nums text-ink">
+                    {/* Montant jamais coupé avant « FCFA » : à 360 px, c'est « Copier » qui passe dessous */}
+                    <span className="whitespace-nowrap text-[36px] sm:text-[40px] font-extrabold leading-none tabular-nums text-ink">
                       {formatPrice(animatedAmount || totalAmount)}
                     </span>
                     <span className="inline-flex h-8 items-center gap-1 rounded-[var(--radius-sm)] border border-silver bg-surface px-2.5 text-xs font-bold text-ink">
@@ -718,11 +736,12 @@ export function PaymentPage() {
                           <span className="block text-[11px] font-semibold uppercase tracking-wider text-text-2">
                             Code USSD complet
                           </span>
+                          {/* Jamais tronqué : c'est le code que le client vérifie avant de payer */}
                           <code
                             data-testid="ussd-plain-code"
-                            className="mt-0.5 block truncate font-mono text-body font-extrabold text-ink"
+                            className="mt-0.5 block font-mono text-body font-extrabold break-words text-ink"
                           >
-                            {ussdCode}
+                            <UssdCodeSegments code={ussdCode} />
                           </code>
                         </div>
                         <button

@@ -197,10 +197,10 @@ export function CartPage() {
           </div>
         )}
 
-        {/* Mise en page 2 colonnes sur ordinateur (64 % / 36 %, §4.3) */}
-        <div className="mt-6 grid grid-cols-1 gap-8 lg:grid-cols-12 lg:items-start">
+        {/* Mise en page 2 colonnes dès la tablette (64 % / 36 %, §4.3) : pas de colonne unique étirée à 768-1023 px */}
+        <div className="mt-6 grid grid-cols-1 gap-8 md:grid-cols-12 md:items-start md:gap-6 lg:gap-8">
           {/* Colonne gauche (64 % -> 8/12 ou 7/12) : Lignes d'articles */}
-          <div className="space-y-4 lg:col-span-7 xl:col-span-8">
+          <div className="space-y-4 md:col-span-7 xl:col-span-8">
             <AnimatePresence initial={false}>
               {items.map((item) => (
                 <CartItemRow
@@ -242,7 +242,7 @@ export function CartPage() {
           </div>
 
           {/* Colonne droite collante sur ordinateur (36 % -> 5/12 ou 4/12, §4.3) */}
-          <aside className="space-y-4 lg:sticky lg:top-24 lg:col-span-5 xl:col-span-4">
+          <aside className="space-y-4 md:col-span-5 lg:sticky lg:top-24 xl:col-span-4">
             <div className="rounded-[var(--radius-md)] border border-silver/70 bg-white p-5 sm:p-6">
               <h2 className="text-h3 text-ink">RÉCAPITULATIF</h2>
 

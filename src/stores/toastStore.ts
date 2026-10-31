@@ -9,6 +9,10 @@ export interface ToastMessage {
   actionHref?: string;
   onAction?: () => void;
   durationMs?: number;
+  /** Titre et texte sur deux lignes au plus (toast riche d'une notification, M6 §7.4). */
+  wrap?: boolean;
+  /** Icône affichée sans miniature : coche (par défaut) ou cloche (notification). */
+  icon?: 'check' | 'bell';
 }
 
 export interface ToastState {

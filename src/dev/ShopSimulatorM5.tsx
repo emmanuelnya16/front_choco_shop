@@ -13,8 +13,15 @@ import { api, ApiError } from '@/lib/api/client';
 import { endpoints } from '@/lib/api/endpoints';
 import { qk } from '@/lib/api/queryKeys';
 import { haptic } from '@/lib/utils/haptics';
+import type { PushPayload, PushType } from '@/pwa/pushPayload';
 import type { ReservationDetailResponse, ReservationsListResponse } from '@/types/api';
 import { isFinalStatus, STATUS_META } from '@/types/reservationStatus';
+import { notifyShopAction, pushTypeAfterAdvance, rejectionOverrides } from './devNotifications';
+
+/** Notification locale d'une action du simulateur (M6 §7.5), selon la réservation mise à jour. */
+type ShopNotification = (
+  updated: Partial<ReservationDetailResponse> | undefined,
+) => { type: PushType | null; overrides?: Partial<PushPayload> };
 
 const DEV_LIST_KEY = ['dev', 'm5-simulator', 'reservations'] as const;
 
@@ -47,7 +54,7 @@ export function ShopSimulatorM5() {
     ]);
   };
 
-  const run = async (label: string, action: () => Promise<unknown>) => {
+  const run = async (label: string, action: () => Promise<unknown>, notify?: ShopNotification) => {
     const ref = selectedRef.trim().toUpperCase();
     if (!ref) return;
     setBusy(true);
@@ -55,10 +62,15 @@ export function ShopSimulatorM5() {
     try {
       const result = await action();
       const updated = result as Partial<ReservationDetailResponse> | undefined;
+      // Avec le service worker de l'app (npm run preview:pwa) : même notification que le vrai push
+      const notification = notify?.(updated);
+      const notified = notification
+        ? await notifyShopAction(notification.type, ref, notification.overrides)
+        : false;
       setFeedback(
-        updated?.status
+        (updated?.status
           ? `${label} · ${ref} → « ${STATUS_META[updated.status].label} »`
-          : `${label} effectué.`,
+          : `${label} effectué.`) + (notified ? ' · notification locale affichée' : ''),
       );
       haptic('success');
     } catch (err) {
@@ -132,7 +144,13 @@ export function ShopSimulatorM5() {
           <button
             type="button"
             disabled={busy || finished}
-            onClick={() => void run('Étape suivante', () => api.post(endpoints.mock.advanceReservation(ref)))}
+            onClick={() =>
+              void run(
+                'Étape suivante',
+                () => api.post(endpoints.mock.advanceReservation(ref)),
+                (updated) => ({ type: pushTypeAfterAdvance(updated?.status) }),
+              )
+            }
             className={`${buttonBase} bg-ink text-white`}
           >
             <ChevronsRight className="h-4 w-4 shrink-0" aria-hidden="true" />
@@ -146,8 +164,10 @@ export function ShopSimulatorM5() {
                 type="button"
                 disabled={busy || finished}
                 onClick={() =>
-                  void run(`Colis prêt + ${count} photo${count > 1 ? 's' : ''}`, () =>
-                    api.post(endpoints.mock.packageReady(ref), { count }),
+                  void run(
+                    `Colis prêt + ${count} photo${count > 1 ? 's' : ''}`,
+                    () => api.post(endpoints.mock.packageReady(ref), { count }),
+                    () => ({ type: 'package_ready' }),
                   )
                 }
                 className={`${buttonBase} bg-red px-2 text-white`}
@@ -163,7 +183,11 @@ export function ShopSimulatorM5() {
             type="button"
             disabled={busy || finished}
             onClick={() =>
-              void run('Livrée / retirée', () => api.post(endpoints.mock.completeReservation(ref)))
+              void run(
+                'Livrée / retirée',
+                () => api.post(endpoints.mock.completeReservation(ref)),
+                () => ({ type: 'delivered' }),
+              )
             }
             className={`${buttonBase} bg-success text-white`}
           >
@@ -186,8 +210,10 @@ export function ShopSimulatorM5() {
               type="button"
               disabled={busy || finished}
               onClick={() =>
-                void run('Paiement rejeté', () =>
-                  api.post(endpoints.mock.rejectReservation(ref), { reason: rejectReason }),
+                void run(
+                  'Paiement rejeté',
+                  () => api.post(endpoints.mock.rejectReservation(ref), { reason: rejectReason }),
+                  () => ({ type: 'payment_rejected', overrides: rejectionOverrides(ref, rejectReason.toLowerCase()) }),
                 )
               }
               className={`${buttonBase} border border-danger bg-white text-danger`}

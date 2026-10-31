@@ -9,6 +9,7 @@ import {
 import { api, ApiError } from '@/lib/api/client';
 import { endpoints } from '@/lib/api/endpoints';
 import { qk } from '@/lib/api/queryKeys';
+import { usePollIntervalMs } from '@/pwa/pushStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useReservationStore } from '@/stores/reservationStore';
 import type {
@@ -20,7 +21,8 @@ import type {
   ReservationsSummary,
 } from '@/types/api';
 
-// HYPOTHÈSE: rechargement toutes les 30 s quand la page est visible, en attendant les notifications push (M6).
+// HYPOTHÈSE: rechargement toutes les 30 s quand la page est visible ; toutes les 2 min quand les
+// notifications push fonctionnent (permission accordée et abonnement actif, M6 §7.4).
 export const TRACKING_POLL_INTERVAL_MS = 30_000;
 
 /**
@@ -29,6 +31,7 @@ export const TRACKING_POLL_INTERVAL_MS = 30_000;
  */
 export function useReservationsInfinite(scope: ReservationScope) {
   const status = useAuthStore((s) => s.status);
+  const pollIntervalMs = usePollIntervalMs(TRACKING_POLL_INTERVAL_MS);
 
   return useInfiniteQuery({
     queryKey: qk.reservationsList(scope),
@@ -39,7 +42,7 @@ export function useReservationsInfinite(scope: ReservationScope) {
       lastPage.page < lastPage.totalPages ? lastPage.page + 1 : undefined,
     enabled: status === 'authenticated',
     staleTime: 10_000,
-    refetchInterval: TRACKING_POLL_INTERVAL_MS,
+    refetchInterval: pollIntervalMs,
     refetchIntervalInBackground: false,
     refetchOnWindowFocus: 'always',
   });
@@ -48,13 +51,14 @@ export function useReservationsInfinite(scope: ReservationScope) {
 /** Résumé pour le repère de l'onglet Réservations (§8.2 M5). */
 export function useReservationsSummary() {
   const status = useAuthStore((s) => s.status);
+  const pollIntervalMs = usePollIntervalMs(TRACKING_POLL_INTERVAL_MS);
 
   return useQuery({
     queryKey: qk.reservationsSummary(),
     queryFn: () => api.get<ReservationsSummary>(endpoints.reservations.summary),
     enabled: status === 'authenticated',
     staleTime: 10_000,
-    refetchInterval: TRACKING_POLL_INTERVAL_MS,
+    refetchInterval: pollIntervalMs,
     refetchIntervalInBackground: false,
     refetchOnWindowFocus: 'always',
   });

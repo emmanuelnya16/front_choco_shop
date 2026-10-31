@@ -1,7 +1,8 @@
-import { CheckCircle2, X } from 'lucide-react';
+import { Bell, CheckCircle2, X } from 'lucide-react';
 import { AnimatePresence } from 'motion/react';
 import * as m from 'motion/react-m';
 import { Link } from 'react-router';
+import { cn } from '@/lib/utils/cn';
 import { duration, ease } from '@/motion/tokens';
 import { useToastStore } from '@/stores/toastStore';
 
@@ -38,13 +39,17 @@ export function Toaster() {
                   aria-hidden="true"
                   className="h-10 w-8 shrink-0 rounded-[var(--radius-sm)] bg-surface object-cover"
                 />
+              ) : toast.icon === 'bell' ? (
+                <Bell className="h-4 w-4 shrink-0 text-silver" aria-hidden="true" />
               ) : (
                 <CheckCircle2 className="h-4 w-4 shrink-0 text-red" aria-hidden="true" />
               )}
               <div className="min-w-0">
-                <p className="truncate font-medium">{toast.message}</p>
+                <p className={cn('font-medium', toast.wrap ? 'line-clamp-2' : 'truncate')}>{toast.message}</p>
                 {toast.subtitle && (
-                  <p className="truncate text-xs text-silver">{toast.subtitle}</p>
+                  <p className={cn('text-xs text-silver', toast.wrap ? 'line-clamp-2' : 'truncate')}>
+                    {toast.subtitle}
+                  </p>
                 )}
               </div>
             </div>

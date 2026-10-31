@@ -233,16 +233,24 @@ export function SuccessPage() {
   }, [reservation, whatsappNumber, operatorLabel]);
 
   const handleActivateNotifications = async () => {
-    const perm = await pushService.requestPermission();
+    // Permission puis abonnement, une seule fois (M6 §7.1) ; ne lève jamais
+    const result = await pushService.enableNotifications();
     setNotifCardVisible(false);
-    if (perm === 'granted') {
-      await pushService.subscribe();
+    if (result === 'subscribed') {
       showToast({
         message: 'Notifications activées ! Vous serez prévenu dès la validation.',
+        wrap: true,
       });
-    } else if (perm === 'denied') {
+    } else if (result === 'denied') {
       showToast({
         message: 'Notifications refusées. Vous pourrez suivre votre réservation depuis votre compte.',
+        wrap: true,
+      });
+    } else if (result === 'failed') {
+      showToast({
+        message: 'Impossible d’activer les notifications pour le moment.',
+        subtitle: 'Réessayez depuis votre profil, rubrique Notifications.',
+        wrap: true,
       });
     }
   };

@@ -1743,6 +1743,17 @@ export const handlers = [
     return new HttpResponse(null, { status: 204 });
   }),
 
+  // GET /_mock/status — mode effectif des mocks pour /_dev (M6 §7.5) : « browser » (MSW dans l'onglet)
+  // ou « node » (serveur de mocks), et nombre d'abonnements aux notifications enregistrés.
+  http.get(apiUrl('/_mock/status'), () =>
+    HttpResponse.json({
+      ok: true,
+      runtime: typeof window === 'undefined' ? 'node' : 'browser',
+      pushSubscriptions: pushSubscriptions.size,
+      sessionUser: currentSessionUser?.phone ?? null,
+    }),
+  ),
+
   // POST /_mock/reset — remet TOUT à zéro (session, OTP, adresses, favoris, réservations) :
   // utile avec le serveur de mocks Node, dont l'état survit aux rechargements de page.
   http.post(apiUrl('/_mock/reset'), async () => {

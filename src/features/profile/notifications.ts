@@ -1,15 +1,30 @@
-import { pushService, type PushPermissionState } from '@/features/notifications/pushService';
+import { getPushStatus } from '@/features/notifications/pushService';
+import { usePushStore, type PushStatus } from '@/pwa/pushStore';
 
 export type NotificationsDisplayState = 'enabled' | 'disabled' | 'blocked' | 'ios-install' | 'unsupported';
 
-/** État affiché dans le profil (§7.2 M5). */
+const DISPLAY_STATE_BY_PUSH_STATUS: Record<PushStatus, NotificationsDisplayState> = {
+  // « Activées » uniquement avec un abonnement actif (permission seule : rien n'arriverait)
+  subscribed: 'enabled',
+  granted: 'disabled',
+  default: 'disabled',
+  denied: 'blocked',
+  'needs-install': 'ios-install',
+  unsupported: 'unsupported',
+};
+
+export function toNotificationsDisplayState(status: PushStatus): NotificationsDisplayState {
+  return DISPLAY_STATE_BY_PUSH_STATUS[status];
+}
+
+/** État affiché dans le profil (§7.2 M5, §7.1 M6), lu de façon synchrone. */
 export function getNotificationsDisplayState(): NotificationsDisplayState {
-  if (pushService.isIosWithoutHomeScreenInstall()) return 'ios-install';
-  const permission: PushPermissionState = pushService.getNotificationPermission();
-  if (permission === 'unsupported') return 'unsupported';
-  if (permission === 'granted') return 'enabled';
-  if (permission === 'denied') return 'blocked';
-  return 'disabled';
+  return toNotificationsDisplayState(getPushStatus());
+}
+
+/** Même état, réactif : suit la permission et l'abonnement (M6 §7.1). */
+export function useNotificationsDisplayState(): NotificationsDisplayState {
+  return toNotificationsDisplayState(usePushStore((s) => s.status));
 }
 
 export const NOTIFICATIONS_STATE_LABELS: Record<NotificationsDisplayState, string> = {

@@ -29,6 +29,7 @@ import { useDocumentTitle } from '@/lib/utils/useDocumentTitle';
 import { DESIGN_COLOR_SWATCHES } from '@/mocks/fixtures/settings';
 import { lineReveal, pressable, staggerContainer } from '@/motion/presets';
 import { useReducedMotionPref } from '@/motion/useReducedMotionPref';
+import type { PushPayload, PushType } from '@/pwa/pushPayload';
 import { useReservationStore } from '@/stores/reservationStore';
 import type { ProductsResponse, ReservationDetailResponse } from '@/types/api';
 import { hasPackagePhotos } from '@/types/domain';
@@ -40,7 +41,10 @@ import {
   type StatusTone,
 } from '@/types/reservationStatus';
 
+import { notifyShopAction, rejectionOverrides } from './devNotifications';
 import { M1KitShowcase } from './M1KitShowcase';
+import { NotificationsDevSection } from './NotificationsDevSection';
+import { PwaDevSection } from './PwaDevSection';
 import { ShopSimulatorM5 } from './ShopSimulatorM5';
 
 const LazyGsapSandbox = lazy(() => import('./GsapTestSandbox'));
@@ -55,7 +59,7 @@ const TONE_STYLES: Record<StatusTone, string> = {
 const HERO_LINES = ["L'INCOMPRIS", 'NE SE PLIE', 'À PERSONNE.'] as const;
 
 export function DevPage() {
-  useDocumentTitle('Contrôle M0–M5 (/_dev)');
+  useDocumentTitle('Contrôle M0–M6 (/_dev)');
   const reducedMotion = useReducedMotionPref();
   const queryClient = useQueryClient();
   const activeReservation = useReservationStore((s) => s.activeReservation);
@@ -77,6 +81,9 @@ export function DevPage() {
   const runShopSimulation = async (
     label: string,
     action: () => Promise<ReservationDetailResponse>,
+    // Notification locale de l'action quand l'app tourne avec son service worker (M6 §7.5)
+    pushType: PushType | null = null,
+    pushOverrides: Partial<PushPayload> = {},
   ) => {
     const cleanRef = simulatorRef.trim().toUpperCase();
     if (!cleanRef) return;
@@ -87,13 +94,15 @@ export function DevPage() {
       queryClient.setQueryData(qk.reservation(cleanRef), updated);
       await queryClient.invalidateQueries({ queryKey: qk.reservation(cleanRef) });
       await queryClient.invalidateQueries({ queryKey: qk.pendingReservations() });
+      await queryClient.invalidateQueries({ queryKey: qk.reservationsSummary() });
       if (updated.status === 'reserved' || updated.status === 'payment_rejected') {
         setActiveReservation(updated, updated.serverTime);
       } else if (activeReservation?.ref === updated.ref) {
         clearActiveReservation();
       }
+      const notified = await notifyShopAction(pushType, updated.ref, pushOverrides);
       setSimulatorFeedback(
-        `${label} appliqué sur ${updated.ref} → statut « ${STATUS_META[updated.status].label} »`,
+        `${label} appliqué sur ${updated.ref} → statut « ${STATUS_META[updated.status].label} »${notified ? ' · notification locale affichée' : ''}`,
       );
       haptic('success');
     } catch (err) {
@@ -828,7 +837,11 @@ export function DevPage() {
           </dl>
         </section>
 
-        {/* 9 bis. SIMULATEUR BOUTIQUE (M4) */}
+        {/* 9 bis. APPLICATION INSTALLABLE ET NOTIFICATIONS (M6) */}
+        <PwaDevSection />
+        <NotificationsDevSection />
+
+        {/* 9 ter. SIMULATEUR BOUTIQUE (M4) */}
         <section aria-labelledby="dev-shop-simulator">
           <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-silver pb-3">
             <div>
@@ -889,10 +902,13 @@ export function DevPage() {
                 type="button"
                 disabled={simulatorBusy}
                 onClick={() =>
-                  void runShopSimulation('Validation', () =>
-                    api.post<ReservationDetailResponse>(
-                      endpoints.mock.validateReservation(simulatorRef.trim().toUpperCase()),
-                    ),
+                  void runShopSimulation(
+                    'Validation',
+                    () =>
+                      api.post<ReservationDetailResponse>(
+                        endpoints.mock.validateReservation(simulatorRef.trim().toUpperCase()),
+                      ),
+                    'payment_validated',
                   )
                 }
                 className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-[var(--radius-md)] bg-success px-4 py-2.5 text-small font-bold text-white transition-opacity disabled:opacity-50"
@@ -905,11 +921,15 @@ export function DevPage() {
                 type="button"
                 disabled={simulatorBusy}
                 onClick={() =>
-                  void runShopSimulation('Rejet (capture illisible)', () =>
-                    api.post<ReservationDetailResponse>(
-                      endpoints.mock.rejectReservation(simulatorRef.trim().toUpperCase()),
-                      { reason: 'Capture illisible' },
-                    ),
+                  void runShopSimulation(
+                    'Rejet (capture illisible)',
+                    () =>
+                      api.post<ReservationDetailResponse>(
+                        endpoints.mock.rejectReservation(simulatorRef.trim().toUpperCase()),
+                        { reason: 'Capture illisible' },
+                      ),
+                    'payment_rejected',
+                    rejectionOverrides(simulatorRef.trim().toUpperCase(), 'capture illisible'),
                   )
                 }
                 className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-[var(--radius-md)] bg-danger px-4 py-2.5 text-small font-bold text-white transition-opacity disabled:opacity-50"
@@ -922,11 +942,15 @@ export function DevPage() {
                 type="button"
                 disabled={simulatorBusy}
                 onClick={() =>
-                  void runShopSimulation('Rejet (montant incorrect)', () =>
-                    api.post<ReservationDetailResponse>(
-                      endpoints.mock.rejectReservation(simulatorRef.trim().toUpperCase()),
-                      { reason: 'Montant reçu différent de 63 000 FCFA' },
-                    ),
+                  void runShopSimulation(
+                    'Rejet (montant incorrect)',
+                    () =>
+                      api.post<ReservationDetailResponse>(
+                        endpoints.mock.rejectReservation(simulatorRef.trim().toUpperCase()),
+                        { reason: 'Montant reçu différent de 63 000 FCFA' },
+                      ),
+                    'payment_rejected',
+                    rejectionOverrides(simulatorRef.trim().toUpperCase(), 'montant reçu différent de 63 000 FCFA'),
                   )
                 }
                 className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-[var(--radius-md)] border border-danger bg-white px-4 py-2.5 text-small font-bold text-danger transition-opacity disabled:opacity-50"
@@ -939,10 +963,16 @@ export function DevPage() {
                 type="button"
                 disabled={simulatorBusy}
                 onClick={() =>
-                  void runShopSimulation('Expire dans 2 min', () =>
-                    api.post<ReservationDetailResponse>(
-                      endpoints.mock.expireSoonReservation(simulatorRef.trim().toUpperCase()),
-                    ),
+                  void runShopSimulation(
+                    'Expire dans 2 min',
+                    () =>
+                      api.post<ReservationDetailResponse>(
+                        endpoints.mock.expireSoonReservation(simulatorRef.trim().toUpperCase()),
+                      ),
+                    'expiring_soon',
+                    {
+                      body: `${simulatorRef.trim().toUpperCase()} expire dans 2 min. Payez pour garder vos articles.`,
+                    },
                   )
                 }
                 className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-[var(--radius-md)] bg-warning px-4 py-2.5 text-small font-bold text-white transition-opacity disabled:opacity-50"
@@ -980,7 +1010,7 @@ export function DevPage() {
           </div>
         </section>
 
-        {/* 9 ter. SIMULATEUR BOUTIQUE ENRICHI (M5) */}
+        {/* 9 quater. SIMULATEUR BOUTIQUE ENRICHI (M5) */}
         <ShopSimulatorM5 />
 
         {/* 10. KIT VISUEL M1 */}

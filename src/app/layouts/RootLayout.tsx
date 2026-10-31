@@ -8,6 +8,7 @@ import { FloatingWhatsApp } from '@/components/layout/FloatingWhatsApp';
 import { SizePicker } from '@/components/ui/SizePicker';
 import { Toaster } from '@/components/ui/Toast';
 import { FlyToCartLayer } from '@/features/catalog/cart-fly/FlyToCartLayer';
+import { NotificationsBridge } from '@/features/notifications/NotificationsBridge';
 import { OfflineBanner } from '@/features/offline/OfflineBanner';
 import { OfflineRouteFallback } from '@/features/offline/OfflineRouteFallback';
 import { useIsOfflineChunkError } from '@/features/offline/useOfflineChunkError';
@@ -124,6 +125,7 @@ export function RootLayout() {
       <FloatingWhatsApp />
       <Toaster />
       <PackageReadyNotifier />
+      <NotificationsBridge />
       <FlyToCartLayer />
 
       <SizePicker

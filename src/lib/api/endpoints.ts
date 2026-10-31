@@ -99,5 +99,7 @@ export const endpoints = {
     resetReservations: '/_mock/reservations/reset',
     // Remise à zéro complète (serveur de mocks Node, M6 §3.2)
     resetAll: '/_mock/reset',
+    // Mode effectif des mocks (MSW navigateur ou serveur Node) pour /_dev (M6 §7.5)
+    status: '/_mock/status',
   },
 } as const;

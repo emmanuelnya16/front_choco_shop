@@ -1,11 +1,15 @@
 import { BellRing, Lock } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Sheet } from '@/components/ui/Sheet';
-import { pushService } from '@/features/notifications/pushService';
 import {
-  getNotificationsDisplayState,
+  disableNotifications,
+  enableNotifications,
+  refreshPushStatus,
+} from '@/features/notifications/pushService';
+import {
   NOTIFICATIONS_STATE_LABELS,
+  useNotificationsDisplayState,
   type NotificationsDisplayState,
 } from '@/features/profile/notifications';
 
@@ -15,21 +19,38 @@ export interface NotificationsSheetProps {
   onStateChange?: (state: NotificationsDisplayState) => void;
 }
 
-/** Feuille « Notifications » du profil (§7.5 M5). L'abonnement réel arrive au module M6. */
+const ACTIVATION_ERROR =
+  'Impossible d’activer les notifications pour le moment. Vérifiez votre connexion, puis réessayez.';
+
+/** Feuille « Notifications » du profil (§7.5 M5) : état réel de l'abonnement (§7.1 M6). */
 export function NotificationsSheet({ open, onClose, onStateChange }: NotificationsSheetProps) {
-  const [state, setState] = useState<NotificationsDisplayState>(() => getNotificationsDisplayState());
-  const [requesting, setRequesting] = useState(false);
+  const state = useNotificationsDisplayState();
+  const [pending, setPending] = useState<'activate' | 'deactivate' | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  // La ligne « Notifications » du profil suit l'état réel (permission et abonnement)
+  useEffect(() => {
+    onStateChange?.(state);
+  }, [state, onStateChange]);
+
+  // À l'ouverture : permission ou abonnement ont pu changer depuis les réglages du téléphone
+  useEffect(() => {
+    if (open) void refreshPushStatus();
+  }, [open]);
 
   const activate = async () => {
-    setRequesting(true);
-    try {
-      await pushService.requestPermission();
-    } finally {
-      const next = getNotificationsDisplayState();
-      setState(next);
-      onStateChange?.(next);
-      setRequesting(false);
-    }
+    setPending('activate');
+    setError(null);
+    const result = await enableNotifications();
+    setPending(null);
+    if (result === 'failed') setError(ACTIVATION_ERROR);
+  };
+
+  const deactivate = async () => {
+    setPending('deactivate');
+    setError(null);
+    await disableNotifications();
+    setPending(null);
   };
 
   return (
@@ -50,15 +71,39 @@ export function NotificationsSheet({ open, onClose, onStateChange }: Notificatio
       </p>
 
       {state === 'disabled' && (
-        <Button variant="primary" size="lg" fullWidth className="mt-5" loading={requesting} onClick={() => void activate()}>
+        <Button
+          variant="primary"
+          size="lg"
+          fullWidth
+          className="mt-5"
+          loading={pending === 'activate'}
+          disabled={pending !== null}
+          onClick={() => void activate()}
+        >
           Activer
         </Button>
       )}
 
       {state === 'enabled' && (
-        <p className="mt-4 text-small text-text-2">
-          Vous recevrez nos alertes sur ce téléphone. Pour les couper, utilisez les réglages de votre
-          navigateur.
+        <>
+          <p className="mt-4 text-small text-text-2">Vous recevrez nos alertes sur ce téléphone.</p>
+          <Button
+            variant="outline"
+            size="lg"
+            fullWidth
+            className="mt-4"
+            loading={pending === 'deactivate'}
+            disabled={pending !== null}
+            onClick={() => void deactivate()}
+          >
+            Désactiver
+          </Button>
+        </>
+      )}
+
+      {error && state === 'disabled' && (
+        <p role="alert" className="mt-3 text-small text-danger">
+          {error}
         </p>
       )}
 

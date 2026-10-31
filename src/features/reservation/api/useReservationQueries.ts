@@ -4,6 +4,7 @@ import { requestPersistentStorage } from '@/features/offline/persistentStorage';
 import { api } from '@/lib/api/client';
 import { endpoints } from '@/lib/api/endpoints';
 import { qk } from '@/lib/api/queryKeys';
+import { PUSH_POLL_INTERVAL_MS, selectPushActive, usePushStore } from '@/pwa/pushStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useReservationStore } from '@/stores/reservationStore';
 import type {
@@ -151,7 +152,10 @@ export function usePendingReservations() {
 export interface UseReservationOptions {
   /** Active l'interrogation périodique toutes les 20 s lorsque l'onglet est visible (§7.1 M4) */
   live?: boolean;
-  /** Intervalle de l'interrogation en direct (20 s par défaut ; 30 s sur le détail M5, §8.1). */
+  /**
+   * Intervalle de l'interrogation en direct (20 s par défaut ; 30 s sur le détail M5, §8.1).
+   * Remplacé par 2 min quand les notifications push fonctionnent (M6 §7.4).
+   */
   intervalMs?: number;
 }
 
@@ -167,6 +171,8 @@ export function useReservation(
   const clearActiveReservation = useReservationStore(
     (s) => s.clearActiveReservation,
   );
+  const pushActive = usePushStore(selectPushActive);
+  const liveIntervalMs = pushActive ? PUSH_POLL_INTERVAL_MS : (options?.intervalMs ?? 20_000);
 
   const initialFromStore =
     activeReservation &&
@@ -184,8 +190,8 @@ export function useReservation(
     initialData: initialFromStore,
     staleTime: options?.live ? 0 : 30 * 1000,
     // HYPOTHÈSE: Simple interrogation périodique toutes les 20 s sur les écrans de paiement, preuve et Merci (§7.1).
-    // Les notifications push (M6) prendront le relais en arrière-plan.
-    refetchInterval: options?.live ? (options.intervalMs ?? 20_000) : false,
+    // Quand les notifications push fonctionnent, elles rafraîchissent l'écran : 2 min suffisent (M6 §7.4).
+    refetchInterval: options?.live ? liveIntervalMs : false,
     refetchIntervalInBackground: false,
     refetchOnWindowFocus: options?.live ? 'always' : true,
   });

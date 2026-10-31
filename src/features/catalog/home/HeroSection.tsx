@@ -5,6 +5,17 @@ import { SmartImage } from '@/components/ui/SmartImage';
 import { gsap, useGSAP } from '@/lib/gsap';
 import { useReducedMotionPref } from '@/motion/useReducedMotionPref';
 
+/**
+ * Photos du hero (public/images/README.md). Fichiers locaux en une seule taille : chacun doit rester
+ * sous 250 Ko (`npm run check:size` le vérifie sur le build).
+ * HYPOTHÈSE: pas de variante AVIF tant que les fichiers n'existent pas ; une <source> AVIF absente
+ * afficherait le visuel de repli au lieu de la photo WebP.
+ */
+const HERO_IMAGE_MOBILE = '/images/hero/hero-mobile.webp';
+const HERO_SOURCES = [
+  { media: '(min-width: 64rem)', srcSet: '/images/hero/hero-desktop.webp', type: 'image/webp' },
+] as const;
+
 export function HeroSection() {
   const scopeRef = useRef<HTMLElement>(null);
   const reducedMotion = useReducedMotionPref();
@@ -107,35 +118,20 @@ export function HeroSection() {
       {/* Background images with parallax wrapper */}
       <div className="hero-bg-parallax absolute inset-0 h-full w-full">
         <div className="hero-bg-media relative h-full w-full">
-          {/* Desktop 16:9 image */}
-          <div className="hidden h-full w-full lg:block">
-            <SmartImage
-              src="/images/hero/hero-desktop.webp"
-              fallback="/images/fallback/mood-hero.svg"
-              alt=""
-              tone="mood"
-              ratio="auto"
-              priority
-              sizes="100vw"
-              className="h-full w-full"
-              imgClassName="h-full w-full object-cover object-center"
-            />
-          </div>
-
-          {/* Mobile 9:14 image */}
-          <div className="block h-full w-full lg:hidden">
-            <SmartImage
-              src="/images/hero/hero-mobile.webp"
-              fallback="/images/fallback/mood-hero.svg"
-              alt=""
-              tone="mood"
-              ratio="auto"
-              priority
-              sizes="100vw"
-              className="h-full w-full"
-              imgClassName="h-full w-full object-cover object-center"
-            />
-          </div>
+          {/* Une seule image téléchargée (M7 §7) : portrait 9:14 sur téléphone, 16:9 à partir de lg
+              (64rem). Image du premier affichage : chargée tout de suite et en priorité. */}
+          <SmartImage
+            src={HERO_IMAGE_MOBILE}
+            sources={HERO_SOURCES}
+            fallback="/images/fallback/mood-hero.svg"
+            alt=""
+            tone="mood"
+            ratio="auto"
+            priority
+            sizes="100vw"
+            className="h-full w-full"
+            imgClassName="h-full w-full object-cover object-center"
+          />
         </div>
       </div>
 

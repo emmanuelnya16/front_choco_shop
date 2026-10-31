@@ -1,20 +1,54 @@
 import { useState, type ReactNode } from 'react';
+import { cloudinaryResponsive } from '@/lib/utils/cloudinary';
 import { cn } from '@/lib/utils/cn';
 
 export type ImageAspectRatio = '4/5' | '4/3' | '16/9' | '2/1' | '1/1' | '16/10' | '3/4' | 'auto';
+
+/** Variante choisie par le navigateur avant `src` (élément <source> d'un <picture>). */
+export interface SmartImageSource {
+  srcSet: string;
+  /** Ex. « (min-width: 64rem) » pour le cadrage ordinateur. */
+  media?: string;
+  type?: string;
+  sizes?: string;
+}
 
 export interface SmartImageProps {
   src: string;
   fallback?: string | ReactNode;
   alt: string;
   ratio?: ImageAspectRatio;
+  /** Image visible au premier affichage (hero) : chargée tout de suite et en priorité. */
   priority?: boolean;
   sizes?: string;
+  /** Largeurs disponibles ; calculé automatiquement pour une photo Cloudinary. */
+  srcSet?: string;
+  /** Variantes par taille d'écran : une seule est téléchargée (contrairement à deux <img> masquées). */
+  sources?: readonly SmartImageSource[];
   className?: string;
   imgClassName?: string;
   tone?: 'product' | 'mood';
   colorRevealOnGroupHover?: boolean;
   onLoadComplete?: () => void;
+}
+
+/** <picture> sans boîte propre (display: contents) quand il y a des variantes, sinon l'image seule. */
+function ImageElement({ sources, children }: { sources: readonly SmartImageSource[] | null; children: ReactNode }) {
+  if (!sources) return children;
+  return (
+    <picture className="contents">
+      {sources.map((source) => (
+        <source
+          key={`${source.media ?? ''}|${source.srcSet}`}
+          srcSet={source.srcSet}
+          media={source.media}
+          type={source.type}
+          sizes={source.sizes}
+        />
+      ))}
+      {children}
+    </picture>
+  );
 }
 
 const RATIO_CLASSES: Record<ImageAspectRatio, string> = {
@@ -33,6 +67,8 @@ const RATIO_CLASSES: Record<ImageAspectRatio, string> = {
  * - Réserve l'espace avec `aspect-ratio` (aucun saut CLS).
  * - Bascule automatiquement vers `fallback` si la photo principale est absente, sans erreur console.
  * - Applique le traitement noir et blanc granuleux de la maquette lorsque `tone="mood"`.
+ * - Photo Cloudinary : plusieurs largeurs au format le plus léger (M7 §7), le téléphone prend la
+ *   plus petite suffisante selon `sizes` ; jamais la photo d'origine.
  */
 export function SmartImage({
   src,
@@ -41,6 +77,8 @@ export function SmartImage({
   ratio = '4/5',
   priority = false,
   sizes,
+  srcSet,
+  sources,
   className,
   imgClassName,
   tone = 'product',
@@ -52,7 +90,11 @@ export function SmartImage({
   const [isLoaded, setIsLoaded] = useState(false);
 
   const fallbackUrl = typeof fallback === 'string' ? fallback : undefined;
-  const activeSrc = !failedPrimary ? src : fallbackUrl;
+  const responsive = !failedPrimary && !srcSet ? cloudinaryResponsive(src) : null;
+  const activeSrc = !failedPrimary ? (responsive?.src ?? src) : fallbackUrl;
+  const activeSrcSet = !failedPrimary ? (srcSet ?? responsive?.srcSet) : undefined;
+  // Le visuel de repli remplace toutes les variantes
+  const activeSources = !failedPrimary && sources?.length ? sources : null;
 
   const handleLoad = () => {
     setIsLoaded(true);
@@ -89,23 +131,26 @@ export function SmartImage({
       )}
 
       {!failedFallback && activeSrc ? (
-        <img
-          src={activeSrc}
-          alt={alt}
-          loading={priority ? 'eager' : 'lazy'}
-          decoding="async"
-          fetchPriority={priority ? 'high' : 'auto'}
-          sizes={sizes}
-          onLoad={handleLoad}
-          onError={handleError}
-          className={cn(
-            'h-full w-full object-cover transition-opacity duration-400',
-            isLoaded ? 'opacity-100' : 'opacity-0',
-            tone === 'mood' && 'mood-image',
-            tone === 'mood' && colorRevealOnGroupHover && 'mood-image-color-reveal',
-            imgClassName,
-          )}
-        />
+        <ImageElement sources={activeSources}>
+          <img
+            src={activeSrc}
+            srcSet={activeSrcSet}
+            alt={alt}
+            loading={priority ? 'eager' : 'lazy'}
+            decoding="async"
+            fetchPriority={priority ? 'high' : 'auto'}
+            sizes={sizes}
+            onLoad={handleLoad}
+            onError={handleError}
+            className={cn(
+              'h-full w-full object-cover transition-opacity duration-400',
+              isLoaded ? 'opacity-100' : 'opacity-0',
+              tone === 'mood' && 'mood-image',
+              tone === 'mood' && colorRevealOnGroupHover && 'mood-image-color-reveal',
+              imgClassName,
+            )}
+          />
+        </ImageElement>
       ) : typeof fallback !== 'string' && fallback ? (
         <div className="flex h-full w-full items-center justify-center">{fallback}</div>
       ) : (

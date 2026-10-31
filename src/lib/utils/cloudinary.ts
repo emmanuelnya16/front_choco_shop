@@ -51,6 +51,41 @@ export function cloudinaryUrl(
   return `https://res.cloudinary.com/${env.cloudinaryCloudName}/image/upload/${transforms.join(',')}/${cleanId}`;
 }
 
+/** Largeurs servies par défaut : d'une vignette de téléphone à une photo plein écran. */
+export const RESPONSIVE_WIDTHS: readonly number[] = [320, 480, 640, 960, 1280];
+
+/** Adresse publique Cloudinary : préfixe jusqu'à « /upload/ » et reste du chemin. */
+const CLOUDINARY_UPLOAD_URL = /^(https:\/\/res\.cloudinary\.com\/[^/]+\/image\/upload\/)(.+)$/;
+/** Premier segment déjà transformé (« f_auto,q_auto,w_600 », « c_fill »…) ou signé (« s--…-- »). */
+const LOCKED_SEGMENT = /^(?:s--[^/]+--|[a-z]{1,3}_[^/]*)(?:\/|$)/;
+
+/**
+ * Image en plusieurs largeurs (M7 §7) : `src` et `srcSet` pour une photo Cloudinary, au format le
+ * plus léger accepté par le téléphone (f_auto) et jamais agrandie (c_limit). Ainsi un téléphone ne
+ * reçoit jamais la photo d'origine.
+ * Renvoie `null` pour un fichier local (une seule taille) ou une adresse Cloudinary déjà
+ * transformée ou signée (photos privées : l'adresse fournie par l'API est utilisée telle quelle).
+ * HYPOTHÈSE: l'API renvoie pour les photos du catalogue soit une adresse publique
+ * `https://res.cloudinary.com/<compte>/image/upload/…`, soit un identifiant public (`products/x`).
+ */
+export function cloudinaryResponsive(
+  source: string,
+  widths: readonly number[] = RESPONSIVE_WIDTHS,
+): { src: string; srcSet: string } | null {
+  if (!source || widths.length === 0) return null;
+  const match = CLOUDINARY_UPLOAD_URL.exec(source);
+  if (match ? LOCKED_SEGMENT.test(match[2]) : isDirectUrlOrLocalPath(source)) return null;
+  // Identifiant public : même adresse que cloudinaryUrl(id, { w, crop: 'limit' })
+  const prefix = match?.[1] ?? `https://res.cloudinary.com/${env.cloudinaryCloudName}/image/upload/`;
+  const rest = match?.[2] ?? source;
+  const at = (w: number) => `${prefix}f_auto,q_auto,c_limit,w_${w}/${rest}`;
+  const sorted = [...widths].sort((a, b) => a - b);
+  return {
+    src: at(sorted[Math.min(2, sorted.length - 1)]),
+    srcSet: sorted.map((w) => `${at(w)} ${w}w`).join(', '),
+  };
+}
+
 export interface CloudinaryResponsiveSet {
   src: string;
   srcSet: string;

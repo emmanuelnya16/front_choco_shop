@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  DR Choco L’Incompris : plan du site, pages fixes (M7 §7).
+
+  HYPOTHÈSE: domaine définitif inconnu au 31/10/2026 ; https://drchoco.com est provisoire (voir
+  public/robots.txt et src/lib/seo/seo.ts).
+
+  HYPOTHÈSE: les fiches produits (/produit/:slug) et toute nouvelle catégorie seront listées par un
+  plan généré dynamiquement par le back-end (ex. /sitemap-produits.xml, déclaré dans robots.txt et
+  regroupé avec celui-ci dans un index de plans). Ce fichier statique ne couvre que les pages fixes
+  et les catégories connues (src/mocks/fixtures/categories.ts).
+-->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://drchoco.com/</loc></url>
+  <url><loc>https://drchoco.com/explorer</loc></url>
+
+  <!-- Catégories -->
+  <url><loc>https://drchoco.com/explorer/vetements</loc></url>
+  <url><loc>https://drchoco.com/explorer/t-shirts</loc></url>
+  <url><loc>https://drchoco.com/explorer/hoodies</loc></url>
+  <url><loc>https://drchoco.com/explorer/pantalons</loc></url>
+  <url><loc>https://drchoco.com/explorer/chaussures</loc></url>
+  <url><loc>https://drchoco.com/explorer/sneakers</loc></url>
+  <url><loc>https://drchoco.com/explorer/derbies</loc></url>
+  <url><loc>https://drchoco.com/explorer/babouches</loc></url>
+  <url><loc>https://drchoco.com/explorer/cuir-lisse</loc></url>
+  <url><loc>https://drchoco.com/explorer/croco-embosse</loc></url>
+
+  <!-- Centre d’aide -->
+  <url><loc>https://drchoco.com/aide</loc></url>
+  <url><loc>https://drchoco.com/aide/comment-reserver</loc></url>
+  <url><loc>https://drchoco.com/aide/paiement-mobile-money</loc></url>
+  <url><loc>https://drchoco.com/aide/livraison-retrait</loc></url>
+  <url><loc>https://drchoco.com/aide/suivre-ma-reservation</loc></url>
+
+  <!-- Pages légales -->
+  <url><loc>https://drchoco.com/pages/conditions-generales</loc></url>
+  <url><loc>https://drchoco.com/pages/annulation-retours</loc></url>
+  <url><loc>https://drchoco.com/pages/confidentialite</loc></url>
+  <url><loc>https://drchoco.com/pages/mentions-legales</loc></url>
+</urlset>

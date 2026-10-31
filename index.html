@@ -14,15 +14,22 @@
     <link rel="icon" href="/favicon.ico" sizes="48x48" />
     <link rel="icon" type="image/png" href="/pwa-64x64.png" sizes="64x64" />
     <link rel="apple-touch-icon" href="/apple-touch-icon-180x180.png" />
-    <title>DR Choco L'Incompris</title>
+    <!-- Référencement (M7 §7) : titre et description par défaut, identiques à src/lib/seo/seo.ts
+         (DEFAULT_TITLE, DEFAULT_DESCRIPTION) ; chaque page les remplace par les siens (useSeo).
+         Pas d'adresse canonique ici : elle dépend de la page, elle est écrite par useSeo. -->
+    <title>DR Choco L’Incompris</title>
     <meta
       name="description"
-      content="Vêtements, chaussures et babouches pour hommes. Réservez en ligne, payez par Mobile Money."
+      content="Vêtements, chaussures et babouches pour hommes. Réservez en ligne, payez par Mobile Money. Livraison partout au Cameroun ou retrait en boutique."
     />
-    <meta property="og:title" content="DR Choco L'Incompris" />
+    <!-- Aperçu de partage par défaut. Pour une fiche produit, WhatsApp et Facebook ne lisent que
+         le HTML du serveur : les balises du produit doivent y être insérées côté serveur (M2). -->
+    <meta property="og:site_name" content="DR Choco L’Incompris" />
+    <meta property="og:locale" content="fr_FR" />
+    <meta property="og:title" content="DR Choco L’Incompris" />
     <meta
       property="og:description"
-      content="Vêtements, chaussures et babouches pour hommes. Réservez en ligne, payez par Mobile Money."
+      content="Vêtements, chaussures et babouches pour hommes. Réservez en ligne, payez par Mobile Money. Livraison partout au Cameroun ou retrait en boutique."
     />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />

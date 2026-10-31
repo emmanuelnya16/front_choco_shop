@@ -1,0 +1,21 @@
+# DR Choco L’Incompris : consignes pour les moteurs de recherche (M7 §7)
+#
+# HYPOTHÈSE: le domaine définitif n'est pas connu au 31/10/2026 ; https://drchoco.com est provisoire.
+# Le remplacer ici, dans public/sitemap.xml et dans src/lib/seo/seo.ts (DEFAULT_SITE_URL, ou la
+# variable VITE_SITE_URL du build) avant la mise en ligne.
+#
+# Pages privées exclues : administration, réservation et paiement, suivi des réservations, profil,
+# panier et page de contrôle. Ces pages portent aussi la consigne « noindex ».
+# L'API (/api) et les fichiers de l'application (/assets) restent autorisés : le robot en a besoin
+# pour afficher les pages du catalogue.
+
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /reservation
+Disallow: /reservations
+Disallow: /profil
+Disallow: /panier
+Disallow: /_dev
+
+Sitemap: https://drchoco.com/sitemap.xml

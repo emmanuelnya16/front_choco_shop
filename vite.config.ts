@@ -1,9 +1,9 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
-import { readFileSync } from 'fs';
+import { readFileSync, rmSync } from 'fs';
 import path from 'path';
 import { visualizer } from 'rollup-plugin-visualizer';
-import { defineConfig, loadEnv, type PluginOption } from 'vite';
+import { defineConfig, loadEnv, type Plugin, type PluginOption } from 'vite';
 import { configDefaults } from 'vitest/config';
 import { VitePWA } from 'vite-plugin-pwa';
 import { pwaManifest } from './pwa-manifest';
@@ -26,6 +26,120 @@ function chunkFileName(chunk: { facadeModuleId: string | null; moduleIds: string
   return 'assets/[name]-[hash].js';
 }
 
+/**
+ * Police Archivo (M7 §7) : seuls les sous-ensembles latin et latin étendu sont gardés. Le français
+ * n'utilise que le latin ; le latin étendu (ɛ, ɔ, ŋ des noms camerounais…) n'est téléchargé que si
+ * un tel caractère s'affiche. Le vietnamien, fourni par @fontsource, n'est plus jamais émis.
+ */
+const ARCHIVO_SUBSETS = ['latin', 'latin-ext'];
+
+function archivoSubsetsOnly(): Plugin {
+  return {
+    name: 'drchoco:archivo-subsets',
+    enforce: 'pre',
+    transform(code, id) {
+      if (!/[\\/]@fontsource-variable[\\/]archivo[\\/][^?]*\.css(?:\?|$)/.test(id)) return null;
+      return {
+        code: code.replace(/(?:\/\*[^*]*\*\/\s*)?@font-face\s*\{[^}]*\}\s*/g, (block) => {
+          const subset = /archivo-([a-z-]+?)-(?:wdth|wght|standard)-/.exec(block)?.[1];
+          return subset && !ARCHIVO_SUBSETS.includes(subset) ? '' : block;
+        }),
+        map: null,
+      };
+    },
+  };
+}
+
+/** Fichier principal de la police : latin, axes graisse et largeur, style droit. */
+const MAIN_FONT_FILE = /(?:^|\/)archivo-latin-wdth-normal-[\w-]+\.woff2$/;
+
+/**
+ * Préchargement de la police principale (M7 §7) : `<link rel="preload" as="font">` avec le nom
+ * haché du build, pour que le texte s'affiche dans la bonne police dès le premier rendu.
+ * Le même fichier est précaché par le service worker (globPatterns ci-dessous).
+ */
+function preloadMainFont(): Plugin {
+  let base = '/';
+  let warn: (message: string) => void = () => undefined;
+  return {
+    name: 'drchoco:preload-main-font',
+    apply: 'build',
+    configResolved(config) {
+      base = config.base;
+      warn = (message) => config.logger.warn(message);
+    },
+    transformIndexHtml: {
+      order: 'post',
+      handler(_html, ctx) {
+        const font = Object.keys(ctx.bundle ?? {}).find((fileName) => MAIN_FONT_FILE.test(fileName));
+        if (!font) {
+          warn('[drchoco:preload-main-font] police Archivo latine introuvable dans le build : pas de préchargement.');
+          return undefined;
+        }
+        return [
+          {
+            tag: 'link',
+            attrs: { rel: 'preload', as: 'font', type: 'font/woff2', href: `${base}${font}`, crossorigin: true },
+            injectTo: 'head',
+          },
+        ];
+      },
+    },
+  };
+}
+
+/**
+ * Modules du serveur de démonstration et d'AI Studio (M7 §7) : utiles au poste de développement,
+ * jamais dans l'application envoyée au téléphone. Un import depuis le code client fait échouer le build.
+ */
+const SERVER_ONLY_PACKAGES = /^(?:@google\/genai|express|dotenv|tsx)(?:\/|$)/;
+
+function forbidServerModules(): Plugin {
+  // Dossier server/ du projet (à côté de ce fichier), quel que soit le dossier racine du build
+  const serverDir = `${path.resolve(import.meta.dirname, 'server').replace(/\\/g, '/')}/`;
+  return {
+    name: 'drchoco:forbid-server-modules',
+    apply: 'build',
+    enforce: 'pre',
+    resolveId(source, importer) {
+      if (importer && SERVER_ONLY_PACKAGES.test(source)) {
+        this.error(`« ${source} » est réservé au serveur ou à AI Studio : interdit dans l'application (importé par ${importer}).`);
+      }
+      return null;
+    },
+    load(id) {
+      if (id.replace(/\\/g, '/').startsWith(serverDir)) {
+        this.error(`${id} appartient au serveur de démonstration : interdit dans l'application.`);
+      }
+      return null;
+    },
+  };
+}
+
+/**
+ * Fichiers de public/ qui servent de source mais ne doivent pas être mis en ligne (M7 §7) :
+ * le logo original (178 Ko, décliné en icônes par `npm run icons`) et la notice des photos.
+ * Ils restent dans public/ ; seule la copie du build est retirée.
+ */
+const SOURCE_ONLY_PUBLIC_FILES = ['images/logo_choco.jpg', 'images/README.md'];
+
+function stripSourceOnlyPublicFiles(): Plugin {
+  let outDir = 'dist';
+  return {
+    name: 'drchoco:strip-source-only-public-files',
+    apply: 'build',
+    configResolved(config) {
+      outDir = path.resolve(config.root, config.build.outDir);
+    },
+    writeBundle: {
+      order: 'post',
+      handler() {
+        for (const file of SOURCE_ONLY_PUBLIC_FILES) rmSync(path.join(outDir, file), { force: true });
+      },
+    },
+  };
+}
+
 export default defineConfig(({ mode, command }) => {
   // `vite build --mode analyze` fonctionne sous Windows comme sous Linux (pas de variable en ligne).
   const isAnalyze = mode === 'analyze' || process.env.ANALYZE === 'true';
@@ -35,6 +149,10 @@ export default defineConfig(({ mode, command }) => {
   const pwaEnabled = pwaFlag ? pwaFlag === 'true' || pwaFlag === '1' : command === 'build';
 
   const plugins: PluginOption[] = [
+    forbidServerModules(),
+    archivoSubsetsOnly(),
+    preloadMainFont(),
+    stripSourceOnlyPublicFiles(),
     react(),
     tailwindcss(),
     VitePWA({
@@ -59,7 +177,9 @@ export default defineConfig(({ mode, command }) => {
           'assets/mocks-*',
           'assets/dev-*',
           'assets/admin-*',
-          // Polices rarement utilisées : chargées à la demande puis gardées (cache « fonts »)
+          // Polices rarement utilisées : chargées à la demande puis gardées (cache « fonts »).
+          // La police latine, préchargée par index.html, est précachée. Le vietnamien n'est plus émis
+          // (archivoSubsetsOnly) : la règle reste en garde-fou.
           'assets/*latin-ext*.woff2',
           'assets/*vietnamese*.woff2',
           // Médias privés de démonstration (preuves et photos de colis) : jamais enregistrés
@@ -117,6 +237,9 @@ export default defineConfig(({ mode, command }) => {
     build: {
       target: 'es2020',
       sourcemap: true,
+      // .vite/manifest.json : lu par scripts/check-size.mjs pour le poids de chaque page (M7 §7).
+      // Fichier caché : jamais précaché, et refusé par public/.htaccess comme tout fichier en « . ».
+      manifest: true,
       rolldownOptions: {
         output: {
           chunkFileNames: chunkFileName,

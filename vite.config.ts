@@ -1,10 +1,10 @@
-/// <reference types="vitest/config" />
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { readFileSync } from 'fs';
 import path from 'path';
 import { visualizer } from 'rollup-plugin-visualizer';
 import { defineConfig, loadEnv, type PluginOption } from 'vite';
+import { configDefaults } from 'vitest/config';
 import { VitePWA } from 'vite-plugin-pwa';
 import { pwaManifest } from './pwa-manifest';
 
@@ -126,6 +126,8 @@ export default defineConfig(({ mode, command }) => {
       environment: 'jsdom',
       setupFiles: './src/test/setup.ts',
       globals: true,
+      // Copies de travail des agents (git worktree) rangées dans .claude/ : jamais testées ici
+      exclude: [...configDefaults.exclude, '.claude/**'],
     },
   };
 });

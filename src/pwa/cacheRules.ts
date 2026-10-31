@@ -112,6 +112,8 @@ const API_CATALOG = [
   /^\/search\/suggest(\/|$)/,
   /^\/settings\/public$/,
   /^\/delivery\//,
+  // Pages légales et d'aide (M7 §3.1) : une page déjà lue reste lisible hors connexion
+  /^\/pages\/[^/]+$/,
 ];
 const API_USER = [/^\/me$/, /^\/me\/addresses(\/|$)/, /^\/reservations(\/|$)/, /^\/favorites(\/|$)/];
 
@@ -127,7 +129,10 @@ export function classifyRequest(req: RequestDescriptor, ctx: CacheRulesContext):
   if (isAdminUrl(url, ctx)) return 'network-only';
   if (isPrivateMedia(url)) return 'network-only';
 
-  const apiPath = apiRelativePath(url, ctx);
+  // Une navigation n'est jamais un appel à l'API, même si l'API partage l'origine de l'app :
+  // « /pages/conditions-generales » ouvert dans l'onglet reste une page (M7)
+  const isNavigation = req.mode === 'navigate' || req.destination === 'document';
+  const apiPath = isNavigation ? null : apiRelativePath(url, ctx);
   if (apiPath !== null) {
     if (API_NEVER_CACHE.some((re) => re.test(apiPath))) return 'network-only';
     if (API_PRIVATE.some((re) => re.test(apiPath))) return 'network-only';

@@ -37,11 +37,19 @@ export const appRoutes: RouteObject[] = [
           return { Component: ExplorePage };
         },
       },
+      // Centre d'aide et pages d'aide (M7 §3.2)
       {
         path: 'aide',
         lazy: async () => {
-          const { LegalPage } = await import('@/pages/LegalPage');
-          return { Component: LegalPage };
+          const { HelpCenterPage } = await import('@/pages/HelpCenterPage');
+          return { Component: HelpCenterPage };
+        },
+      },
+      {
+        path: 'aide/:slug',
+        lazy: async () => {
+          const { HelpContentPage } = await import('@/pages/ContentPage');
+          return { Component: HelpContentPage };
         },
       },
       {
@@ -135,11 +143,12 @@ export const appRoutes: RouteObject[] = [
           return { Component: ProfileInformationsPage };
         },
       },
+      // Pages légales (M7 §3.2)
       {
         path: 'pages/:slug',
         lazy: async () => {
-          const { LegalPage } = await import('@/pages/LegalPage');
-          return { Component: LegalPage };
+          const { LegalContentPage } = await import('@/pages/ContentPage');
+          return { Component: LegalContentPage };
         },
       },
       {

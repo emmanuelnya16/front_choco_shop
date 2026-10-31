@@ -21,4 +21,5 @@ export const qk = {
   favorites: () => ['favorites'] as const,
   cities: () => ['delivery', 'cities'] as const,
   agencies: (city?: string) => ['delivery', 'agencies', city ?? 'all'] as const,
+  contentPage: (slug: string) => ['content', 'page', slug] as const,
 } as const;

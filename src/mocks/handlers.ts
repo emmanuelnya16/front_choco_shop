@@ -34,6 +34,7 @@ import {
 } from '@/types/reservationStatus';
 import { mockCategories } from './fixtures/categories';
 import { mockLooks } from './fixtures/looks';
+import { findMockContentPage } from './fixtures/pages';
 import { mockProducts } from './fixtures/products';
 import {
   buildPackagePhoto,
@@ -808,6 +809,32 @@ export const handlers = [
   http.get(apiUrl('/settings/public'), async () => {
     await delay(randomMobileLatency());
     return HttpResponse.json(mockPublicSettings);
+  }),
+
+  // GET /pages/:slug — pages légales et d'aide en Markdown (M7 §3.1)
+  http.get(apiUrl('/pages/:slug'), async ({ params }) => {
+    await delay(randomMobileLatency());
+    const slug = String(params.slug ?? '');
+    const page = findMockContentPage(slug);
+
+    if (!page) {
+      return HttpResponse.json(
+        {
+          code: 'PAGE_NOT_FOUND',
+          message: 'Cette page est introuvable.',
+          details: { slug },
+        },
+        { status: 404 },
+      );
+    }
+
+    return HttpResponse.json(page);
+  }),
+
+  // POST /client-errors — remontée des erreurs de l'app (M7) : rien n'est conservé
+  http.post(apiUrl('/client-errors'), async () => {
+    await delay(50);
+    return new HttpResponse(null, { status: 204 });
   }),
 
   // GET /delivery/cities

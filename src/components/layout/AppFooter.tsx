@@ -19,14 +19,16 @@ const FOOTER_SECTIONS = [
       { label: 'Nouveautés', to: '/explorer?sort=newest' },
     ],
   },
+  // Centre d'aide, pages d'aide et pages légales (M7 §3)
   {
     id: 'aide',
     title: 'Aide',
     links: [
-      { label: 'Comment réserver', to: '/#comment-reserver' },
-      { label: 'Paiement Mobile Money', to: '/pages/paiement-mobile-money' },
-      { label: 'Livraison et retrait', to: '/pages/livraison-et-retrait' },
-      { label: 'Suivre ma réservation', to: '/reservations' },
+      { label: 'Centre d’aide', to: '/aide' },
+      { label: 'Comment réserver', to: '/aide/comment-reserver' },
+      { label: 'Payer par Mobile Money', to: '/aide/paiement-mobile-money' },
+      { label: 'Livraison et retrait', to: '/aide/livraison-retrait' },
+      { label: 'Suivre ma réservation', to: '/aide/suivre-ma-reservation' },
     ],
   },
   {
@@ -34,8 +36,9 @@ const FOOTER_SECTIONS = [
     title: 'Légal',
     links: [
       { label: 'Conditions générales', to: '/pages/conditions-generales' },
-      { label: "Politique d'annulation et de retour", to: '/pages/politique-retour' },
+      { label: 'Politique d’annulation et de retour', to: '/pages/annulation-retours' },
       { label: 'Confidentialité', to: '/pages/confidentialite' },
+      { label: 'Mentions légales', to: '/pages/mentions-legales' },
     ],
   },
 ];

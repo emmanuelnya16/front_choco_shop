@@ -58,6 +58,12 @@ export const endpoints = {
   settings: {
     public: '/settings/public',
   },
+  // Pages légales et d'aide en Markdown (M7 §3.1), modifiables depuis l'administration
+  content: {
+    page: (slug: string) => `/pages/${encodeURIComponent(slug)}`,
+  },
+  // Remontée des erreurs de l'app (M7) : aucune donnée personnelle
+  clientErrors: '/client-errors',
   reservations: {
     list: '/reservations',
     // HYPOTHÈSE: liste paginée par onglet (10 par page) pour « Mes réservations » (§3.1 M5).

@@ -5,7 +5,7 @@
 //   - public/brand/logo-choco-white.png : emblème blanc sur fond TRANSPARENT, carré 1024 px, source des
 //     icônes, écrans de démarrage et pastille des notifications (pwa-assets.config.ts,
 //     scripts/generate-extra-icons.mjs) ;
-//   - src/assets/brand/logo-choco-{64,128,192}.webp : pastille ronde (emblème blanc sur disque ink) pour
+//   - src/assets/brand/logo-choco-{128,192}.webp : pastille ronde (emblème blanc sur disque ink) pour
 //     l'en-tête, le pied de page et l'écran de lancement (importée par src/components/ui/Logo.tsx).
 import { mkdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -51,7 +51,7 @@ await white.clone().png({ compressionLevel: 9 }).toFile(join(ROOT, 'public', 'br
 
 // 3. Pastilles rondes pour l'interface : disque ink, emblème blanc à 92 % du diamètre
 const whitePng = await white.clone().png().toBuffer();
-for (const size of [64, 128, 192]) {
+for (const size of [128, 192]) {
   const emblem = await sharp(whitePng)
     .resize(Math.round(size * 0.92), Math.round(size * 0.92), { kernel: 'lanczos3' })
     .toBuffer();
@@ -64,4 +64,4 @@ for (const size of [64, 128, 192]) {
     .toFile(join(ROOT, 'src', 'assets', 'brand', `logo-choco-${size}.webp`));
 }
 
-console.log('Logo préparé : public/brand/logo-choco-white.png et src/assets/brand/logo-choco-{64,128,192}.webp');
+console.log('Logo préparé : public/brand/logo-choco-white.png et src/assets/brand/logo-choco-{128,192}.webp');

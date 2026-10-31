@@ -1,7 +1,6 @@
 import { AlertCircle, ArrowLeft } from 'lucide-react';
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { Link, Outlet, ScrollRestoration, useRouteError } from 'react-router';
-import { AppFooter } from '@/components/layout/AppFooter';
 import { AppHeader } from '@/components/layout/AppHeader';
 import { BottomNav } from '@/components/layout/BottomNav';
 import { FloatingWhatsApp } from '@/components/layout/FloatingWhatsApp';
@@ -42,6 +41,13 @@ const LazySizePicker = lazy(() =>
 const LazyPendingReservationBanner = lazy(() =>
   import('@/features/reservation/components/PendingReservationBanner').then((m) => ({
     default: m.PendingReservationBanner,
+  })),
+);
+
+// Pied de page : sous la ligne de flottaison sur toutes les pages, hors du JavaScript de démarrage
+const LazyAppFooter = lazy(() =>
+  import('@/components/layout/AppFooter').then((m) => ({
+    default: m.AppFooter,
   })),
 );
 
@@ -149,7 +155,9 @@ export function RootLayout() {
         </Suspense>
       </main>
 
-      <AppFooter />
+      <Suspense fallback={null}>
+        <LazyAppFooter />
+      </Suspense>
       <BottomNav />
       <FloatingWhatsApp />
       <Toaster />

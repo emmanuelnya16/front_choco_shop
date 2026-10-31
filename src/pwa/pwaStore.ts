@@ -1,5 +1,8 @@
 import { create } from 'zustand';
 
+/** Posé avant le rechargement d'une mise à jour : toast « Application mise à jour » au redémarrage. */
+export const UPDATED_FLAG_KEY = 'drc_app_updated';
+
 /** État de l'application installable : mise à jour en attente et actions en cours (M6 §4.7). */
 interface PwaState {
   /** Le service worker est enregistré (l'app fonctionne hors connexion). */

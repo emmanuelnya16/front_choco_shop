@@ -1,18 +1,15 @@
 import { AlertCircle, ArrowLeft } from 'lucide-react';
-import { lazy, Suspense, useEffect } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { Link, Outlet, ScrollRestoration, useRouteError } from 'react-router';
 import { AppFooter } from '@/components/layout/AppFooter';
 import { AppHeader } from '@/components/layout/AppHeader';
 import { BottomNav } from '@/components/layout/BottomNav';
 import { FloatingWhatsApp } from '@/components/layout/FloatingWhatsApp';
-import { SizePicker } from '@/components/ui/SizePicker';
 import { Toaster } from '@/components/ui/Toast';
-import { FlyToCartLayer } from '@/features/catalog/cart-fly/FlyToCartLayer';
-import { NotificationsBridge } from '@/features/notifications/NotificationsBridge';
 import { OfflineBanner } from '@/features/offline/OfflineBanner';
 import { OfflineRouteFallback } from '@/features/offline/OfflineRouteFallback';
 import { useIsOfflineChunkError } from '@/features/offline/useOfflineChunkError';
-import { PendingReservationBanner } from '@/features/reservation/components/PendingReservationBanner';
+import { FlyToCartLayer } from '@/features/catalog/cart-fly/FlyToCartLayer';
 import { PackageReadyNotifier } from '@/features/tracking/components/PackageReadyNotifier';
 import { refreshSessionSilently } from '@/lib/api/client';
 import { useForegroundRefresh } from '@/lib/hooks/useForegroundRefresh';
@@ -30,6 +27,27 @@ const LazyCartDrawer = lazy(() =>
 const LazyAuthSheet = lazy(() =>
   import('@/features/auth/components/AuthSheet').then((m) => ({
     default: m.AuthSheet,
+  })),
+);
+
+// Hors du JavaScript de démarrage (budget M5/M6) : chargés juste après le premier affichage
+// ou à la première ouverture.
+const LazySizePicker = lazy(() =>
+  import('@/components/ui/SizePicker').then((m) => ({
+    default: m.SizePicker,
+  })),
+);
+
+// Bandeau des réservations en attente : il dépend d'une requête réseau, son code se charge en parallèle
+const LazyPendingReservationBanner = lazy(() =>
+  import('@/features/reservation/components/PendingReservationBanner').then((m) => ({
+    default: m.PendingReservationBanner,
+  })),
+);
+
+const LazyNotificationsBridge = lazy(() =>
+  import('@/features/notifications/NotificationsBridge').then((m) => ({
+    default: m.NotificationsBridge,
   })),
 );
 
@@ -83,6 +101,9 @@ export function RootLayout() {
   const closeSizePicker = useUiStore((s) => s.closeSizePicker);
   const isCartDrawerOpen = useUiStore((s) => s.isCartDrawerOpen);
   const isAuthSheetOpen = useUiStore((s) => s.isAuthSheetOpen);
+  // Le sélecteur de taille reste monté après sa première ouverture (animation de fermeture)
+  const [sizePickerMounted, setSizePickerMounted] = useState(false);
+  if (sizePickerProduct && !sizePickerMounted) setSizePickerMounted(true);
 
   useNetworkRecoveryToast();
   // Retour sur l'app après plus d'une heure : les données affichées sont rechargées (M6 §8)
@@ -118,7 +139,9 @@ export function RootLayout() {
 
       <AppHeader />
       <OfflineBanner />
-      <PendingReservationBanner />
+      <Suspense fallback={null}>
+        <LazyPendingReservationBanner />
+      </Suspense>
 
       <main id="contenu" className="flex-1">
         <Suspense fallback={<RouteLoadingBar />}>
@@ -133,17 +156,18 @@ export function RootLayout() {
       <UpdateBanner />
       <SplashScreen />
       <PackageReadyNotifier />
-      <NotificationsBridge />
       <FlyToCartLayer />
 
-      <SizePicker
-        product={sizePickerProduct}
-        intent={sizePickerIntent}
-        open={Boolean(sizePickerProduct)}
-        onClose={closeSizePicker}
-      />
-
       <Suspense fallback={null}>
+        <LazyNotificationsBridge />
+        {sizePickerMounted && (
+          <LazySizePicker
+            product={sizePickerProduct}
+            intent={sizePickerIntent}
+            open={Boolean(sizePickerProduct)}
+            onClose={closeSizePicker}
+          />
+        )}
         {isCartDrawerOpen && <LazyCartDrawer />}
         {isAuthSheetOpen && <LazyAuthSheet />}
       </Suspense>

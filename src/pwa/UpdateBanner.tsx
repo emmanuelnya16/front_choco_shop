@@ -11,8 +11,12 @@ import { useReducedMotionPref } from '@/motion/useReducedMotionPref';
 import { selectCartCount, useCartStore } from '@/stores/cartStore';
 import { useToastStore } from '@/stores/toastStore';
 import { isUpdateBlockedPath } from './cacheRules';
-import { usePwaStore } from './pwaStore';
-import { applyUpdate, UPDATED_FLAG_KEY } from './registerSW';
+import { UPDATED_FLAG_KEY, usePwaStore } from './pwaStore';
+
+/** registerSW (et workbox-window) n'est chargé qu'à l'appui : hors du JavaScript de démarrage. */
+function applyUpdateLazily() {
+  void import('./registerSW').then(({ applyUpdate }) => applyUpdate());
+}
 
 /** Lit puis retire le drapeau posé avant le rechargement d'une mise à jour. */
 function consumeUpdatedFlag(): boolean {
@@ -76,7 +80,7 @@ export function UpdateBanner() {
             variant="primary"
             size="sm"
             loading={applying}
-            onClick={applyUpdate}
+            onClick={applyUpdateLazily}
             className="shrink-0"
           >
             Mettre à jour

@@ -2,7 +2,10 @@ import { create } from 'zustand';
 import { isIosDevice } from '@/features/payment/utils/ussd';
 import { useToastStore } from '@/stores/toastStore';
 import { useInstallStore, type InstallState, type InstallSurface } from './installStore';
+import { takeEarlyInstallCapture, takeLaunchSource, type LaunchSource } from './installEarly';
 import { track } from './track';
+
+export { parseLaunchSource, takeLaunchSource, type LaunchSource } from './installEarly';
 
 export type { InstallState, InstallSurface } from './installStore';
 
@@ -20,7 +23,6 @@ interface BeforeInstallPromptEvent extends Event {
 type NavigatorWithStandalone = Navigator & { standalone?: boolean };
 
 export type InstallOutcome = 'accepted' | 'dismissed' | 'unavailable';
-export type LaunchSource = 'pwa' | 'pwa-shortcut';
 
 // « DR Choco est installé sur votre écran d'accueil » (§5.1) en titre + sous-titre : le Toaster tronque
 // chaque ligne, la phrase entière serait coupée sur un téléphone de 360 px.
@@ -134,32 +136,9 @@ export function getInstallState(): InstallState {
 // Ouverture depuis l'écran d'accueil (§5.5)
 // ---------------------------------------------------------------------------
 
-/** Lit ?source=pwa ou ?source=pwa-shortcut et renvoie l'adresse sans ce paramètre. */
-export function parseLaunchSource(href: string): { source: LaunchSource | null; cleanUrl: string } {
-  const url = new URL(href);
-  const value = url.searchParams.get('source');
-  if (value !== 'pwa' && value !== 'pwa-shortcut') {
-    return { source: null, cleanUrl: `${url.pathname}${url.search}${url.hash}` };
-  }
-  url.searchParams.delete('source');
-  return { source: value, cleanUrl: `${url.pathname}${url.search}${url.hash}` };
-}
-
-/** Retire le paramètre de lancement de l'adresse, sans recharger ni ajouter d'entrée d'historique. */
-export function takeLaunchSource(): LaunchSource | null {
-  if (typeof window === 'undefined') return null;
-  try {
-    const { source, cleanUrl } = parseLaunchSource(window.location.href);
-    if (source) window.history.replaceState(window.history.state, '', cleanUrl);
-    return source;
-  } catch {
-    return null;
-  }
-}
-
-// Lu dès le chargement de ce module : main.tsx l'importe AVANT App, donc avant la création du routeur,
-// qui ne voit jamais le paramètre (sinon il resterait dans les filtres et onglets recopiés de l'adresse).
-let pendingLaunchSource: LaunchSource | null = takeLaunchSource();
+// Paramètre de lancement retiré de l'adresse par src/pwa/installEarly.ts, au chargement de main.tsx
+// (avant la création du routeur) ; repris ici à l'initialisation.
+let pendingLaunchSource: LaunchSource | null = null;
 
 // ---------------------------------------------------------------------------
 // Cycle de vie
@@ -219,7 +198,12 @@ export function initInstallService(): void {
 
   useInstallStore.getState().recordVisit();
 
-  const source = pendingLaunchSource ?? takeLaunchSource();
+  // Évènements arrivés avant le chargement de ce service (capture précoce de main.tsx)
+  const early = takeEarlyInstallCapture();
+  if (early.deferredPrompt) handleBeforeInstallPrompt(early.deferredPrompt);
+  if (early.installed) handleAppInstalled();
+
+  const source = pendingLaunchSource ?? early.launchSource ?? takeLaunchSource();
   pendingLaunchSource = null;
   if (source && !launchTracked) {
     launchTracked = true;

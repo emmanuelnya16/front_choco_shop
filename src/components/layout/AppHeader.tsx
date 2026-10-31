@@ -8,14 +8,12 @@ import {
   ShoppingBag,
   User,
 } from 'lucide-react';
-import { type FormEvent, type MouseEvent, useRef, useState } from 'react';
+import { type FormEvent, lazy, type MouseEvent, Suspense, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
-import { MegaMenu } from '@/components/layout/MegaMenu';
 import { Button } from '@/components/ui/Button';
 import { IconButton } from '@/components/ui/IconButton';
 import { Logo } from '@/components/ui/Logo';
 import { Container } from '@/components/ui/Primitives';
-import { DesktopSearchDropdown } from '@/features/catalog/search/DesktopSearchDropdown';
 import { addRecentSearch } from '@/features/catalog/search/recentSearches';
 import { AttentionDot } from '@/features/tracking/components/AttentionDot';
 import { useReservationsAttention } from '@/features/tracking/useReservationsAttention';
@@ -26,6 +24,20 @@ import { selectCartCount, useCartStore } from '@/stores/cartStore';
 import { useAuthStore } from '@/stores/authStore';
 import { selectFavoritesCount, useFavoritesStore } from '@/stores/favoritesStore';
 import { useUiStore } from '@/stores/uiStore';
+
+// Méga-menu et suggestions de recherche (ordinateur) : chargés à la première ouverture, hors du
+// JavaScript de démarrage
+const LazyMegaMenu = lazy(() =>
+  import('@/components/layout/MegaMenu').then((m) => ({
+    default: m.MegaMenu,
+  })),
+);
+
+const LazyDesktopSearchDropdown = lazy(() =>
+  import('@/features/catalog/search/DesktopSearchDropdown').then((m) => ({
+    default: m.DesktopSearchDropdown,
+  })),
+);
 
 const DESKTOP_LINKS = [
   { label: 'Accueil', to: '/', matchExact: true },
@@ -54,9 +66,15 @@ export function AppHeader() {
     null,
   );
   const isSearchDropdownOpen = searchDropdownOpenPath === location.pathname;
+  // Reste monté après la première ouverture (animation de fermeture)
+  const [searchDropdownMounted, setSearchDropdownMounted] = useState(false);
+  if (isSearchDropdownOpen && !searchDropdownMounted) setSearchDropdownMounted(true);
 
   const [megaMenuOpenPath, setMegaMenuOpenPath] = useState<string | null>(null);
   const isMegaMenuOpen = megaMenuOpenPath === location.pathname;
+  // Reste monté après la première ouverture (animation de fermeture)
+  const [megaMenuMounted, setMegaMenuMounted] = useState(false);
+  if (isMegaMenuOpen && !megaMenuMounted) setMegaMenuMounted(true);
 
   const [isPast40, setIsPast40] = useState(false);
   const [isPast80, setIsPast80] = useState(false);
@@ -171,12 +189,16 @@ export function AppHeader() {
                 />
               </form>
 
-              <DesktopSearchDropdown
-                query={searchQuery}
-                onQueryChange={setSearchQuery}
-                open={isSearchDropdownOpen}
-                onClose={() => setSearchDropdownOpenPath(null)}
-              />
+              {searchDropdownMounted && (
+                <Suspense fallback={null}>
+                  <LazyDesktopSearchDropdown
+                    query={searchQuery}
+                    onQueryChange={setSearchQuery}
+                    open={isSearchDropdownOpen}
+                    onClose={() => setSearchDropdownOpenPath(null)}
+                  />
+                </Suspense>
+              )}
             </div>
 
             <div className="flex items-center gap-1.5">
@@ -301,11 +323,15 @@ export function AppHeader() {
             </span>
           </Container>
 
-          <MegaMenu
-            open={isMegaMenuOpen}
-            onClose={() => setMegaMenuOpenPath(null)}
-            triggerRef={megaTriggerRef}
-          />
+          {megaMenuMounted && (
+            <Suspense fallback={null}>
+              <LazyMegaMenu
+                open={isMegaMenuOpen}
+                onClose={() => setMegaMenuOpenPath(null)}
+                triggerRef={megaTriggerRef}
+              />
+            </Suspense>
+          )}
         </div>
       </header>
 

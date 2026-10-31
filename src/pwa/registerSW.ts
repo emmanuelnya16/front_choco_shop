@@ -1,11 +1,10 @@
 import { Workbox } from 'workbox-window';
-import { usePwaStore } from './pwaStore';
+import { UPDATED_FLAG_KEY, usePwaStore } from './pwaStore';
 import { SW_MESSAGES, type AppToSwMessage, type SwReply } from './swProtocol';
 
 const SW_URL = '/sw.js';
 const UPDATE_CHECK_INTERVAL_MS = 60 * 60 * 1000;
-/** Posé avant le rechargement d'une mise à jour : toast « Application mise à jour » au redémarrage. */
-export const UPDATED_FLAG_KEY = 'drc_app_updated';
+export { UPDATED_FLAG_KEY } from './pwaStore';
 
 let workbox: Workbox | null = null;
 

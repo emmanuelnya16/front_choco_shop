@@ -796,7 +796,10 @@ describe('Module M5 — 11. Correctifs issus de la revue de code', () => {
     fireEvent.click(screen.getAllByRole('link', { name: /Profil/ })[0]!);
     await screen.findByRole('heading', { name: /Junior Mbarga/, level: 1 });
 
-    expect(useToastStore.getState().toasts.some((t) => t.actionLabel === 'Annuler')).toBe(false);
+    // Le retrait du toast suit le démontage de la page : sous charge il peut arriver un instant plus tard
+    await waitFor(() =>
+      expect(useToastStore.getState().toasts.some((t) => t.actionLabel === 'Annuler')).toBe(false),
+    );
     await waitFor(async () => {
       const list = await api.get<Address[]>(endpoints.me.addresses);
       expect(list.map((a) => a.label)).toEqual(['Maison']);

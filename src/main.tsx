@@ -4,11 +4,12 @@ import '@/styles/index.css';
 
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-// Avant App : le paramètre ?source=pwa est retiré de l'adresse avant la création du routeur (M6 §5.5)
-import { initInstallService } from '@/pwa/installService';
+// Avant App : ?source=pwa est retiré de l'adresse avant la création du routeur (M6 §5.5), et
+// beforeinstallprompt, qui part tôt, est gardé (§5.1). Module minuscule : le service complet est
+// chargé après le premier affichage.
+import '@/pwa/installEarly';
 import { App } from '@/app/App';
 import { env } from '@/lib/env';
-import { registerServiceWorker, unregisterPwaServiceWorkers } from '@/pwa/registerSW';
 
 async function enableMocking(): Promise<void> {
   // Démarre MSW en développement ou en prévisualisation lorsque VITE_API_MOCK=true.
@@ -19,6 +20,7 @@ async function enableMocking(): Promise<void> {
   }
 
   // Un seul service worker par portée : celui de l'app laisse la place à MSW (M6 §3.2)
+  const { unregisterPwaServiceWorkers } = await import('@/pwa/registerSW');
   await unregisterPwaServiceWorkers();
   const { worker } = await import('@/mocks/browser');
   // Note MSW 3.x : `onUnhandledRequest` est remplacé par `onUnhandledFrame`
@@ -32,9 +34,6 @@ if (!rootElement) {
   throw new Error('Élément id="root" introuvable dans index.html');
 }
 
-// Installation : beforeinstallprompt part tôt, l'écouteur est posé avant le rendu (M6 §5.1)
-initInstallService();
-
 enableMocking()
   .catch((err) => {
     console.error('[MSW] Impossible de démarrer le worker de mocks :', err);
@@ -46,7 +45,10 @@ enableMocking()
       </StrictMode>,
     );
     // Application installable et hors connexion : jamais en même temps que les mocks du navigateur
+    // (chargé après le premier affichage : workbox-window hors du JavaScript de démarrage)
     if (env.pwaEnabled && !env.apiMock) {
-      registerServiceWorker();
+      void import('@/pwa/registerSW').then(({ registerServiceWorker }) => registerServiceWorker());
     }
+    // Service d'installation (visites, invitations, mesure) : hors du JavaScript de démarrage
+    void import('@/pwa/installService').then(({ initInstallService }) => initInstallService());
   });

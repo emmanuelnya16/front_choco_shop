@@ -134,6 +134,9 @@ export default defineConfig(({ mode, command }) => {
       environment: 'jsdom',
       setupFiles: './src/test/setup.ts',
       globals: true,
+      // Tests d'intégration qui rendent des pages entières (routes chargées à la demande, mocks MSW) :
+      // 5 s ne suffisent pas toujours quand 13 fichiers tournent en parallèle sur un poste chargé.
+      testTimeout: 15_000,
       // Copies de travail des agents (git worktree) rangées dans .claude/ : jamais testées ici
       exclude: [...configDefaults.exclude, '.claude/**'],
     },

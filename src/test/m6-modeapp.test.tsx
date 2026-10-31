@@ -96,7 +96,8 @@ describe('M6 · modeapp · 1. Bandeau de mise à jour', () => {
     renderBannerAt('/explorer');
     expect(await screen.findByText(BANNER_TEXT)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Mettre à jour' }));
-    expect(applyUpdate).toHaveBeenCalledTimes(1);
+    // registerSW est chargé à l'appui (hors du JavaScript de démarrage)
+    await waitFor(() => expect(applyUpdate).toHaveBeenCalledTimes(1));
   });
 
   it.each(['/reservation', '/reservation/RES-000102/paiement', '/reservation/RES-000102/preuve'])(

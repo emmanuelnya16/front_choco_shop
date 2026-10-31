@@ -1,3 +1,11 @@
+/**
+ * Étape de déploiement (M7 §5) : règle la remontée d'erreurs et le contrôle des réponses de l'API.
+ * - `development` : erreurs affichées dans la console, avertissements du contrat de l'API ;
+ * - `preproduction` : erreurs envoyées au serveur, avertissements du contrat dans la console ;
+ * - `production` : erreurs envoyées au serveur, écarts du contrat signalés au serveur.
+ */
+export type AppStage = 'development' | 'preproduction' | 'production';
+
 export interface AppEnv {
   readonly apiBaseUrl: string;
   readonly apiMock: boolean;
@@ -11,6 +19,11 @@ export interface AppEnv {
   readonly pwaEnabled: boolean;
   /** Clé publique VAPID (base64url) pour l'abonnement aux notifications. */
   readonly vapidPublicKey: string;
+  /**
+   * Étape de déploiement, lue depuis VITE_APP_STAGE (`development`, `preproduction` ou `production`).
+   * Absente ou invalide : `development` en développement (`vite`), `production` pour un build.
+   */
+  readonly appStage: AppStage;
 }
 
 const DEFAULTS: Record<string, string> = {
@@ -26,6 +39,19 @@ const DEFAULTS: Record<string, string> = {
 };
 
 const VAPID_KEY_PATTERN = /^[A-Za-z0-9_-]{80,100}$/;
+
+const APP_STAGES: readonly AppStage[] = ['development', 'preproduction', 'production'];
+
+/**
+ * VITE_APP_STAGE : `development`, `preproduction` ou `production` (M7 §5).
+ * HYPOTHÈSE: une valeur absente ou inconnue ne bloque pas le démarrage : on retient l'étape par défaut
+ * (`development` avec le serveur de développement, `production` pour un build).
+ */
+function readAppStage(rawEnv: Record<string, unknown>, isDev: boolean): AppStage {
+  const raw = String(rawEnv.VITE_APP_STAGE ?? '').trim().toLowerCase();
+  const match = APP_STAGES.find((stage) => stage === raw);
+  return match ?? (isDev ? 'development' : 'production');
+}
 
 function readRequiredEnv(key: keyof typeof DEFAULTS, rawEnv: Record<string, unknown>): string {
   const rawValue = rawEnv[key];
@@ -72,6 +98,7 @@ export function validateEnv(rawEnv: Record<string, unknown> = import.meta.env): 
     // HYPOTHÈSE: VITE_PWA_ENABLED absent = vrai en production, faux en développement (M6 §3.2)
     pwaEnabled: pwaEnabledRaw ? pwaEnabledRaw === 'true' || pwaEnabledRaw === '1' : !isDev,
     vapidPublicKey,
+    appStage: readAppStage(rawEnv, isDev),
   });
 }
 

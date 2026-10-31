@@ -21,6 +21,24 @@ function reportNetworkFailure(): void {
   useNetworkStore.getState().reportFailure();
 }
 
+/** Contrôle du contrat de l'API : coupé pendant les tests automatisés, sauf demande explicite. */
+let contractCheckOverride: boolean | null = null;
+
+/** Active (`true`), coupe (`false`) ou remet par défaut (`null`) le contrôle du contrat (tests). */
+export function setContractCheck(enabled: boolean | null): void {
+  contractCheckOverride = enabled;
+}
+
+/**
+ * Contrat des réponses (M7 §5.3) : zod et les schémas sont chargés à la demande, hors du JavaScript
+ * de démarrage. La réponse n'attend jamais le contrôle, qui ne lève jamais d'erreur.
+ */
+function checkResponseContract(method: string, path: string, data: unknown): void {
+  if (contractCheckOverride ?? import.meta.env.MODE !== 'test') {
+    import('./contract').then(({ checkContract }) => checkContract(method, path, data), () => undefined);
+  }
+}
+
 export class ApiError extends Error {
   readonly status: number;
   readonly code: string;
@@ -141,6 +159,7 @@ async function attemptTokenRefresh(): Promise<RefreshOutcome> {
       }
 
       const data = (await response.json()) as RefreshTokenResponse;
+      checkResponseContract('POST', endpoints.auth.refresh, data);
       if (data.accessToken) {
         if (data.user) {
           useAuthStore.getState().setSession(data.accessToken, data.user);
@@ -263,7 +282,9 @@ async function request<T>(
       return undefined as T;
     }
 
-    return (await response.json()) as T;
+    const data: unknown = await response.json();
+    checkResponseContract(method, path, data);
+    return data as T;
   } catch (error) {
     if (error instanceof ApiError) {
       throw error;

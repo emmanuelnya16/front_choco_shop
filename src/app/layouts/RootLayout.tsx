@@ -1,13 +1,17 @@
-import { AlertCircle, ArrowLeft } from 'lucide-react';
-import { lazy, Suspense, useEffect, useState } from 'react';
-import { Link, Outlet, ScrollRestoration, useRouteError } from 'react-router';
+import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react';
+import { Outlet, ScrollRestoration, useLocation, useNavigate, useRouteError } from 'react-router';
+import { clearChunkReloadFlag, pageReload } from '@/components/errors/chunkReload';
+import {
+  ErrorBoundary,
+  ErrorScreen,
+  SafeLazy,
+  type ErrorFallbackProps,
+} from '@/components/errors/ErrorBoundary';
 import { AppHeader } from '@/components/layout/AppHeader';
 import { BottomNav } from '@/components/layout/BottomNav';
 import { FloatingWhatsApp } from '@/components/layout/FloatingWhatsApp';
 import { Toaster } from '@/components/ui/Toast';
 import { OfflineBanner } from '@/features/offline/OfflineBanner';
-import { OfflineRouteFallback } from '@/features/offline/OfflineRouteFallback';
-import { useIsOfflineChunkError } from '@/features/offline/useOfflineChunkError';
 import { FlyToCartLayer } from '@/features/catalog/cart-fly/FlyToCartLayer';
 import { PackageReadyNotifier } from '@/features/tracking/components/PackageReadyNotifier';
 import { refreshSessionSilently } from '@/lib/api/client';
@@ -16,6 +20,19 @@ import { useNetworkRecoveryToast } from '@/lib/hooks/useOnlineStatus';
 import { SplashScreen } from '@/pwa/SplashScreen';
 import { UpdateBanner } from '@/pwa/UpdateBanner';
 import { useUiStore } from '@/stores/uiStore';
+
+// Contenu « hors connexion » des zones d'erreur (M6 §6.5) : chargé seulement s'il sert
+const LazyOfflineRouteFallback = lazy(() =>
+  import('@/features/offline/OfflineRouteFallback').then((m) => ({
+    default: m.OfflineRouteFallback,
+  })),
+);
+
+const LazyOfflineScreen = lazy(() =>
+  import('@/features/offline/OfflineScreen').then((m) => ({
+    default: m.OfflineScreen,
+  })),
+);
 
 const LazyCartDrawer = lazy(() =>
   import('@/features/cart/components/CartDrawer').then((m) => ({
@@ -72,33 +89,79 @@ export function RouteLoadingBar() {
   );
 }
 
+/**
+ * Repli des zones « route » (plein écran) et « page » (sous l'en-tête) :
+ * - morceau de code introuvable en ligne → rechargement automatique unique (M7 §5.1) ;
+ * - page jamais enregistrée et réseau absent → contenu « hors connexion » (M6 §6.5) ;
+ * - sinon → écran d'erreur générale (l'erreur est signalée par la zone).
+ */
+function LayoutErrorFallback({ variant, resolution, reset }: ErrorFallbackProps) {
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
+  const fullScreen = variant === 'route';
+
+  if (resolution === 'offline') {
+    return (
+      <SafeLazy failureText="Vous êtes hors connexion.">
+        {fullScreen ? (
+          <LazyOfflineRouteFallback />
+        ) : (
+          <div className="px-page pt-4 pb-16 lg:pt-16">
+            <LazyOfflineScreen className="mt-6" />
+          </div>
+        )}
+      </SafeLazy>
+    );
+  }
+  if (resolution === 'reloading') return <RouteLoadingBar />;
+
+  // Déjà sur l'accueil : la zone « page » réaffiche son contenu, le routeur recharge l'app
+  const goHome = () => (pathname !== '/' ? void navigate('/') : fullScreen ? pageReload.reload() : reset());
+  return <ErrorScreen fullScreen={fullScreen} animated onGoHome={goHome} />;
+}
+
+const renderLayoutFallback = (props: ErrorFallbackProps) => <LayoutErrorFallback {...props} />;
+
+/** Renvoie l'erreur du routeur à la zone d'erreur, qui décide du repli. */
+function Rethrow({ error }: { error: unknown }): never {
+  throw error;
+}
+
+/**
+ * Erreur au niveau du routeur (page impossible à charger, erreur de la mise en page) : traitée
+ * par la même zone d'erreur que le reste de l'app (rechargement unique, hors connexion, remontée).
+ */
 export function RouterErrorBoundary() {
   const error = useRouteError();
-  // Page jamais enregistrée et réseau absent : contenu « hors connexion » plutôt qu'une erreur (M6 §6.5)
-  const offlineChunk = useIsOfflineChunkError(error);
-  if (offlineChunk) return <OfflineRouteFallback />;
-  const message =
-    error instanceof Error ? error.message : 'Une erreur inattendue est survenue.';
-
   return (
-    <main className="mx-auto flex min-h-dvh max-w-content flex-col items-start justify-center px-page py-12">
-      <div className="max-w-lg rounded-[var(--radius-md)] border border-silver bg-surface p-6">
-        <div className="flex items-center gap-2 text-danger">
-          <AlertCircle className="h-5 w-5 shrink-0" aria-hidden="true" />
-          <span className="text-label">ERREUR D&apos;APPLICATION</span>
-        </div>
-        <h1 className="mt-2 text-h1 text-ink">Oups, quelque chose s&apos;est mal passé</h1>
-        <p className="mt-2 text-small text-text-2">{message}</p>
-        <Link
-          to="/"
-          className="mt-6 inline-flex min-h-[44px] items-center gap-2 rounded-[var(--radius-md)] bg-ink px-5 py-2.5 text-small font-bold text-white"
-        >
-          <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-          Revenir à l&apos;accueil
-        </Link>
-      </div>
-    </main>
+    <ErrorBoundary variant="route" resetKey={error} fallback={renderLayoutFallback}>
+      <Rethrow error={error} />
+    </ErrorBoundary>
   );
+}
+
+/**
+ * Zone « page » autour de l'Outlet (M7 §5.1), réinitialisée quand le chemin change.
+ * Composant à part : seul lui suit l'adresse, la mise en page ne se réaffiche pas pour autant.
+ */
+function PageErrorBoundary({ children }: { children: ReactNode }) {
+  const { pathname } = useLocation();
+  return (
+    <ErrorBoundary variant="page" resetKey={pathname} fallback={renderLayoutFallback}>
+      {children}
+    </ErrorBoundary>
+  );
+}
+
+/**
+ * Rendu dans la même attente que la page : son effet ne part que lorsque la page s'est
+ * vraiment affichée. Le drapeau de rechargement automatique est alors effacé (M7 §5.1).
+ */
+function PageDisplayed() {
+  useEffect(() => {
+    clearChunkReloadFlag();
+  }, []);
+  return null;
 }
 
 export function RootLayout() {
@@ -150,9 +213,13 @@ export function RootLayout() {
       </Suspense>
 
       <main id="contenu" className="flex-1">
-        <Suspense fallback={<RouteLoadingBar />}>
-          <Outlet />
-        </Suspense>
+        {/* Zone « page » : une erreur de la page laisse l'en-tête et la barre du bas utilisables */}
+        <PageErrorBoundary>
+          <Suspense fallback={<RouteLoadingBar />}>
+            <Outlet />
+            <PageDisplayed />
+          </Suspense>
+        </PageErrorBoundary>
       </main>
 
       <Suspense fallback={null}>

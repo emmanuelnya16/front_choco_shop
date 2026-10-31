@@ -5,6 +5,8 @@ import {
   Store,
   Truck,
 } from 'lucide-react';
+import type { ReactNode } from 'react';
+import { ErrorBoundary } from '@/components/errors/ErrorBoundary';
 import { Marquee, type MarqueeItem } from '@/components/ui/Marquee';
 import { BabouchesSpotlightSection } from '@/features/catalog/home/BabouchesSpotlightSection';
 import { BestSellersSection } from '@/features/catalog/home/BestSellersSection';
@@ -58,54 +60,98 @@ const TRUST_MARQUEE_ITEMS: MarqueeItem[] = [
   },
 ];
 
+/**
+ * Zone d'erreur d'une section (M7 §5.1) : une section en échec n'emporte pas l'accueil.
+ * Les bandeaux décoratifs disparaissent ; les autres sections affichent un encart discret.
+ */
+function HomeSection({
+  zone,
+  decorative = false,
+  children,
+}: {
+  zone: string;
+  decorative?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <ErrorBoundary variant="section" zone={`home:${zone}`} hideOnError={decorative}>
+      {children}
+    </ErrorBoundary>
+  );
+}
+
 export function HomePage() {
   return (
     <div className="bg-white text-ink">
       {/* 7.1 Hero */}
-      <HeroSection />
+      <HomeSection zone="hero">
+        <HeroSection />
+      </HomeSection>
 
       {/* 7.2 Bandeau des avantages */}
-      <Marquee
-        tone="red"
-        direction="left"
-        separator="✦"
-        items={BENEFITS_MARQUEE_ITEMS}
-      />
+      <HomeSection zone="benefits-marquee" decorative>
+        <Marquee
+          tone="red"
+          direction="left"
+          separator="✦"
+          items={BENEFITS_MARQUEE_ITEMS}
+        />
+      </HomeSection>
 
       {/* 7.3 Catégories */}
-      <CategoriesSection />
+      <HomeSection zone="categories">
+        <CategoriesSection />
+      </HomeSection>
 
       {/* 7.4 Les plus réservés */}
-      <BestSellersSection />
+      <HomeSection zone="best-sellers">
+        <BestSellersSection />
+      </HomeSection>
 
       {/* 7.5 Nouveautés */}
-      <NewArrivalsSection />
+      <HomeSection zone="new-arrivals">
+        <NewArrivalsSection />
+      </HomeSection>
 
       {/* 7.6 Bandeau paiement et livraison */}
-      <Marquee
-        tone="surface"
-        direction="right"
-        separator="·"
-        items={TRUST_MARQUEE_ITEMS}
-      />
+      <HomeSection zone="trust-marquee" decorative>
+        <Marquee
+          tone="surface"
+          direction="right"
+          separator="·"
+          items={TRUST_MARQUEE_ITEMS}
+        />
+      </HomeSection>
 
       {/* 7.7 Spécial babouches */}
-      <BabouchesSpotlightSection />
+      <HomeSection zone="babouches">
+        <BabouchesSpotlightSection />
+      </HomeSection>
 
       {/* 7.8 Comment ça marche */}
-      <HowItWorksSection />
+      <HomeSection zone="how-it-works">
+        <HowItWorksSection />
+      </HomeSection>
 
       {/* 7.9 Nos engagements */}
-      <EngagementsSection />
+      <HomeSection zone="engagements">
+        <EngagementsSection />
+      </HomeSection>
 
       {/* 7.10 Bloc WhatsApp et application */}
-      <WhatsAppAppSection />
+      <HomeSection zone="whatsapp-app">
+        <WhatsAppAppSection />
+      </HomeSection>
 
       {/* 7.11 Portés par l'Incompris */}
-      <LooksSection />
+      <HomeSection zone="looks">
+        <LooksSection />
+      </HomeSection>
 
-      {/* Feuille d'installation de deuxième visite (M6 §5.2) */}
-      <InstallAutoPrompt />
+      {/* Feuille d'installation de deuxième visite (M6 §5.2) : rien à montrer si elle échoue */}
+      <HomeSection zone="install-prompt" decorative>
+        <InstallAutoPrompt />
+      </HomeSection>
     </div>
   );
 }

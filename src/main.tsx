@@ -9,7 +9,13 @@ import { createRoot } from 'react-dom/client';
 // chargé après le premier affichage.
 import '@/pwa/installEarly';
 import { App } from '@/app/App';
+import { ErrorBoundary } from '@/components/errors/ErrorBoundary';
+import { installGlobalErrorHandlers } from '@/components/errors/globalErrorHandlers';
 import { env } from '@/lib/env';
+
+// Erreurs hors affichage (M7 §5.1) : signalées sans rien montrer, rechargement unique après une
+// mise à jour. Installé avant tout le reste, mocks compris.
+installGlobalErrorHandlers();
 
 async function enableMocking(): Promise<void> {
   // Démarre MSW en développement ou en prévisualisation lorsque VITE_API_MOCK=true.
@@ -41,7 +47,10 @@ enableMocking()
   .finally(() => {
     createRoot(rootElement).render(
       <StrictMode>
-        <App />
+        {/* Zone « coquille » : dernier rempart, au-dessus des fournisseurs et du routeur */}
+        <ErrorBoundary variant="shell" zone="shell">
+          <App />
+        </ErrorBoundary>
       </StrictMode>,
     );
     // Application installable et hors connexion : jamais en même temps que les mocks du navigateur

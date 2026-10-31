@@ -69,6 +69,14 @@ export default defineConfig(({ mode, command }) => {
           'screenshots/**',
           'splash/**',
           'brand/**',
+          // Icônes lues par le système à l'installation, jamais par l'app hors connexion
+          // (seules pwa-192x192.png et badge-96.png, utilisées par les notifications, sont précachées)
+          'shortcuts/**',
+          'pwa-64x64.png',
+          'pwa-512x512.png',
+          'maskable-icon-*.png',
+          'apple-touch-icon-*.png',
+          'favicon.ico',
         ],
         maximumFileSizeToCacheInBytes: 600 * 1024,
         sourcemap: false,

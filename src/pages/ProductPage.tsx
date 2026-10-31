@@ -16,6 +16,7 @@ import { AnimatePresence } from 'motion/react';
 import * as m from 'motion/react-m';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
+import { BackButton } from '@/components/ui/BackButton';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Container, Price, Skeleton } from '@/components/ui/Primitives';
@@ -30,6 +31,7 @@ import { ProductSeo } from '@/features/catalog/product/ProductSeo';
 import { SizeGuideSheet } from '@/features/catalog/product/SizeGuideSheet';
 import { isNetworkError } from '@/features/offline/networkErrors';
 import { OfflineScreen } from '@/features/offline/OfflineScreen';
+import { useBackNavigation } from '@/lib/hooks/useBackNavigation';
 import { useOnlineStatus } from '@/lib/hooks/useOnlineStatus';
 import { cn } from '@/lib/utils/cn';
 import { haptic } from '@/lib/utils/haptics';
@@ -72,19 +74,14 @@ type AccordionSectionId = 'description' | 'care' | 'delivery';
  */
 export function ProductPage() {
   const { slug } = useParams<{ slug: string }>();
-  const navigate = useNavigate();
 
   const { data: product, isLoading, isError, error, refetch } = useProduct(slug);
   const { data: popularFallback } = useProducts({ sort: 'popular', pageSize: 4 });
   const isOnline = useOnlineStatus();
 
-  const handleBack = () => {
-    if (window.history.length > 2) {
-      navigate(-1);
-    } else {
-      navigate('/explorer', { viewTransition: true });
-    }
-  };
+  // Retour (M6 §8) : écran précédent de l'app, sinon la catégorie de l'article
+  // HYPOTHÈSE: parent logique d'une fiche ouverte par lien direct = sa catégorie dans Explorer
+  const handleBack = useBackNavigation(product ? `/explorer/${product.categorySlug}` : '/explorer');
 
   if (isLoading && !product) {
     return <ProductPageSkeleton />;
@@ -101,6 +98,7 @@ export function ProductPage() {
   if (isNotFound) {
     return (
       <Container className="py-12">
+        <BackButton fallback="/explorer" className="mb-4 lg:hidden" />
         <div className="mx-auto max-w-xl rounded-[var(--radius-md)] border border-silver bg-surface p-8 text-center">
           <span className="text-label text-red">ARTICLE INTROUVABLE</span>
           <h1 className="mt-2 text-h1 text-ink">
@@ -155,6 +153,7 @@ export function ProductPage() {
   if (!product) {
     return (
       <Container className="py-14">
+        <BackButton fallback="/explorer" className="mb-4 lg:hidden" />
         <div className="mx-auto max-w-md rounded-[var(--radius-md)] border border-silver bg-surface p-6 text-center">
           <AlertCircle className="mx-auto h-10 w-10 text-danger" aria-hidden="true" />
           <h1 className="mt-3 text-h2 text-ink">
@@ -522,7 +521,7 @@ function ProductDetailView({
             animate={{ y: '0%', opacity: 1 }}
             exit={{ y: '-100%', opacity: 0 }}
             transition={{ duration: 0.22, ease: ease.out }}
-            className="fixed top-[var(--offline-banner-h,0px)] right-0 left-0 z-header flex h-[52px] items-center justify-between border-b border-silver/70 bg-white/95 px-4 pt-safe shadow-[var(--shadow-header)] backdrop-blur-md lg:hidden"
+            className="fixed top-[var(--offline-banner-h,0px)] right-0 left-0 z-header flex h-[calc(52px+env(safe-area-inset-top,0px))] items-center justify-between border-b border-silver/70 bg-white/95 px-4 pt-safe shadow-[var(--shadow-header)] backdrop-blur-md lg:hidden"
           >
             <button
               type="button"

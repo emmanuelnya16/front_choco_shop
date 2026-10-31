@@ -1,3 +1,4 @@
+import { BackButton } from '@/components/ui/BackButton';
 import { OfflineScreen } from '@/features/offline/OfflineScreen';
 import { useDocumentTitle } from '@/lib/utils/useDocumentTitle';
 
@@ -10,8 +11,10 @@ export function OfflinePage() {
   useDocumentTitle('Hors connexion');
 
   return (
-    <div className="px-page pt-10 pb-16 lg:pt-16">
-      <OfflineScreen />
+    <div className="px-page pt-4 pb-16 lg:pt-16">
+      {/* Mode application : pas de bouton retour du navigateur (M6 §8) */}
+      <BackButton fallback="/" className="lg:hidden" />
+      <OfflineScreen className="mt-6" />
     </div>
   );
 }

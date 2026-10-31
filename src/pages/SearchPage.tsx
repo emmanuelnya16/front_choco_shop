@@ -1,4 +1,5 @@
 import {
+  ArrowLeft,
   ArrowRight,
   Clock,
   Search as SearchIcon,
@@ -30,6 +31,7 @@ import {
   POPULAR_SEARCH_CHIPS,
   useRecentSearches,
 } from '@/features/catalog/search/recentSearches';
+import { useBackNavigation } from '@/lib/hooks/useBackNavigation';
 import { useOnlineStatus } from '@/lib/hooks/useOnlineStatus';
 import { cn } from '@/lib/utils/cn';
 import { useReducedMotionPref } from '@/motion/useReducedMotionPref';
@@ -98,13 +100,8 @@ export function SearchPage() {
   const originX = searchOrigin ? `${searchOrigin.x}px` : 'calc(100% - 64px)';
   const originY = searchOrigin ? `${searchOrigin.y}px` : '28px';
 
-  const handleCancel = () => {
-    if (window.history.length > 2) {
-      navigate(-1);
-    } else {
-      navigate('/explorer', { viewTransition: true });
-    }
-  };
+  // Retour (M6 §8) : écran précédent de l'app, sinon le catalogue
+  const handleCancel = useBackNavigation('/explorer');
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -167,8 +164,16 @@ export function SearchPage() {
       className="min-h-dvh bg-ink pb-24 text-white"
     >
       {/* Barre de recherche en haut (52 px de haut, §6.1) */}
-      <div className="sticky top-0 z-sticky border-b border-white/10 bg-ink/95 py-3 backdrop-blur-md">
+      <div className="sticky top-0 z-sticky border-b border-white/10 bg-ink/95 pt-[calc(12px+env(safe-area-inset-top,0px))] pb-3 backdrop-blur-md">
         <Container className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={handleCancel}
+            aria-label="Retour"
+            className="-ml-2 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--radius-full)] text-white hover:bg-ink-2 lg:hidden"
+          >
+            <ArrowLeft className="h-5 w-5" aria-hidden="true" />
+          </button>
           <form onSubmit={handleSubmit} role="search" className="relative flex-1">
             <SearchIcon
               className="pointer-events-none absolute top-1/2 left-4 h-5 w-5 -translate-y-1/2 text-silver"
@@ -214,7 +219,7 @@ export function SearchPage() {
           <button
             type="button"
             onClick={handleCancel}
-            className="shrink-0 px-2 py-2 text-small font-bold text-silver hover:text-white"
+            className="hidden shrink-0 px-2 py-2 text-small font-bold text-silver hover:text-white lg:inline-flex"
           >
             Annuler
           </button>

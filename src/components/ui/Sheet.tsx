@@ -2,6 +2,7 @@ import { X } from 'lucide-react';
 import { AnimatePresence, type PanInfo } from 'motion/react';
 import * as m from 'motion/react-m';
 import { useEffect, useRef, type ReactNode } from 'react';
+import { useOverlayHistory } from '@/lib/hooks/useOverlayHistory';
 import { cn } from '@/lib/utils/cn';
 import { fade, sheetUp } from '@/motion/presets';
 
@@ -18,9 +19,12 @@ export interface SheetProps {
  * Feuille montante sur mobile (avec fermeture par glissement vers le bas `drag="y"`,
  * clic sur le fond ou touche Échap, piège du focus et blocage du défilement),
  * et fenêtre centrée de 440 px sur ordinateur (`lg:`).
+ * Entrée d'historique à l'ouverture (M6 §8) : la touche retour d'Android ferme d'abord la feuille.
  */
 export function Sheet({ open, onClose, title, children, className }: SheetProps) {
   const dialogRef = useRef<HTMLDivElement | null>(null);
+
+  useOverlayHistory(open, onClose);
 
   useEffect(() => {
     if (!open) {
@@ -99,7 +103,7 @@ export function Sheet({ open, onClose, title, children, className }: SheetProps)
             dragElastic={{ top: 0, bottom: 0.35 }}
             onDragEnd={handleDragEnd}
             className={cn(
-              'relative z-10 w-full max-w-lg rounded-t-[var(--radius-sheet)] bg-white p-5 pb-safe shadow-[var(--shadow-sheet)] lg:max-w-[440px] lg:rounded-[var(--radius-md)] lg:p-6',
+              'relative z-10 w-full max-w-lg rounded-t-[var(--radius-sheet)] bg-white p-5 pb-[calc(20px+env(safe-area-inset-bottom,0px))] shadow-[var(--shadow-sheet)] lg:max-w-[440px] lg:rounded-[var(--radius-md)] lg:p-6',
               className,
             )}
           >

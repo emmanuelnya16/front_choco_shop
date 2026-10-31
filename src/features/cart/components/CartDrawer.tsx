@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { useRequireAuth } from '@/features/auth/api/useAuthQueries';
 import { useValidateCart } from '@/features/cart/api/useCartQueries';
 import { useOnlineStatus } from '@/lib/hooks/useOnlineStatus';
+import { useOverlayHistory } from '@/lib/hooks/useOverlayHistory';
 import {
   selectCartCount,
   selectCartSubtotal,
@@ -51,6 +52,9 @@ export function CartDrawer() {
 
   const [isHovered, setIsHovered] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
+
+  // Entrée d'historique (M6 §8) : le bouton retour du navigateur ferme d'abord le tiroir
+  useOverlayHistory(isOpen, closeDrawer);
 
   // Fermeture automatique après 2,5 s lors d'une ouverture déclenchée par un ajout sur ordinateur (§4.3)
   useEffect(() => {

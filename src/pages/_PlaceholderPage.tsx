@@ -1,5 +1,6 @@
 import { ArrowLeft, ArrowUpRight, Compass, Terminal } from 'lucide-react';
 import { Link, useLocation, useParams } from 'react-router';
+import { BackButton } from '@/components/ui/BackButton';
 import { env } from '@/lib/env';
 import { useDocumentTitle } from '@/lib/utils/useDocumentTitle';
 
@@ -46,6 +47,8 @@ export function PlaceholderPage({
 
   return (
     <main className="mx-auto min-h-dvh max-w-content px-page py-8">
+      {/* Retour (M6 §8) : pages légales, aide et page introuvable */}
+      {location.pathname !== '/' && <BackButton fallback="/" className="mb-4 lg:hidden" />}
       {/* Bandeau d'accès rapide au socle M0 */}
       <header className="mb-8 flex flex-wrap items-center justify-between gap-4 border-b border-silver pb-5">
         <div className="flex items-center gap-3">

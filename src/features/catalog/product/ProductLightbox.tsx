@@ -11,6 +11,7 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 import { SmartImage, type ImageAspectRatio } from '@/components/ui/SmartImage';
+import { useOverlayHistory } from '@/lib/hooks/useOverlayHistory';
 import { duration, ease } from '@/motion/tokens';
 import type { ProductImageEntry } from '@/types/domain';
 
@@ -35,6 +36,7 @@ export interface ProductLightboxProps {
  * - Balayage horizontal ou flèches clavier pour changer de photo
  * - Double-tap / double-clic ou bouton loupe pour zoomer à `2.5x` centré sur le point touché + déplacement libre
  * - Glissement vertical vers le bas (`> 120 px`) pour refermer la visionneuse
+ * - Entrée d'historique à l'ouverture (M6 §8) : la touche retour d'Android ferme la visionneuse
  */
 export function ProductLightbox({
   open,
@@ -45,6 +47,8 @@ export function ProductLightbox({
   label,
   renderActions,
 }: ProductLightboxProps) {
+  useOverlayHistory(open && images.length > 0, onClose);
+
   if (!open || typeof document === 'undefined' || images.length === 0) {
     return null;
   }
@@ -225,7 +229,7 @@ function LightboxDialog({
         className="fixed inset-0 z-toast flex flex-col justify-between bg-ink text-white select-none"
       >
         {/* Barre supérieure : Compteur (1 / 4) + Zoom + Fermer (×) */}
-        <div className="relative z-10 flex items-center justify-between px-4 pt-safe py-3">
+        <div className="relative z-10 flex items-center justify-between px-4 pt-[calc(12px+env(safe-area-inset-top,0px))] pb-3">
           <span className="rounded-[var(--radius-full)] bg-ink-2 px-3 py-1 text-xs font-bold text-white tabular-nums">
             {currentIndex + 1} / {images.length}
           </span>
@@ -317,7 +321,7 @@ function LightboxDialog({
         </div>
 
         {/* Pied de visionneuse : légende + miniatures */}
-        <div className="relative z-10 flex flex-col items-center gap-2 px-4 pb-safe py-4">
+        <div className="relative z-10 flex flex-col items-center gap-2 px-4 pt-4 pb-[calc(16px+env(safe-area-inset-bottom,0px))]">
           <p className="text-xs text-silver">
             Double-touchez pour zoomer · Glissez vers le bas pour fermer
           </p>

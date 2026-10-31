@@ -11,6 +11,7 @@ import { AnimatePresence } from 'motion/react';
 import * as m from 'motion/react-m';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router';
+import { BackButton } from '@/components/ui/BackButton';
 import { Button } from '@/components/ui/Button';
 import { InstallSheets } from '@/features/install/InstallSheets';
 import { SuccessInstallCard } from '@/features/install/SuccessInstallCard';
@@ -320,6 +321,8 @@ export function SuccessPage() {
       <CheckoutStepper currentStep={3} />
 
       <div className="mx-auto max-w-[560px] px-page pt-6">
+        {/* Retour (M6 §8) : toujours vers le suivi, l'écran de paiement renverrait ici aussitôt (HYPOTHÈSE) */}
+        <BackButton fallback={`/reservations/${reservation.ref}`} parentOnly className="mb-2" />
         {/* 1. Disque animé 96 px + coche DrawSVG + Titre masqué */}
         <div className="flex flex-col items-center text-center">
           <div className="relative flex h-24 w-24 items-center justify-center">

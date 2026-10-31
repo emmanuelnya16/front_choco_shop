@@ -1,8 +1,8 @@
 import { AnimatePresence } from 'motion/react';
 import * as m from 'motion/react-m';
-import { ArrowLeft, MapPin, MoreHorizontal, Pencil, Plus, Star, Trash2, Truck, User } from 'lucide-react';
+import { MapPin, MoreHorizontal, Pencil, Plus, Star, Trash2, Truck, User } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router';
+import { BackButton } from '@/components/ui/BackButton';
 import { Button } from '@/components/ui/Button';
 import { Skeleton } from '@/components/ui/Primitives';
 import { Sheet } from '@/components/ui/Sheet';
@@ -28,13 +28,7 @@ export function ProfileAddressesPage() {
   return (
     <ProfileShell>
       <div className="px-page pt-6 lg:px-0 lg:pt-0">
-        <Link
-          to="/profil"
-          className="-ml-2 inline-flex min-h-[44px] items-center gap-1.5 px-2 text-small font-semibold text-ink lg:hidden"
-        >
-          <ArrowLeft className="h-5 w-5" aria-hidden="true" />
-          Profil
-        </Link>
+        <BackButton fallback="/profil" label="Profil" className="lg:hidden" />
         <h1 className="mt-2 text-h1 text-ink lg:mt-0">Mes adresses</h1>
         {status === 'authenticated' ? (
           <AddressesContent />

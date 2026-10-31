@@ -43,6 +43,11 @@ const VARIANT_CLASSES: Record<ButtonVariant, string> = {
     'bg-danger text-white border border-transparent [@media(hover:hover)]:hover:brightness-92',
 };
 
+/** Liens vers une autre application du téléphone : jamais de `<Link>` du routeur ni de nouvel onglet. */
+const APP_SCHEME_PATTERN = /^(tel|mailto|sms):/i;
+/** Adresses web absolues (wa.me, Google Maps…) : toujours externes. */
+const WEB_URL_PATTERN = /^(https?:)?\/\//i;
+
 const SIZE_CLASSES: Record<ButtonSize, string> = {
   sm: 'min-h-[36px] px-4 py-1.5 text-[13px] gap-1.5',
   md: 'min-h-[44px] px-5 py-2.5 text-[14px] gap-2',
@@ -95,7 +100,17 @@ export function Button({
   );
 
   if (href && !isDisabled) {
-    if (external || href.startsWith('http') || href.startsWith('https://wa.me')) {
+    // Téléphone, e-mail, SMS : simple lien, l'application concernée s'ouvre sans quitter la session (M6 §8)
+    if (APP_SCHEME_PATTERN.test(href)) {
+      return (
+        <m.a href={href} className={baseClassName} {...pressable}>
+          {content}
+        </m.a>
+      );
+    }
+
+    // WhatsApp, Google Maps et autres sites : nouvel onglet ou application, jamais dans l'app installée
+    if (external || WEB_URL_PATTERN.test(href)) {
       return (
         <m.a
           href={href}

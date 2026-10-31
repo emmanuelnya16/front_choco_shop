@@ -1,7 +1,8 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { AlertCircle, ArrowLeft, Lock } from 'lucide-react';
+import { AlertCircle, Lock } from 'lucide-react';
 import { useForm, useWatch } from 'react-hook-form';
-import { Link, useNavigate } from 'react-router';
+import { useNavigate } from 'react-router';
+import { BackButton } from '@/components/ui/BackButton';
 import { Button } from '@/components/ui/Button';
 import { useUpdateProfile } from '@/features/auth/api/useAuthQueries';
 import { ProfileShell } from '@/features/profile/components/ProfileShell';
@@ -25,13 +26,7 @@ export function ProfileInformationsPage() {
   return (
     <ProfileShell>
       <div className="px-page pt-6 lg:px-0 lg:pt-0">
-        <Link
-          to="/profil"
-          className="-ml-2 inline-flex min-h-[44px] items-center gap-1.5 px-2 text-small font-semibold text-ink lg:hidden"
-        >
-          <ArrowLeft className="h-5 w-5" aria-hidden="true" />
-          Profil
-        </Link>
+        <BackButton fallback="/profil" label="Profil" className="lg:hidden" />
         <h1 className="mt-2 text-h1 text-ink lg:mt-0">Mes informations</h1>
         {status === 'authenticated' && user ? (
           <InformationsForm user={user} />

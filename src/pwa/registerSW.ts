@@ -29,7 +29,9 @@ export function registerServiceWorker(): void {
 
   // La nouvelle version a pris la main après « Mettre à jour » : on recharge une seule fois
   wb.addEventListener('controlling', (event) => {
-    if (!event.isUpdate) return;
+    // `isUpdate` reste faux si aucune version ne contrôlait la page à l'enregistrement (première
+    // visite gardée ouverte) : l'accord du client (`applying`) suffit alors à recharger (M6 §4.7)
+    if (!event.isUpdate && !usePwaStore.getState().applying) return;
     try {
       sessionStorage.setItem(UPDATED_FLAG_KEY, '1');
     } catch {

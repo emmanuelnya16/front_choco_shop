@@ -3,7 +3,6 @@ import * as m from 'motion/react-m';
 import {
   AlertCircle,
   AlertTriangle,
-  ArrowLeft,
   ArrowRight,
   Check,
   CheckCircle2,
@@ -15,6 +14,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
+import { BackButton } from '@/components/ui/BackButton';
 import { Button } from '@/components/ui/Button';
 import { Container, Price } from '@/components/ui/Primitives';
 import { Sheet } from '@/components/ui/Sheet';
@@ -386,16 +386,11 @@ export function PaymentPage() {
 
   return (
     <div className="pb-28 lg:pb-16">
-      {/* 4.1 En-tête de page : flèche retour vers l'accueil + indicateur d'étapes sur Paiement */}
+      {/* 4.1 En-tête de page : flèche retour (M6 §8 : écran précédent, sinon le suivi) + indicateur d'étapes */}
+      {/* HYPOTHÈSE: le parent du paiement est le suivi de la réservation (et non plus l'accueil) */}
       <div className="border-b border-silver/70 bg-white">
         <Container className="flex items-center justify-between py-2.5">
-          <Link
-            to="/"
-            className="inline-flex min-h-[44px] items-center gap-2 text-small font-bold text-ink transition-colors hover:text-red"
-          >
-            <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-            <span>Retour à l&rsquo;accueil</span>
-          </Link>
+          <BackButton fallback={`/reservations/${reservation.ref}`} />
           <span className="font-mono text-xs font-bold text-text-2">
             {reservation.ref}
           </span>

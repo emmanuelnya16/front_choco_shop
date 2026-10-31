@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { Container } from '@/components/ui/Primitives';
 import { SmartImage } from '@/components/ui/SmartImage';
 import { useCategories } from '@/features/catalog/api/useCatalogQueries';
+import { useOverlayHistory } from '@/lib/hooks/useOverlayHistory';
 import { fadeUp, staggerContainer } from '@/motion/presets';
 import { duration, ease } from '@/motion/tokens';
 import { useReducedMotionPref } from '@/motion/useReducedMotionPref';
@@ -21,6 +22,9 @@ export function MegaMenu({ open, onClose, triggerRef }: MegaMenuProps) {
   const { data: categories = [] } = useCategories();
   const panelRef = useRef<HTMLDivElement>(null);
   const reducedMotion = useReducedMotionPref();
+
+  // Entrée d'historique (M6 §8) : le bouton retour ferme d'abord le menu
+  useOverlayHistory(open, onClose);
 
   useEffect(() => {
     if (!open) return;

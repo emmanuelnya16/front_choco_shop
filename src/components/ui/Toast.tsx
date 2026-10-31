@@ -18,7 +18,7 @@ export function Toaster() {
   return (
     <div
       aria-live="polite"
-      className="pointer-events-none fixed right-4 bottom-[calc(var(--bottom-nav-h)+16px)] left-4 z-toast flex flex-col items-center gap-2 lg:right-6 lg:bottom-6 lg:left-auto lg:items-end"
+      className="pointer-events-none fixed right-4 bottom-[calc(var(--bottom-nav-h)+16px+env(safe-area-inset-bottom,0px))] left-4 z-toast flex flex-col items-center gap-2 lg:right-6 lg:bottom-6 lg:left-auto lg:items-end"
     >
       <AnimatePresence>
         {toasts.map((toast) => (

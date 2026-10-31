@@ -1,7 +1,8 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { AlertCircle, ArrowLeft, Copy, Download, SearchX, WifiOff } from 'lucide-react';
+import { AlertCircle, Copy, Download, SearchX, WifiOff } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { useLocation, useNavigate, useParams } from 'react-router';
+import { useLocation, useParams } from 'react-router';
+import { BackButton } from '@/components/ui/BackButton';
 import { Button } from '@/components/ui/Button';
 import { Price, Skeleton } from '@/components/ui/Primitives';
 import { usePublicSettings } from '@/features/catalog/api/useCatalogQueries';
@@ -72,22 +73,8 @@ function PageFrame({ children }: { children: ReactNode }) {
 }
 
 function BackLink() {
-  const navigate = useNavigate();
-  const location = useLocation();
-  return (
-    <button
-      type="button"
-      onClick={() =>
-        location.key !== 'default'
-          ? navigate(-1)
-          : navigate('/reservations', { viewTransition: true })
-      }
-      className="-ml-2 inline-flex min-h-[44px] items-center gap-1.5 px-2 text-small font-semibold text-ink"
-    >
-      <ArrowLeft className="h-5 w-5" aria-hidden="true" />
-      Mes réservations
-    </button>
-  );
+  // Logique de retour unique (M6 §8) : écran précédent de l'app, sinon « Mes réservations »
+  return <BackButton fallback="/reservations" label="Mes réservations" />;
 }
 
 /** Non connecté : la feuille de connexion s'ouvre par-dessus, puis la réservation s'affiche (§5.5 M5). */

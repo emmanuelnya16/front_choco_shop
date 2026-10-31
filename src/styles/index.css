@@ -67,6 +67,8 @@
   --z-index-sheet: 60;
   --z-index-toast: 70;
   --z-index-cursor: 80;
+  /* Écran de lancement de l'app installée (M6 §8) : au-dessus de tout */
+  --z-index-splash: 90;
 
   /* 6.4 Largeur maximale de contenu */
   --spacing-content: 1280px;
@@ -119,6 +121,56 @@
   img {
     display: block;
     max-width: 100%;
+  }
+
+  /*
+   * M6 §8 — Coquille « mode application » : en-tête, barre basse et boutons ne se sélectionnent
+   * pas et n'ouvrent pas le menu d'appui long d'iOS ; `manipulation` supprime le délai du
+   * double appui. Les textes des pages restent sélectionnables (aucune règle sur body).
+   */
+  .site-header,
+  .bottom-nav,
+  button,
+  [role='button'] {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+
+  button,
+  [role='button'],
+  .site-header a,
+  .bottom-nav a {
+    touch-action: manipulation;
+  }
+
+  /* Champ de recherche de l'en-tête : saisie et sélection normales (iOS bloque sinon la saisie) */
+  .site-header input {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+
+  /*
+   * Textes utiles toujours sélectionnables, même dans une zone non sélectionnable : références,
+   * codes USSD, adresses (hors boutons et liens, où l'appui doit rester un appui).
+   * HYPOTHÈSE: références et codes USSD sont en font-mono ; montants et adresses sont dans le
+   * texte courant, qui n'est jamais rendu non sélectionnable.
+   */
+  :where(code, kbd, samp, address, .font-mono):not(:where(button, a, [role='button']) *) {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+
+  /*
+   * App installée : pas de rechargement accidentel en tirant la page vers le bas. Le tirer pour
+   * actualiser de « Mes réservations » (M5) pose son propre style en ligne sur html et le retire
+   * en quittant la page : cette règle reprend alors la main.
+   * HYPOTHÈSE: limité à l'app installée (§8) ; dans un onglet, le navigateur garde son geste.
+   */
+  @media (display-mode: standalone), (display-mode: fullscreen) {
+    html {
+      overscroll-behavior-y: none;
+    }
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -195,6 +247,10 @@
 
 @utility z-cursor {
   z-index: 80;
+}
+
+@utility z-splash {
+  z-index: 90;
 }
 
 @utility tabular-nums {
@@ -313,4 +369,19 @@
 
 .no-scrollbar::-webkit-scrollbar {
   display: none;
+}
+
+/*
+ * M6 §4.7 — Bandeau « Une nouvelle version est disponible » sur mobile : quand le bandeau
+ * « réservation en attente de paiement » (collé au-dessus de la barre basse, 52 px) est affiché,
+ * il se place au-dessus de lui au lieu de recouvrir son bouton d'action.
+ */
+@media (width < 64rem) {
+  body:has(
+      [role='region'][aria-label='Réservation en attente de paiement'],
+      [role='region'][aria-label='Paiement de réservation non validé']
+    )
+    .update-banner {
+    bottom: calc(var(--bottom-nav-h) + 52px + 12px + env(safe-area-inset-bottom, 0px));
+  }
 }

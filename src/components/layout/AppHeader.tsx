@@ -363,9 +363,12 @@ export function AppHeader() {
             </Container>
           </m.header>
 
-          {/* Spacer on mobile for non-homepage routes so fixed header doesn't overlap content */}
+          {/* Cale mobile hors accueil : hauteur de l'en-tête + zone de sécurité (encoche), qui s'additionnent */}
           {!isHomePage && (
-            <div className="h-[var(--header-h)] pt-safe lg:hidden" aria-hidden="true" />
+            <div
+              className="h-[calc(var(--header-h)+env(safe-area-inset-top,0px))] lg:hidden"
+              aria-hidden="true"
+            />
           )}
         </>
       )}

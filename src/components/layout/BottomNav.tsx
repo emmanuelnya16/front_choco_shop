@@ -8,6 +8,7 @@ import {
   User,
 } from 'lucide-react';
 import { Link, useLocation } from 'react-router';
+import { isBottomNavHidden } from '@/components/layout/bottomNavVisibility';
 import { AttentionDot } from '@/features/tracking/components/AttentionDot';
 import { useReservationsAttention } from '@/features/tracking/useReservationsAttention';
 import { cn } from '@/lib/utils/cn';
@@ -60,13 +61,7 @@ export function BottomNav() {
 
   // Masqué sur la fiche produit, le parcours de réservation/paiement/preuve et le panier non vide pour laisser place à la barre d'action collante
   // `/reservation` et `/reservation/:ref/*` seulement : « Mes réservations » (`/reservations`) garde la barre (M5).
-  const isCheckoutFlow =
-    location.pathname === '/reservation' || location.pathname.startsWith('/reservation/');
-  if (
-    location.pathname.startsWith('/produit/') ||
-    isCheckoutFlow ||
-    (location.pathname === '/panier' && cartCount > 0)
-  ) {
+  if (isBottomNavHidden(location.pathname, cartCount)) {
     return null;
   }
 

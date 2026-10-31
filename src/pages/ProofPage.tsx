@@ -1,6 +1,5 @@
 import {
   AlertTriangle,
-  ArrowLeft,
   ChevronDown,
   HelpCircle,
   ImagePlus,
@@ -15,6 +14,7 @@ import { AnimatePresence } from 'motion/react';
 import * as m from 'motion/react-m';
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
+import { BackButton } from '@/components/ui/BackButton';
 import { Button } from '@/components/ui/Button';
 import { Sheet } from '@/components/ui/Sheet';
 import { isNetworkError } from '@/features/offline/networkErrors';
@@ -32,6 +32,7 @@ import { useReservation } from '@/features/reservation/api/useReservationQueries
 import { CheckoutStepper } from '@/features/reservation/components/CheckoutStepper';
 import { HoldCountdown } from '@/features/reservation/components/HoldCountdown';
 import { ApiError } from '@/lib/api/client';
+import { useBlockAppUpdate } from '@/lib/hooks/useBlockAppUpdate';
 import { useOnlineStatus } from '@/lib/hooks/useOnlineStatus';
 import { cn } from '@/lib/utils/cn';
 import { haptic } from '@/lib/utils/haptics';
@@ -338,6 +339,8 @@ export function ProofPage() {
 
   const dropzoneLabelId = useId();
   const isUploading = uploadMutation.isPending;
+  // Aucune mise à jour de l'application pendant l'envoi (M6 §4.7)
+  useBlockAppUpdate(isUploading);
 
   if (reservationQuery.isLoading) {
     return (
@@ -389,13 +392,11 @@ export function ProofPage() {
 
       <div className="mx-auto max-w-[600px] px-page pt-4">
         <div className="mb-4">
-          <Link
-            to={`/reservation/${reservation.ref}/paiement`}
-            className="inline-flex min-h-[44px] items-center gap-1.5 text-small font-bold text-text-2 transition-colors hover:text-ink"
-          >
-            <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-            Instructions de paiement
-          </Link>
+          {/* Retour (M6 §8) : écran précédent de l'app, sinon les instructions de paiement */}
+          <BackButton
+            fallback={`/reservation/${reservation.ref}/paiement`}
+            label="Instructions de paiement"
+          />
         </div>
 
         {/* Mode renvoi (7.2) : Bandeau danger en haut */}

@@ -225,7 +225,7 @@ function ProfileConnected({ user }: { user: User }) {
         {/* En-tête */}
         <m.header
           variants={fadeUp}
-          className="flex items-center gap-4 bg-ink px-page pt-safe pb-6 text-white lg:rounded-[var(--radius-md)] lg:p-6"
+          className="flex items-center gap-4 bg-ink px-page pb-6 text-white lg:rounded-[var(--radius-md)] lg:p-6"
         >
           <div className="mt-6 flex w-full items-center gap-4 lg:mt-0">
             <span

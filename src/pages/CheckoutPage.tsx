@@ -17,6 +17,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { FormProvider, useForm, useWatch } from 'react-hook-form';
 import { Navigate, useBlocker, useNavigate } from 'react-router';
+import { BackButton } from '@/components/ui/BackButton';
 import { Button } from '@/components/ui/Button';
 import { Container, Price } from '@/components/ui/Primitives';
 import { SmartImage } from '@/components/ui/SmartImage';
@@ -45,6 +46,7 @@ import {
   type ReservationFormValues,
 } from '@/features/reservation/schema/reservationSchema';
 import { ApiError } from '@/lib/api/client';
+import { useBlockAppUpdate } from '@/lib/hooks/useBlockAppUpdate';
 import { useOnlineStatus } from '@/lib/hooks/useOnlineStatus';
 import { cn } from '@/lib/utils/cn';
 import { haptic } from '@/lib/utils/haptics';
@@ -273,6 +275,8 @@ export function CheckoutPage() {
   );
 
   const isSending = createReservation.isPending || isSubmitting;
+  // Aucune mise à jour de l'application pendant la création de la réservation (M6 §4.7)
+  useBlockAppUpdate(isSending);
 
   // Bloque la navigation retour pendant l'envoi de la réservation (§7.1)
   const blocker = useBlocker(isSending && !confirmedRef);
@@ -537,6 +541,8 @@ export function CheckoutPage() {
 
       <Container className="py-6 lg:py-10">
         <div className="mb-6">
+          {/* Retour (M6 §8) : écran précédent de l'app, sinon le panier (HYPOTHÈSE: parent logique) */}
+          <BackButton fallback="/panier" className="mb-2 flex w-fit lg:hidden" />
           <span className="text-label text-text-2">ÉTAPE 1 SUR 3</span>
           <h1 className="mt-1 text-h1 text-ink">FINALISER LA RÉSERVATION</h1>
         </div>

@@ -2,6 +2,7 @@ import { ArrowRight, Smartphone } from 'lucide-react';
 import { AnimatePresence } from 'motion/react';
 import * as m from 'motion/react-m';
 import { useEffect } from 'react';
+import { BackButton } from '@/components/ui/BackButton';
 import { Button } from '@/components/ui/Button';
 import { Container } from '@/components/ui/Primitives';
 import { ProductCard, ProductCardSkeleton } from '@/components/ui/ProductCard';
@@ -51,6 +52,8 @@ export function FavoritesPage() {
   return (
     <div className="min-h-dvh bg-white py-6 lg:py-10">
       <Container>
+        {/* Retour (M6 §8) : écran précédent de l'app, sinon le profil (HYPOTHÈSE: parent logique, onglet Profil) */}
+        <BackButton fallback="/profil" className="mb-2 lg:hidden" />
         {/* En-tête : Titre + Compteur (§8.1) */}
         <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-silver/70 pb-4">
           <div className="flex items-baseline gap-3">

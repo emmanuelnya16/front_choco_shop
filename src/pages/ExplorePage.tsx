@@ -367,7 +367,7 @@ export function ExplorePage() {
       </Container>
 
       {/* Barre de filtres et tri collante sur mobile (§5.1) */}
-      <div className="sticky top-[var(--header-h)] z-sticky mt-2 border-b border-silver/60 bg-white/95 py-2.5 backdrop-blur-md lg:hidden">
+      <div className="sticky top-[calc(var(--header-h)+env(safe-area-inset-top,0px))] z-sticky mt-2 border-b border-silver/60 bg-white/95 py-2.5 backdrop-blur-md lg:hidden">
         <Container className="no-scrollbar flex items-center gap-2 overflow-x-auto">
           <button
             type="button"
@@ -672,7 +672,7 @@ export function ExplorePage() {
               })
             }
             aria-label="Remonter en haut de la page"
-            className="fixed bottom-[calc(var(--bottom-nav-h)+18px)] left-4 z-sticky inline-flex min-h-[42px] items-center gap-1.5 rounded-[var(--radius-full)] bg-ink px-4 py-2 text-xs font-bold text-white shadow-[var(--shadow-sheet)] lg:bottom-6 lg:left-6"
+            className="fixed bottom-[calc(var(--bottom-nav-h)+18px+env(safe-area-inset-bottom,0px))] left-4 z-sticky inline-flex min-h-[42px] items-center gap-1.5 rounded-[var(--radius-full)] bg-ink px-4 py-2 text-xs font-bold text-white shadow-[var(--shadow-sheet)] lg:bottom-6 lg:left-6"
           >
             <ArrowUp className="h-3.5 w-3.5" aria-hidden="true" />
             <span>Remonter</span>

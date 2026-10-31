@@ -15,7 +15,10 @@ import { useIsOfflineChunkError } from '@/features/offline/useOfflineChunkError'
 import { PendingReservationBanner } from '@/features/reservation/components/PendingReservationBanner';
 import { PackageReadyNotifier } from '@/features/tracking/components/PackageReadyNotifier';
 import { refreshSessionSilently } from '@/lib/api/client';
+import { useForegroundRefresh } from '@/lib/hooks/useForegroundRefresh';
 import { useNetworkRecoveryToast } from '@/lib/hooks/useOnlineStatus';
+import { SplashScreen } from '@/pwa/SplashScreen';
+import { UpdateBanner } from '@/pwa/UpdateBanner';
 import { useUiStore } from '@/stores/uiStore';
 
 const LazyCartDrawer = lazy(() =>
@@ -40,6 +43,7 @@ export function RouteLoadingBar() {
       <div className="h-1 w-full overflow-hidden bg-surface">
         <div className="h-full w-1/2 animate-pulse bg-ink" />
       </div>
+      <SplashScreen />
     </div>
   );
 }
@@ -81,6 +85,8 @@ export function RootLayout() {
   const isAuthSheetOpen = useUiStore((s) => s.isAuthSheetOpen);
 
   useNetworkRecoveryToast();
+  // Retour sur l'app après plus d'une heure : les données affichées sont rechargées (M6 §8)
+  useForegroundRefresh();
 
   // Rafraîchissement silencieux de la session (§5.5) : au démarrage, au retour du réseau et au
   // retour sur l'app. Une coupure garde le client connecté (M6 §6) ; seul un refus du serveur
@@ -124,6 +130,8 @@ export function RootLayout() {
       <BottomNav />
       <FloatingWhatsApp />
       <Toaster />
+      <UpdateBanner />
+      <SplashScreen />
       <PackageReadyNotifier />
       <NotificationsBridge />
       <FlyToCartLayer />

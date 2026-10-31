@@ -56,7 +56,7 @@ export function FloatingWhatsApp() {
           : { ...spring.bounce, delay: 1.5 }
       }
       className={cn(
-        'fixed right-4 bottom-[calc(var(--bottom-nav-h)+16px)] z-30 h-[52px] w-[52px] items-center justify-center rounded-full border border-white/15 bg-ink text-white shadow-[var(--shadow-pop)] transition-colors hover:bg-ink-2 lg:right-6 lg:bottom-6',
+        'fixed right-4 bottom-[calc(var(--bottom-nav-h)+16px+env(safe-area-inset-bottom,0px))] z-30 h-[52px] w-[52px] items-center justify-center rounded-full border border-white/15 bg-ink text-white shadow-[var(--shadow-pop)] transition-colors hover:bg-ink-2 lg:right-6 lg:bottom-6',
         // Masqué sur mobile dans la fiche produit (§7.1) pour laisser toute la place à la barre d'action collante
         isProductRoute ? 'hidden lg:flex' : 'flex',
       )}

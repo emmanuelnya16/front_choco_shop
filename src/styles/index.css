@@ -144,6 +144,51 @@
     touch-action: manipulation;
   }
 
+  /*
+   * Coquille — un seul système de décalage pour les éléments fixés en bas de l'écran mobile.
+   * Du bas vers le haut, sans chevauchement :
+   *   1. barre basse OU barre d'action collante d'une page (--bottom-bar-h, zone de sécurité comprise) ;
+   *   2. bandeau rouge « réservation en attente / paiement non validé » (--pending-banner-h) ;
+   *   3. bandeau « nouvelle version » (--update-banner-h, écart de 12 px compris) ;
+   *   4. bouton WhatsApp flottant (--floating-button-h : 52 px + 16 px d'écart) ;
+   *   5. toasts.
+   * Les hauteurs fixes sont posées ici (:has), les hauteurs variables (barres d'action, bandeau de
+   * mise à jour) sont mesurées et posées en ligne sur <html> par useBottomInsets (BottomNav).
+   * Ordinateur : --desktop-shell-top = hauteur collante en haut (en-tête replié 72 px, + bandeau
+   * rouge 52 px s'il est affiché), à utiliser pour les panneaux collants (lg:top-[…]).
+   */
+  :root {
+    --bottom-bar-h: env(safe-area-inset-bottom, 0px);
+    --pending-banner-h: 0px;
+    --update-banner-h: 0px;
+    --floating-button-h: 0px;
+    --desktop-shell-top: 72px;
+  }
+
+  @media (width < 64rem) {
+    :root:has(.bottom-nav) {
+      --bottom-bar-h: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom, 0px));
+    }
+
+    :root:has([data-pending-banner='all']) {
+      --pending-banner-h: 52px;
+    }
+
+    :root:has([data-floating-whatsapp='all']) {
+      --floating-button-h: 68px;
+    }
+  }
+
+  @media (width >= 64rem) {
+    :root:has([data-floating-whatsapp]) {
+      --floating-button-h: 68px;
+    }
+
+    :root:has([data-pending-banner]) {
+      --desktop-shell-top: 124px;
+    }
+  }
+
   /* Champ de recherche de l'en-tête : saisie et sélection normales (iOS bloque sinon la saisie) */
   .site-header input {
     -webkit-user-select: text;
@@ -374,7 +419,7 @@
 /*
  * M6 §4.7 — Bandeau « Une nouvelle version est disponible » sur mobile : quand le bandeau
  * « réservation en attente de paiement » (collé au-dessus de la barre basse, 52 px) est affiché,
- * il se place au-dessus de lui au lieu de recouvrir son bouton d'action.
+ * il se place au-dessus de lui au lieu de recouvrir son bouton d'action (pile du bas, voir :root).
  */
 @media (width < 64rem) {
   body:has(
@@ -382,6 +427,28 @@
       [role='region'][aria-label='Paiement de réservation non validé']
     )
     .update-banner {
-    bottom: calc(var(--bottom-nav-h) + 52px + 12px + env(safe-area-inset-bottom, 0px));
+    bottom: calc(var(--bottom-bar-h) + var(--pending-banner-h) + 12px);
+  }
+}
+
+/*
+ * Toasts pendant qu'une feuille ou une fenêtre est ouverte : jamais sur son bouton principal.
+ * Mobile : les feuilles montent du bas, les toasts passent en haut de l'écran.
+ * Ordinateur : le panier s'ouvre à droite et les fenêtres au centre, les toasts passent en bas à
+ * gauche (au-dessus du bandeau de mise à jour s'il est affiché).
+ */
+@media (width < 64rem) {
+  body:has([role='dialog'][aria-modal='true']) .toaster {
+    top: calc(env(safe-area-inset-top, 0px) + 12px);
+    bottom: auto;
+  }
+}
+
+@media (width >= 64rem) {
+  body:has([role='dialog'][aria-modal='true']) .toaster {
+    right: auto;
+    bottom: calc(1.5rem + var(--update-banner-h));
+    left: 1.5rem;
+    align-items: flex-start;
   }
 }

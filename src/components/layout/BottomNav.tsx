@@ -8,6 +8,7 @@ import {
   User,
 } from 'lucide-react';
 import { Link, useLocation } from 'react-router';
+import { useBottomInsets } from '@/components/layout/bottomInsets';
 import { isBottomNavHidden } from '@/components/layout/bottomNavVisibility';
 import { AttentionDot } from '@/features/tracking/components/AttentionDot';
 import { useReservationsAttention } from '@/features/tracking/useReservationsAttention';
@@ -58,6 +59,8 @@ export function BottomNav() {
   const cartBounceTick = useUiStore((s) => s.cartBounceTick);
   const reducedMotion = useReducedMotionPref();
   const { needsAttention } = useReservationsAttention();
+  // Hauteurs variables de la pile du bas de l'écran (barres d'action des pages, bandeau de mise à jour)
+  useBottomInsets();
 
   // Masqué sur la fiche produit, le parcours de réservation/paiement/preuve et le panier non vide pour laisser place à la barre d'action collante
   // `/reservation` et `/reservation/:ref/*` seulement : « Mes réservations » (`/reservations`) garde la barre (M5).

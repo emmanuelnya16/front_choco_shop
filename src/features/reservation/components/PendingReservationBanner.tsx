@@ -4,6 +4,7 @@ import { AlertCircle, Clock, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router';
 import { Button } from '@/components/ui/Button';
+import { isReservationPath } from '@/components/layout/bottomNavVisibility';
 import { Container } from '@/components/ui/Primitives';
 import { usePendingReservations } from '@/features/reservation/api/useReservationQueries';
 import { cn } from '@/lib/utils/cn';
@@ -99,11 +100,8 @@ export function PendingReservationBanner() {
 
   // Masqué sur les écrans de réservation, paiement, preuve et merci (§7.4), et volontairement aussi sur
   // « Mes réservations » (`/reservations…`) dont les cartes et le bloc d'action montrent déjà le paiement attendu (M5).
-  const isHiddenRoute =
-    location.pathname.startsWith('/reservation') ||
-    location.pathname.includes('/paiement') ||
-    location.pathname.includes('/preuve') ||
-    location.pathname.includes('/merci');
+  // Correspondance exacte des routes : la page d'aide « Paiement Mobile Money » garde le bandeau.
+  const isHiddenRoute = isReservationPath(location.pathname);
 
   const isEligibleStatus =
     activeReservation?.status === 'reserved' ||
@@ -130,14 +128,17 @@ export function PendingReservationBanner() {
     return null;
   }
 
-  const isBottomNavHidden =
-    location.pathname.startsWith('/produit/') ||
-    location.pathname === '/panier';
+  // Fiche produit sur mobile : toute la place revient à la barre d'action collante (même règle que le
+  // bouton WhatsApp, §7.1). Ailleurs, y compris sur le panier vide ou rempli, le bandeau reste visible.
+  const hiddenOnMobile = location.pathname.startsWith('/produit/');
 
   return (
     <AnimatePresence>
       <m.div
         key={`${activeReservation.ref}-${activeReservation.status}`}
+        // Pile du bas de l'écran mobile (index.css) : réserve 52 px au-dessus de la barre basse ou
+        // de la barre d'action, sous le bouton WhatsApp, le bandeau de mise à jour et les toasts
+        data-pending-banner={hiddenOnMobile ? 'desktop' : 'all'}
         role="region"
         aria-label={
           isRejected
@@ -151,14 +152,14 @@ export function PendingReservationBanner() {
         className={cn(
           'z-30 text-white shadow-[var(--shadow-pop)]',
           isRejected ? 'bg-danger' : 'bg-ink',
-          // Mobile : collé au-dessus de BottomNav ; Ordinateur : sous l'en-tête
-          'fixed right-0 left-0 lg:sticky lg:top-[72px] lg:bottom-auto',
-          isBottomNavHidden
-            ? 'bottom-0'
-            : 'bottom-[calc(var(--bottom-nav-h)+env(safe-area-inset-bottom))]',
+          // Mobile : collé au-dessus de la barre basse ou de la barre d'action de la page (panier rempli) ;
+          // Ordinateur : sous la 1re rangée de l'en-tête (72 px une fois la 2e rangée repliée)
+          'fixed right-0 bottom-[var(--bottom-bar-h)] left-0 lg:sticky lg:top-[72px] lg:bottom-auto',
+          hiddenOnMobile && 'max-lg:hidden',
         )}
       >
-        <Container className="flex min-h-[52px] items-center justify-between gap-3 py-2">
+        {/* 52 px de haut (--pending-banner-h) : bouton de 44 px + 2 × 4 px */}
+        <Container className="flex h-[52px] items-center justify-between gap-3 py-1">
           <div className="flex min-w-0 items-center gap-2 text-xs sm:text-small">
             {isRejected ? (
               <AlertCircle
@@ -203,6 +204,8 @@ export function PendingReservationBanner() {
             <Button
               variant={isRejected ? 'dark' : 'primary'}
               size="sm"
+              // Cible tactile de 44 px
+              className="min-h-11"
               href={
                 isRejected
                   ? `/reservation/${activeReservation.ref}/preuve`

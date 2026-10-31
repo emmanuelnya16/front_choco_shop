@@ -134,9 +134,10 @@ export function PlaceholderPage({
 
       {/* Répertoire de vérification rapide de toutes les routes de la section 9.2 */}
       <section className="mt-10" aria-labelledby="routes-directory-heading">
-        <div className="flex items-center justify-between gap-4">
+        {/* Le texte de droite passe sous le titre quand la place manque ; l'icône garde sa taille */}
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
           <div className="flex items-center gap-2">
-            <Compass className="h-5 w-5 text-ink" aria-hidden="true" />
+            <Compass className="h-5 w-5 shrink-0 text-ink" aria-hidden="true" />
             <h2 id="routes-directory-heading" className="text-h2 text-ink">
               Toutes les routes client (Section 9.2)
             </h2>

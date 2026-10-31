@@ -106,18 +106,22 @@ export function AppHeader() {
   const isProductDetailPage = location.pathname.startsWith('/produit/');
   const isSearchPage = location.pathname.startsWith('/recherche');
   const isMobileTransparent = isHomePage && !isPast40;
+  // Ordinateur : 2e rangée repliée au-delà de 80 px de défilement (sauf méga-menu ouvert)
+  const isRow2Folded = isPast80 && !isMegaMenuOpen;
 
   const handleSearchSubmit = (e: FormEvent) => {
     e.preventDefault();
     const trimmed = searchQuery.trim();
-    setSearchDropdownOpenPath(null);
     if (trimmed) {
+      setSearchDropdownOpenPath(null);
       addRecentSearch(trimmed);
       navigate(`/explorer?q=${encodeURIComponent(trimmed)}`, {
         viewTransition: true,
       });
     } else {
-      navigate('/recherche', { viewTransition: true });
+      // Sans texte : les suggestions restent ouvertes sous le champ (l'écran plein écran
+      // /recherche est pensé pour le mobile)
+      setSearchDropdownOpenPath(location.pathname);
     }
   };
 
@@ -147,19 +151,24 @@ export function AppHeader() {
 
   return (
     <>
-      {/* Desktop Header (lg and above) */}
-      <header className="site-header sticky top-0 z-40 hidden bg-white lg:block">
+      {/*
+        Desktop Header (lg and above) : seule la rangée 1 (72 px) occupe la place de l'élément
+        collant. La rangée 2 (48 px) est superposée juste dessous, hors du flux : repliée, elle
+        libère vraiment la place (contenu, bandeau en lg:top-[72px], panneaux lg:top-24).
+      */}
+      <header className="site-header sticky top-0 z-40 hidden lg:block">
         {/* Row 1: 72px */}
         <div
           className={cn(
             'relative z-20 h-[72px] bg-white transition-shadow duration-250',
-            isPast80 && !isMegaMenuOpen && 'shadow-[var(--shadow-header)]',
+            isRow2Folded && 'shadow-[var(--shadow-header)]',
           )}
         >
           <Container className="flex h-full items-center justify-between gap-6">
             <Logo variant="dark" size="md" />
 
-            <div className="relative w-[360px]">
+            {/* Sur /recherche, la page a déjà son champ : celui de l'en-tête s'efface (place gardée) */}
+            <div className={cn('relative w-[360px]', isSearchPage && 'invisible')}>
               <form
                 onSubmit={handleSearchSubmit}
                 role="search"
@@ -246,12 +255,16 @@ export function AppHeader() {
           </Container>
         </div>
 
-        {/* Row 2: 48px — folds via transform & opacity when scrolled > 80px */}
+        {/*
+          Row 2: 48px, superposée sous la rangée 1 (absolute top-full) — se replie derrière elle par
+          transform & opacity au-delà de 80 px de défilement ; se redéploie si le clavier y entre.
+        */}
         <div
+          data-header-row2=""
           className={cn(
-            'relative z-10 h-12 origin-top border-t border-b border-silver/60 bg-white transition-[transform,opacity] duration-250 ease-out',
-            isPast80 && !isMegaMenuOpen
-              ? 'pointer-events-none -translate-y-full scale-y-0 opacity-0'
+            'absolute inset-x-0 top-full z-10 h-12 origin-top border-t border-b border-silver/60 bg-white transition-[transform,opacity] duration-250 ease-out',
+            isRow2Folded
+              ? 'pointer-events-none -translate-y-full scale-y-0 opacity-0 focus-within:pointer-events-auto focus-within:translate-y-0 focus-within:scale-y-100 focus-within:opacity-100'
               : 'translate-y-0 scale-y-100 opacity-100',
           )}
         >
@@ -334,6 +347,9 @@ export function AppHeader() {
           )}
         </div>
       </header>
+
+      {/* Cale ordinateur : place de la rangée 2 en haut de page, défile avec la page */}
+      <div aria-hidden="true" className="hidden h-12 lg:block" />
 
       {/* Mobile Header (below lg) — masqué sur la fiche produit (§7.1) et sur la page recherche plein écran */}
       {!isProductDetailPage && !isSearchPage && (

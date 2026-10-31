@@ -61,7 +61,9 @@ export function AppFooter() {
   };
 
   return (
-    <footer className="bg-ink text-silver pb-[calc(var(--bottom-nav-h)+env(safe-area-inset-bottom,0px))] lg:pb-0">
+    // Mobile : place réservée sous le pied de page pour la pile du bas (barre basse ou barre d'action,
+    // bandeau rouge, bandeau de mise à jour — index.css) ; tout en bas, rien n'est caché
+    <footer className="bg-ink text-silver pb-[calc(var(--bottom-bar-h)+var(--pending-banner-h)+var(--update-banner-h))] lg:pb-0">
       <Container className="py-12 lg:py-16">
         {/* Top Row */}
         <div className="flex flex-col items-start justify-between gap-6 border-b border-white/10 pb-10 lg:flex-row lg:items-center">
@@ -98,7 +100,7 @@ export function AppFooter() {
                   type="button"
                   onClick={() => toggleSection(section.id)}
                   aria-expanded={isOpen}
-                  className="flex w-full items-center justify-between py-2 text-left text-label text-white lg:pointer-events-none lg:py-0"
+                  className="flex min-h-11 w-full items-center justify-between py-2 text-left text-label text-white lg:pointer-events-none lg:min-h-0 lg:py-0"
                 >
                   <span>{section.title}</span>
                   <ChevronDown
@@ -112,7 +114,8 @@ export function AppFooter() {
 
                 <ul
                   className={cn(
-                    'mt-3 space-y-2.5 lg:mt-4 lg:block',
+                    // Mobile : liens de 44 px de haut, sans espace en plus entre eux
+                    'mt-1 lg:mt-4 lg:block lg:space-y-2.5',
                     isOpen ? 'block pb-2' : 'hidden',
                   )}
                 >
@@ -120,7 +123,7 @@ export function AppFooter() {
                     <li key={link.label}>
                       <Link
                         to={link.to}
-                        className="text-small text-silver transition-colors hover:text-white"
+                        className="inline-flex min-h-11 items-center text-small text-silver transition-colors hover:text-white lg:min-h-0"
                       >
                         {link.label}
                       </Link>
@@ -137,7 +140,7 @@ export function AppFooter() {
               type="button"
               onClick={() => toggleSection('boutique')}
               aria-expanded={openAccordion === 'boutique'}
-              className="flex w-full items-center justify-between py-2 text-left text-label text-white lg:pointer-events-none lg:py-0"
+              className="flex min-h-11 w-full items-center justify-between py-2 text-left text-label text-white lg:pointer-events-none lg:min-h-0 lg:py-0"
             >
               <span>Boutique</span>
               <ChevronDown
@@ -173,8 +176,8 @@ export function AppFooter() {
           </div>
         </div>
 
-        {/* Bottom Row */}
-        <div className="mt-8 flex flex-col items-start justify-between gap-4 border-t border-white/10 pt-8 sm:flex-row sm:items-center">
+        {/* Bottom Row — dès 640 px, les pastilles s'arrêtent avant la colonne du bouton WhatsApp flottant */}
+        <div className="mt-8 flex flex-col items-start justify-between gap-4 border-t border-white/10 pt-8 sm:flex-row sm:items-center sm:pr-14">
           <p className="text-xs text-silver">
             © 2026 DR Choco L&apos;Incompris. Tous droits réservés.
           </p>

@@ -69,8 +69,9 @@ export function UpdateBanner() {
           exit={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 16 }}
           transition={{ duration: duration.base, ease: ease.out }}
           className={cn(
-            // update-banner : remonté au-dessus du bandeau « réservation en attente » (index.css)
-            'update-banner fixed right-4 bottom-[calc(var(--bottom-nav-h)+12px+env(safe-area-inset-bottom,0px))] left-4 z-overlay mx-auto max-w-md items-center gap-3 rounded-[var(--radius-md)] bg-ink py-2.5 pr-2 pl-4 text-white shadow-[var(--shadow-sheet)] lg:right-auto lg:bottom-6 lg:left-6 lg:mx-0 lg:w-[400px]',
+            // update-banner : remonté au-dessus du bandeau « réservation en attente » (index.css) ; sa
+            // hauteur est mesurée (--update-banner-h) pour placer le bouton WhatsApp et les toasts au-dessus
+            'update-banner fixed right-4 bottom-[calc(var(--bottom-bar-h)+12px)] left-4 z-overlay mx-auto max-w-md items-center gap-3 rounded-[var(--radius-md)] bg-ink py-2.5 pr-2 pl-4 text-white shadow-[var(--shadow-sheet)] lg:right-auto lg:bottom-6 lg:left-6 lg:mx-0 lg:w-[400px]',
             hiddenOnMobile ? 'hidden lg:flex' : 'flex',
           )}
         >

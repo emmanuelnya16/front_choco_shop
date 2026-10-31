@@ -1,9 +1,11 @@
 import * as m from 'motion/react-m';
 import { useLocation } from 'react-router';
+import { hasMobileActionBar, isPaymentStepPath } from '@/components/layout/bottomNavVisibility';
 import { usePublicSettings } from '@/features/catalog/api/useCatalogQueries';
 import { cn } from '@/lib/utils/cn';
 import { spring } from '@/motion/tokens';
 import { useReducedMotionPref } from '@/motion/useReducedMotionPref';
+import { selectCartCount, useCartStore } from '@/stores/cartStore';
 
 export function WhatsAppIcon({ className = 'h-6 w-6' }: { className?: string }) {
   return (
@@ -27,14 +29,14 @@ export function FloatingWhatsApp() {
   const location = useLocation();
   const reducedMotion = useReducedMotionPref();
   const { data: settings } = usePublicSettings();
+  const cartCount = useCartStore(selectCartCount);
 
-  const isPaymentRoute =
-    location.pathname.includes('/paiement') ||
-    location.pathname.includes('/preuve');
+  // Correspondance exacte : la page d'aide « Paiement Mobile Money » garde le bouton
+  if (isPaymentStepPath(location.pathname)) return null;
 
-  const isProductRoute = location.pathname.startsWith('/produit/');
-
-  if (isPaymentRoute) return null;
+  // Masqué sur mobile quand une barre d'action collante remplace la barre basse (fiche produit §7.1,
+  // finalisation de la réservation, panier non vide) : toute la place lui revient
+  const hiddenOnMobile = hasMobileActionBar(location.pathname, cartCount);
 
   const rawNumber = settings?.whatsappNumber ?? '+237690000000';
   const cleanNumber = rawNumber.replace(/[^0-9]/g, '');
@@ -55,10 +57,11 @@ export function FloatingWhatsApp() {
           ? { duration: 0 }
           : { ...spring.bounce, delay: 1.5 }
       }
+      // Pile du bas (index.css) : au-dessus de la barre basse, du bandeau rouge et du bandeau de mise à jour
+      data-floating-whatsapp={hiddenOnMobile ? 'desktop' : 'all'}
       className={cn(
-        'fixed right-4 bottom-[calc(var(--bottom-nav-h)+16px+env(safe-area-inset-bottom,0px))] z-30 h-[52px] w-[52px] items-center justify-center rounded-full border border-white/15 bg-ink text-white shadow-[var(--shadow-pop)] transition-colors hover:bg-ink-2 lg:right-6 lg:bottom-6',
-        // Masqué sur mobile dans la fiche produit (§7.1) pour laisser toute la place à la barre d'action collante
-        isProductRoute ? 'hidden lg:flex' : 'flex',
+        'fixed right-4 bottom-[calc(var(--bottom-bar-h)+var(--pending-banner-h)+var(--update-banner-h)+16px)] z-30 h-[52px] w-[52px] items-center justify-center rounded-full border border-white/15 bg-ink text-white shadow-[var(--shadow-pop)] transition-colors hover:bg-ink-2 lg:right-6 lg:bottom-6',
+        hiddenOnMobile ? 'hidden lg:flex' : 'flex',
       )}
     >
       <WhatsAppIcon className="h-6 w-6" />

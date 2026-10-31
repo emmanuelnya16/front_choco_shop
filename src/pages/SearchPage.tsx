@@ -163,9 +163,12 @@ export function SearchPage() {
       transition={{ duration: 0.38, ease: [0.22, 1, 0.36, 1] }}
       className="min-h-dvh bg-ink pb-24 text-white"
     >
-      {/* Barre de recherche en haut (52 px de haut, §6.1) */}
-      <div className="sticky top-0 z-sticky border-b border-white/10 bg-ink/95 pt-[calc(12px+env(safe-area-inset-top,0px))] pb-3 backdrop-blur-md">
-        <Container className="flex items-center gap-3">
+      {/*
+        Barre de recherche en haut (52 px de haut, §6.1). Ordinateur : collée sous l'en-tête replié
+        (et sous le bandeau de réservation s'il est affiché), colonne de lecture de 768 px.
+      */}
+      <div className="sticky top-0 z-sticky border-b border-white/10 bg-ink/95 pt-[calc(12px+env(safe-area-inset-top,0px))] pb-3 backdrop-blur-md lg:top-[var(--desktop-shell-top)]">
+        <Container className="flex items-center gap-3 lg:max-w-3xl">
           <button
             type="button"
             onClick={handleCancel}
@@ -196,9 +199,14 @@ export function SearchPage() {
                 setActiveIndex(-1);
               }}
               onKeyDown={handleKeyDown}
-              placeholder="Rechercher un t-shirt, une babouche, une taille…"
+              // Texte indicatif court : lisible en entier dès 360 px
+              placeholder="Rechercher un article…"
               aria-label="Rechercher un article dans le catalogue"
-              className="h-[52px] w-full rounded-[var(--radius-md)] border border-white/15 bg-ink-2 pr-11 pl-12 text-body text-white placeholder:text-grey focus:border-white focus:outline-none"
+              className={cn(
+                'h-[52px] w-full rounded-[var(--radius-md)] border border-white/15 bg-ink-2 pl-12 text-body text-white placeholder:text-grey focus:border-white focus:outline-none',
+                // Place du bouton d'effacement seulement quand il est affiché
+                query.length > 0 ? 'pr-12' : 'pr-4',
+              )}
             />
             {query.length > 0 && (
               <button
@@ -209,7 +217,7 @@ export function SearchPage() {
                   inputRef.current?.focus();
                 }}
                 aria-label="Effacer la saisie"
-                className="absolute top-1/2 right-3 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-[var(--radius-full)] text-silver hover:text-white"
+                className="absolute top-1/2 right-1 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-[var(--radius-full)] text-silver hover:text-white"
               >
                 <X className="h-4 w-4" aria-hidden="true" />
               </button>
@@ -219,14 +227,14 @@ export function SearchPage() {
           <button
             type="button"
             onClick={handleCancel}
-            className="hidden shrink-0 px-2 py-2 text-small font-bold text-silver hover:text-white lg:inline-flex"
+            className="hidden min-h-11 shrink-0 items-center px-2 text-small font-bold text-silver hover:text-white lg:inline-flex"
           >
             Annuler
           </button>
         </Container>
       </div>
 
-      <Container className="pt-6">
+      <Container className="pt-6 lg:max-w-3xl">
         {/* Recherche en direct bloquée hors connexion, avec explication (M6 §6.3) */}
         {!isOnline && (
           <p
@@ -253,7 +261,7 @@ export function SearchPage() {
                   <button
                     type="button"
                     onClick={clearRecent}
-                    className="text-xs font-bold text-white underline underline-offset-2 hover:text-silver"
+                    className="-mr-2 inline-flex min-h-11 items-center px-2 text-xs font-bold text-white underline underline-offset-2 hover:text-silver"
                   >
                     Effacer
                   </button>
@@ -263,12 +271,12 @@ export function SearchPage() {
                   {recentSearches.map((item) => (
                     <li
                       key={item}
-                      className="flex items-center justify-between py-2.5"
+                      className="flex items-center justify-between"
                     >
                       <button
                         type="button"
                         onClick={() => handleSelectTerm(item)}
-                        className="flex flex-1 items-center gap-3 text-left text-body text-white hover:text-silver"
+                        className="flex min-h-11 flex-1 items-center gap-3 text-left text-body text-white hover:text-silver"
                       >
                         <Clock className="h-4 w-4 text-grey" aria-hidden="true" />
                         <span>{item}</span>
@@ -277,7 +285,7 @@ export function SearchPage() {
                         type="button"
                         onClick={() => removeRecent(item)}
                         aria-label={`Supprimer ${item} de l'historique`}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-[var(--radius-full)] text-grey hover:text-white"
+                        className="-mr-2.5 inline-flex h-11 w-11 items-center justify-center rounded-[var(--radius-full)] text-grey hover:text-white"
                       >
                         <X className="h-4 w-4" aria-hidden="true" />
                       </button>

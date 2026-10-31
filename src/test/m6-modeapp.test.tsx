@@ -10,6 +10,8 @@ import {
   useNavigate,
   type RouteObject,
 } from 'react-router';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppProviders } from '@/app/providers';
 import { BackButton } from '@/components/ui/BackButton';
@@ -668,7 +670,11 @@ describe('M6 · modeapp · 5. Liens externes, zones de sécurité, premier plan'
       </>,
     );
     const toastRegion = (await screen.findByText('Ajouté au panier')).closest('[aria-live]');
-    expect(toastRegion?.className).toContain('env(safe-area-inset-bottom,0px)');
+    // Pile commune du bas d'écran : les toasts partent de --bottom-bar-h, qui contient la zone sûre
+    expect(toastRegion?.className).toContain('var(--bottom-bar-h)');
+    const css = readFileSync(resolve(process.cwd(), 'src/styles/index.css'), 'utf8');
+    expect(css).toContain('--bottom-bar-h: env(safe-area-inset-bottom, 0px);');
+    expect(css).toContain('--bottom-bar-h: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom, 0px));');
     const panel = screen.getByRole('heading', { name: 'Zone sûre' }).closest('.z-10');
     expect(panel?.className).toContain('pb-[calc(20px+env(safe-area-inset-bottom,0px))]');
     expect(panel?.className).not.toMatch(/(^|\s)pb-safe(\s|$)/);

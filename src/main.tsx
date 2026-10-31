@@ -4,6 +4,8 @@ import '@/styles/index.css';
 
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
+// Avant App : le paramètre ?source=pwa est retiré de l'adresse avant la création du routeur (M6 §5.5)
+import { initInstallService } from '@/pwa/installService';
 import { App } from '@/app/App';
 import { env } from '@/lib/env';
 import { registerServiceWorker, unregisterPwaServiceWorkers } from '@/pwa/registerSW';
@@ -29,6 +31,9 @@ const rootElement = document.getElementById('root');
 if (!rootElement) {
   throw new Error('Élément id="root" introuvable dans index.html');
 }
+
+// Installation : beforeinstallprompt part tôt, l'écouteur est posé avant le rendu (M6 §5.1)
+initInstallService();
 
 enableMocking()
   .catch((err) => {

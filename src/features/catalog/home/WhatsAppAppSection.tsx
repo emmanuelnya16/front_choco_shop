@@ -4,14 +4,15 @@ import { WhatsAppIcon } from '@/components/layout/FloatingWhatsApp';
 import { Button } from '@/components/ui/Button';
 import { Container } from '@/components/ui/Primitives';
 import { usePublicSettings } from '@/features/catalog/api/useCatalogQueries';
+import { InstallSheets } from '@/features/install/InstallSheets';
+import { useInstallController } from '@/features/install/useInstallController';
 import { gsap, SplitText, useGSAP } from '@/lib/gsap';
 import { useReducedMotionPref } from '@/motion/useReducedMotionPref';
-import { useToastStore } from '@/stores/toastStore';
 
 const PWA_BENEFITS = [
   'Accès en un appui',
   'Suivi de vos réservations',
-  'Alertes nouveautés',
+  'Alerte dès que votre colis est prêt',
 ];
 
 export function WhatsAppAppSection() {
@@ -19,7 +20,7 @@ export function WhatsAppAppSection() {
   const titleRef = useRef<HTMLHeadingElement>(null);
   const reducedMotion = useReducedMotionPref();
   const { data: settings } = usePublicSettings();
-  const showToast = useToastStore((s) => s.show);
+  const install = useInstallController('home');
 
   const rawNumber = settings?.whatsappNumber ?? '+237690000000';
   const cleanNumber = rawNumber.replace(/[^0-9]/g, '');
@@ -95,8 +96,8 @@ export function WhatsAppAppSection() {
               </div>
             </div>
 
-            {/* Right: PWA Install Card */}
-            <div className="rounded-[var(--radius-md)] border border-white/10 bg-ink-2 p-6 lg:col-span-5 lg:p-8">
+            {/* Right: PWA Install Card (masquée une fois l'application installée, M6 §5.2) */}
+            <div hidden={!install.canOffer} className="rounded-[var(--radius-md)] border border-white/10 bg-ink-2 p-6 lg:col-span-5 lg:p-8">
               <span className="text-label text-silver">Application mobile</span>
               <h3 className="mt-2 text-h3 text-white">
                 Ajoutez DR Choco à votre écran d&apos;accueil
@@ -122,12 +123,7 @@ export function WhatsAppAppSection() {
                   size="md"
                   fullWidth
                   iconLeft={<Download className="h-4 w-4" aria-hidden="true" />}
-                  onClick={() =>
-                    showToast({
-                      message:
-                        "Bientôt disponible — l'installation directe arrivera avec la coquille PWA.",
-                    })
-                  }
+                  onClick={install.open}
                 >
                   Installer l&apos;application
                 </Button>
@@ -136,6 +132,7 @@ export function WhatsAppAppSection() {
           </div>
         </div>
       </Container>
+      <InstallSheets controller={install} />
     </section>
   );
 }

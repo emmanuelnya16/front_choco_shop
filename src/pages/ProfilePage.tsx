@@ -24,6 +24,8 @@ import { Logo } from '@/components/ui/Logo';
 import { Sheet } from '@/components/ui/Sheet';
 import { useLogout } from '@/features/auth/api/useAuthQueries';
 import { usePublicSettings } from '@/features/catalog/api/useCatalogQueries';
+import { InstallSheets } from '@/features/install/InstallSheets';
+import { useInstallController } from '@/features/install/useInstallController';
 import { buildWhatsAppQuestionUrl } from '@/features/payment/whatsapp';
 import { NotificationsSheet } from '@/features/profile/components/NotificationsSheet';
 import { ProfileShell } from '@/features/profile/components/ProfileShell';
@@ -46,12 +48,6 @@ import { useUiStore } from '@/stores/uiStore';
 import type { User } from '@/types/domain';
 
 const FALLBACK_WHATSAPP = '+237690000000';
-
-function isInstalledApp(): boolean {
-  if (typeof window === 'undefined') return false;
-  const iosStandalone = (navigator as Navigator & { standalone?: boolean }).standalone === true;
-  return iosStandalone || Boolean(window.matchMedia?.('(display-mode: standalone)').matches);
-}
 
 export function ProfilePage() {
   useDocumentTitle('Mon profil');
@@ -199,7 +195,8 @@ function ProfileConnected({ user }: { user: User }) {
   const favoritesCount = useFavoritesStore(selectFavoritesCount);
   const { needsAttention, activeCount } = useReservationsAttention();
 
-  const [installed] = useState(isInstalledApp);
+  // État d'installation en direct (installée pendant la visite : la ligne disparaît, M6 §5.2)
+  const install = useInstallController('profile');
   const [notificationsState, setNotificationsState] = useState<NotificationsDisplayState>(
     getNotificationsDisplayState,
   );
@@ -310,14 +307,9 @@ function ProfileConnected({ user }: { user: User }) {
                 onClick={() => setNotificationsOpen(true)}
               />
             </li>
-            {!installed && (
+            {install.canOffer && (
               <li>
-                <SettingsRow
-                  icon={Download}
-                  label="Installer l’application"
-                  // HYPOTHÈSE: l'installation réelle (beforeinstallprompt) arrive avec le module M6.
-                  onClick={() => showToast({ message: 'Bientôt disponible : l’installation arrive avec la prochaine mise à jour.' })}
-                />
+                <SettingsRow icon={Download} label="Installer l’application" onClick={install.open} />
               </li>
             )}
           </SettingsGroup>
@@ -343,6 +335,8 @@ function ProfileConnected({ user }: { user: User }) {
           </m.p>
         </div>
       </m.div>
+
+      <InstallSheets controller={install} />
 
       <NotificationsSheet
         open={notificationsOpen}

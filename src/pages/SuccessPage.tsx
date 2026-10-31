@@ -12,6 +12,10 @@ import * as m from 'motion/react-m';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router';
 import { Button } from '@/components/ui/Button';
+import { InstallSheets } from '@/features/install/InstallSheets';
+import { SuccessInstallCard } from '@/features/install/SuccessInstallCard';
+import { useInstallController } from '@/features/install/useInstallController';
+import { useSuccessInstallOffer } from '@/features/install/useSuccessInstallOffer';
 import { pushService } from '@/features/notifications/pushService';
 import { isNetworkError } from '@/features/offline/networkErrors';
 import { OfflineScreen } from '@/features/offline/OfflineScreen';
@@ -67,6 +71,10 @@ export function SuccessPage() {
   });
 
   const isIosNotInstalled = useMemo(() => pushService.isIosWithoutHomeScreenInstall(), []);
+  // « Voir comment installer » (iPhone sans l'app) : instructions d'ajout à l'écran d'accueil (M6 §5.4)
+  const iosInstall = useInstallController('success');
+  // Carte d'installation (première preuve) : à la place de la carte iPhone des notifications (M6 §5.2)
+  const showInstallCard = useSuccessInstallOffer(ref);
 
   const isConfirmed =
     reservation?.status === 'confirmed' ||
@@ -487,7 +495,7 @@ export function SuccessPage() {
         </div>
 
         {/* 6. Carte « Être prévenu » (notifications 6.4) */}
-        {notifCardVisible ? (
+        {notifCardVisible && !(isIosNotInstalled && showInstallCard) ? (
           <section
             data-gsap="actions"
             aria-label="Notifications de suivi"
@@ -505,11 +513,7 @@ export function SuccessPage() {
                   <div className="mt-3 flex flex-wrap items-center gap-3">
                     <button
                       type="button"
-                      onClick={() => {
-                        showToast({
-                          message: 'Bientôt disponible',
-                        });
-                      }}
+                      onClick={iosInstall.open}
                       className="text-small font-bold text-ink underline underline-offset-4 hover:text-red"
                     >
                       Voir comment installer
@@ -556,6 +560,10 @@ export function SuccessPage() {
             )}
           </section>
         ) : null}
+
+        {/* Carte d'installation après la première preuve de paiement (M6 §5.2) */}
+        {showInstallCard && <SuccessInstallCard />}
+        <InstallSheets controller={iosInstall} />
 
         {/* 7. Boutons de navigation */}
         <div data-gsap="actions" className="mt-6 space-y-3">

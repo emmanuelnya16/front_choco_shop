@@ -15,6 +15,7 @@ import { HowItWorksSection } from '@/features/catalog/home/HowItWorksSection';
 import { LooksSection } from '@/features/catalog/home/LooksSection';
 import { NewArrivalsSection } from '@/features/catalog/home/NewArrivalsSection';
 import { WhatsAppAppSection } from '@/features/catalog/home/WhatsAppAppSection';
+import { InstallAutoPrompt } from '@/features/install/InstallAutoPrompt';
 
 const BENEFITS_MARQUEE_ITEMS: MarqueeItem[] = [
   { id: 'b-1', label: 'LIVRAISON PARTOUT AU CAMEROUN' },
@@ -102,6 +103,9 @@ export function HomePage() {
 
       {/* 7.11 Portés par l'Incompris */}
       <LooksSection />
+
+      {/* Feuille d'installation de deuxième visite (M6 §5.2) */}
+      <InstallAutoPrompt />
     </div>
   );
 }

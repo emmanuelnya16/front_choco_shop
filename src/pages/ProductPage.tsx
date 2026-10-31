@@ -120,7 +120,7 @@ export function ProductPage() {
             <h2 id="notfound-popular-heading" className="text-h2 text-ink">
               NOS ARTICLES POPULAIRES
             </h2>
-            <div className="mt-5 grid grid-cols-2 gap-x-3 gap-y-5 lg:grid-cols-4 lg:gap-6">
+            <div className="mt-5 grid grid-cols-2 gap-x-3 gap-y-5 md:grid-cols-4 md:gap-x-4 lg:gap-6">
               {popularFallback.items.slice(0, 4).map((p) => (
                 <ProductCard key={p.id} product={p} />
               ))}
@@ -492,7 +492,8 @@ function ProductDetailView({
     } else {
       showToast({
         message: `${product.name} ajouté au panier`,
-        subtitle: `${activeColor.name} · Taille ${selectedVariant.size}`,
+        // La taille d'abord : à 360 px, la fin du sous-titre du toast est coupée
+        subtitle: `Taille ${selectedVariant.size} · ${activeColor.name}`,
         thumbnail: fallbackSrc,
         actionLabel: 'Voir le panier',
         actionHref: '/panier',
@@ -521,13 +522,13 @@ function ProductDetailView({
             animate={{ y: '0%', opacity: 1 }}
             exit={{ y: '-100%', opacity: 0 }}
             transition={{ duration: 0.22, ease: ease.out }}
-            className="fixed top-[var(--offline-banner-h,0px)] right-0 left-0 z-header flex h-[calc(52px+env(safe-area-inset-top,0px))] items-center justify-between border-b border-silver/70 bg-white/95 px-4 pt-safe shadow-[var(--shadow-header)] backdrop-blur-md lg:hidden"
+            className="fixed top-[var(--offline-banner-h,0px)] right-0 left-0 z-header flex h-[calc(52px+env(safe-area-inset-top,0px))] items-center justify-between border-b border-silver/70 bg-white/95 px-3 pt-safe shadow-[var(--shadow-header)] backdrop-blur-md lg:hidden"
           >
             <button
               type="button"
               onClick={onBack}
               aria-label="Retour"
-              className="inline-flex h-9 w-9 items-center justify-center rounded-[var(--radius-full)] text-ink hover:bg-surface"
+              className="inline-flex h-11 w-11 items-center justify-center rounded-[var(--radius-full)] text-ink hover:bg-surface"
             >
               <ArrowLeft className="h-5 w-5" aria-hidden="true" />
             </button>
@@ -544,7 +545,7 @@ function ProductDetailView({
                 isFavorite ? 'Retirer des favoris' : 'Ajouter aux favoris'
               }
               aria-pressed={isFavorite}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-[var(--radius-full)] text-ink hover:bg-surface"
+              className="inline-flex h-11 w-11 items-center justify-center rounded-[var(--radius-full)] text-ink hover:bg-surface"
             >
               <Heart
                 className={cn(
@@ -561,12 +562,19 @@ function ProductDetailView({
       {/* =====================================================================
        * BOUTONS RONDS FLOTTANTS SUR LA PHOTO MOBILE (Retour, Favori, Partager, §7.1)
        * ===================================================================== */}
-      <div className="pointer-events-none fixed top-[calc(0.75rem+var(--offline-banner-h,0px))] right-4 left-4 z-sticky flex items-center justify-between pt-safe lg:hidden">
+      <div
+        inert={showCompactHeader}
+        className={cn(
+          'pointer-events-none fixed top-[calc(0.75rem+var(--offline-banner-h,0px))] right-4 left-4 z-sticky flex items-center justify-between pt-safe transition-opacity duration-200 lg:hidden',
+          // La barre compacte reprend Retour et Favori : les boutons ronds ne dépassent plus en dessous
+          showCompactHeader && 'opacity-0',
+        )}
+      >
         <button
           type="button"
           onClick={onBack}
           aria-label="Retour"
-          className="pointer-events-auto inline-flex h-10 w-10 items-center justify-center rounded-[var(--radius-full)] bg-white text-ink shadow-[var(--shadow-card-icon)]"
+          className="pointer-events-auto inline-flex h-11 w-11 items-center justify-center rounded-[var(--radius-full)] bg-white text-ink shadow-[var(--shadow-card-icon)]"
         >
           <ArrowLeft className="h-5 w-5" aria-hidden="true" />
         </button>
@@ -579,7 +587,7 @@ function ProductDetailView({
               isFavorite ? 'Retirer des favoris' : 'Ajouter aux favoris'
             }
             aria-pressed={isFavorite}
-            className="relative inline-flex h-10 w-10 items-center justify-center rounded-[var(--radius-full)] bg-white text-ink shadow-[var(--shadow-card-icon)]"
+            className="relative inline-flex h-11 w-11 items-center justify-center rounded-[var(--radius-full)] bg-white text-ink shadow-[var(--shadow-card-icon)]"
           >
             <Heart
               className={cn(
@@ -616,7 +624,7 @@ function ProductDetailView({
             type="button"
             onClick={() => void handleShare()}
             aria-label="Partager cet article"
-            className="inline-flex h-10 w-10 items-center justify-center rounded-[var(--radius-full)] bg-white text-ink shadow-[var(--shadow-card-icon)]"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-[var(--radius-full)] bg-white text-ink shadow-[var(--shadow-card-icon)]"
           >
             <Share2 className="h-4 w-4" aria-hidden="true" />
           </button>
@@ -682,7 +690,7 @@ function ProductDetailView({
               <Link
                 to={`/explorer/${product.categorySlug}`}
                 viewTransition
-                className="text-label text-text-2 hover:text-ink"
+                className="-my-3 inline-flex min-h-[44px] items-center text-label text-text-2 hover:text-ink"
               >
                 {categoryLabel}
               </Link>
@@ -743,7 +751,8 @@ function ProductDetailView({
                         }
                         onClick={() => handleSelectColor(color.code)}
                         className={cn(
-                          'relative flex h-9 w-9 items-center justify-center rounded-[var(--radius-full)] border transition-transform',
+                          // before: zone tactile de 44 px autour de la pastille de 36 px
+                          "relative flex h-9 w-9 items-center justify-center rounded-[var(--radius-full)] border transition-transform before:absolute before:-inset-1 before:rounded-[var(--radius-full)] before:content-['']",
                           COLOR_SWATCH_CLASSES[color.code] ?? 'bg-ink border-ink',
                           isSelected && 'ring-2 ring-ink ring-offset-2',
                           isColorSoldOut && 'opacity-55',
@@ -752,7 +761,11 @@ function ProductDetailView({
                         {isColorSoldOut && (
                           <span
                             aria-hidden="true"
-                            className="pointer-events-none absolute inset-x-[-2px] top-1/2 h-[2px] -translate-y-1/2 -rotate-45 bg-red"
+                            className={cn(
+                              'pointer-events-none absolute inset-x-[-2px] top-1/2 h-[2px] -translate-y-1/2 -rotate-45',
+                              // Barre rouge invisible sur la pastille rouge : barre noire pour celle-ci
+                              color.code === 'rouge' ? 'bg-ink' : 'bg-red',
+                            )}
                           />
                         )}
                       </button>
@@ -775,7 +788,7 @@ function ProductDetailView({
                   <button
                     type="button"
                     onClick={() => setSizeGuideOpen(true)}
-                    className="inline-flex items-center gap-1.5 text-xs font-bold text-ink underline underline-offset-2 hover:text-red"
+                    className="-my-3 inline-flex min-h-[44px] items-center gap-1.5 text-xs font-bold text-ink underline underline-offset-2 hover:text-red"
                   >
                     <Ruler className="h-3.5 w-3.5" aria-hidden="true" />
                     <span>Guide des tailles</span>
@@ -845,7 +858,7 @@ function ProductDetailView({
               )}
 
               {/* Messages dynamiques : erreur aucune taille, désélection couleur, ou stock réel (§7.4 & §7.5) */}
-              <div aria-live="polite" className="mt-2.5 min-h-[22px]">
+              <div aria-live="polite" className="mt-2 min-h-[20px]">
                 {sizeError ? (
                   <p role="alert" className="text-xs font-bold text-danger">
                     Choisissez votre taille pour continuer
@@ -873,7 +886,8 @@ function ProductDetailView({
             {/* =================================================================
              * BOUTONS D'ACTION SUR ORDINATEUR (et état épuisé mobile + bureau, §7.5 & §7.8)
              * ================================================================= */}
-            <div className="mt-5">
+            {/* Sur mobile hors épuisé, les boutons sont dans la barre collante : pas de bloc vide (et sa marge) ici */}
+            <div className={cn(isSoldOut ? 'mt-5' : 'hidden lg:mt-5 lg:block')}>
               {isSoldOut ? (
                 <div className="rounded-[var(--radius-md)] border border-silver bg-surface p-4 text-center">
                   <p className="text-small font-bold text-ink">
@@ -903,7 +917,7 @@ function ProductDetailView({
                       }
                       className="w-[42%]"
                     >
-                      {justAdded ? 'Ajouté ✓' : 'Ajouter au panier'}
+                      {justAdded ? 'Ajouté' : 'Ajouter au panier'}
                     </Button>
 
                     <Button
@@ -952,7 +966,7 @@ function ProductDetailView({
             </div>
 
             {/* Bandeau de réassurance rapide */}
-            <div className="mt-6 grid grid-cols-2 gap-3 rounded-[var(--radius-md)] bg-surface p-3.5 text-xs text-ink">
+            <div className="mt-4 grid grid-cols-2 gap-3 rounded-[var(--radius-md)] bg-surface p-3.5 text-xs text-ink lg:mt-6">
               <div className="flex items-start gap-2.5">
                 <ShieldCheck
                   className="mt-0.5 h-4 w-4 shrink-0 text-red"
@@ -965,7 +979,10 @@ function ProductDetailView({
                   className="mt-0.5 h-4 w-4 shrink-0 text-red"
                   aria-hidden="true"
                 />
-                <span>Retrait gratuit Akwa Douala ou livraison 24–48 h</span>
+                <span>
+                  Retrait gratuit Akwa Douala ou livraison{' '}
+                  <span className="whitespace-nowrap">24–48 h</span>
+                </span>
               </div>
             </div>
 
@@ -1062,16 +1079,18 @@ function ProductDetailView({
             aria-labelledby="similar-products-heading"
             className="mt-14 px-page lg:mt-20 lg:px-0"
           >
-            <div className="flex items-baseline justify-between">
-              <h2 id="similar-products-heading" className="text-h2 text-ink">
+            {/* Sous 640 px, « Voir tout » sans la catégorie : titre et lien tiennent chacun sur une ligne à 360 px */}
+            <div className="flex items-center justify-between gap-4">
+              <h2 id="similar-products-heading" className="min-w-0 text-h2 text-ink">
                 ARTICLES SIMILAIRES
               </h2>
               <Link
                 to={`/explorer/${product.categorySlug}`}
                 viewTransition
-                className="text-xs font-bold text-ink underline-offset-2 hover:underline"
+                aria-label={`Voir tout : ${categoryLabel}`}
+                className="inline-flex min-h-[44px] shrink-0 items-center text-xs font-bold whitespace-nowrap text-ink underline-offset-2 hover:underline"
               >
-                Voir tout ({categoryLabel})
+                Voir tout<span className="hidden sm:inline">&nbsp;({categoryLabel})</span>
               </Link>
             </div>
 
@@ -1120,7 +1139,7 @@ function ProductDetailView({
                     )
                   }
                 >
-                  {justAdded ? 'Ajouté ✓' : 'Ajouter'}
+                  {justAdded ? 'Ajouté' : 'Ajouter'}
                 </Button>
               </div>
 

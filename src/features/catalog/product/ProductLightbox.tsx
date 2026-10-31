@@ -12,11 +12,28 @@ import {
 import { createPortal } from 'react-dom';
 import { SmartImage, type ImageAspectRatio } from '@/components/ui/SmartImage';
 import { useOverlayHistory } from '@/lib/hooks/useOverlayHistory';
+import { cn } from '@/lib/utils/cn';
 import { duration, ease } from '@/motion/tokens';
 import type { ProductImageEntry } from '@/types/domain';
 
 /** Photo de la visionneuse : `ratio` permet d'afficher une photo au format d'origine (photos du colis, M5). */
 export type LightboxImage = ProductImageEntry & { ratio?: ImageAspectRatio; fit?: 'cover' | 'contain' };
+
+/**
+ * Largeur du cadre photo selon son format : la plus petite entre la place disponible, 560 px et la hauteur
+ * de la zone centrale (100cqh) multipliée par le format. La photo entière tient ainsi dans l'écran, même
+ * peu haut (1024x768, téléphone à l'horizontale), au lieu d'être coupée en bas.
+ */
+const FRAME_WIDTH_CLASSES: Record<ImageAspectRatio, string> = {
+  '4/5': 'w-[min(100%,560px,80cqh)]',
+  '3/4': 'w-[min(100%,560px,75cqh)]',
+  '1/1': 'w-[min(100%,560px,100cqh)]',
+  '4/3': 'w-[min(100%,560px,133.33cqh)]',
+  '16/10': 'w-[min(100%,560px,160cqh)]',
+  '16/9': 'w-[min(100%,560px,177.78cqh)]',
+  '2/1': 'w-[min(100%,560px,200cqh)]',
+  auto: 'w-full max-w-[560px]',
+};
 
 export interface ProductLightboxProps {
   open: boolean;
@@ -228,14 +245,21 @@ function LightboxDialog({
         transition={{ duration: duration.base, ease: ease.out }}
         className="fixed inset-0 z-toast flex flex-col justify-between bg-ink text-white select-none"
       >
-        {/* Barre supérieure : Compteur (1 / 4) + Zoom + Fermer (×) */}
-        <div className="relative z-10 flex items-center justify-between px-4 pt-[calc(12px+env(safe-area-inset-top,0px))] pb-3">
-          <span className="rounded-[var(--radius-full)] bg-ink-2 px-3 py-1 text-xs font-bold text-white tabular-nums">
+        {/* Barre supérieure : Compteur (1 / 4) + actions éventuelles + Zoom + Fermer (×).
+            Sous 640 px, les actions supplémentaires (« Enregistrer la photo ») passent sur une 2e ligne
+            sous Zoom et Fermer : à 360 px, tout ne tient pas sur une ligne. */}
+        <div className="relative z-10 flex flex-wrap items-center gap-2 px-4 pt-[calc(12px+env(safe-area-inset-top,0px))] pb-3">
+          <span className="order-1 shrink-0 rounded-[var(--radius-full)] bg-ink-2 px-3 py-1 text-xs font-bold whitespace-nowrap text-white tabular-nums">
             {currentIndex + 1} / {images.length}
           </span>
 
-          <div className="flex items-center gap-2">
-            {renderActions?.(activeEntry, currentIndex)}
+          {renderActions && (
+            <div className="order-3 flex w-full items-center justify-end gap-2 sm:order-2 sm:ml-auto sm:w-auto">
+              {renderActions(activeEntry, currentIndex)}
+            </div>
+          )}
+
+          <div className="order-2 ml-auto flex shrink-0 items-center gap-2 sm:order-3 sm:ml-0">
             <button
               type="button"
               onClick={() => handleToggleZoom()}
@@ -261,13 +285,13 @@ function LightboxDialog({
           </div>
         </div>
 
-        {/* Zone centrale de l'image */}
+        {/* Zone centrale de l'image : conteneur de taille (unités cqh) pour adapter le cadre à sa hauteur */}
         <div
           onClick={handleImageClick}
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
-          className="relative flex flex-1 items-center justify-center overflow-hidden px-4"
+          className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden px-4 py-2 [container-type:size]"
         >
           {images.length > 1 && (
             <button
@@ -292,7 +316,10 @@ function LightboxDialog({
                 ? 'none'
                 : 'transform 220ms cubic-bezier(0.22, 1, 0.36, 1)',
             }}
-            className="max-h-[80dvh] w-full max-w-[560px] cursor-zoom-in overflow-hidden rounded-[var(--radius-md)]"
+            className={cn(
+              'max-h-full cursor-zoom-in overflow-hidden rounded-[var(--radius-md)]',
+              FRAME_WIDTH_CLASSES[activeEntry.ratio ?? '4/5'],
+            )}
           >
             <SmartImage
               src={activeEntry.url}

@@ -194,150 +194,154 @@ function FilterSheetBody({
   const { clothing, shoes } = getSizesForCategory(filters.category);
 
   return (
-    <div className="space-y-6">
-      {/* Interrupteur Disponibilité (mode 'all') */}
-      {mode === 'all' && (
-        <div className="flex items-center justify-between rounded-[var(--radius-md)] border border-silver bg-surface px-4 py-3.5">
-          <div>
-            <p className="text-small font-bold text-ink">En stock uniquement</p>
-            <p className="text-xs text-text-2">
-              Masquer les articles momentanément épuisés
-            </p>
-          </div>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={stagedAvailable}
-            aria-label="Afficher uniquement les articles en stock"
-            onClick={() => setStagedAvailable((v) => !v)}
-            className={cn(
-              'relative inline-flex h-7 w-12 shrink-0 items-center rounded-[var(--radius-full)] transition-colors',
-              stagedAvailable ? 'bg-red' : 'bg-silver',
-            )}
-          >
-            <span
+    // La feuille ne dépasse jamais l'écran : les filtres défilent, le pied « Effacer / Voir X articles » reste visible.
+    // HYPOTHÈSE: 9,5rem = marge haute + poignée, titre et marges de la feuille (≈ 131 px en mobile, 123 px en lg)
+    <div className="flex max-h-[calc(100dvh-9.5rem-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px))] flex-col">
+      <div className="-mx-1 min-h-0 flex-1 space-y-6 overflow-y-auto overscroll-contain px-1 pb-1">
+        {/* Interrupteur Disponibilité (mode 'all') */}
+        {mode === 'all' && (
+          <div className="flex items-center justify-between rounded-[var(--radius-md)] border border-silver bg-surface px-4 py-3.5">
+            <div>
+              <p className="text-small font-bold text-ink">En stock uniquement</p>
+              <p className="text-xs text-text-2">
+                Masquer les articles momentanément épuisés
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={stagedAvailable}
+              aria-label="Afficher uniquement les articles en stock"
+              onClick={() => setStagedAvailable((v) => !v)}
               className={cn(
-                'inline-block h-5 w-5 rounded-[var(--radius-full)] bg-white transition-transform',
-                stagedAvailable ? 'translate-x-6' : 'translate-x-1',
+                'relative inline-flex h-7 w-12 shrink-0 items-center rounded-[var(--radius-full)] transition-colors',
+                stagedAvailable ? 'bg-red' : 'bg-silver',
               )}
-            />
-          </button>
-        </div>
-      )}
-
-      {/* Sélection des tailles (mode 'size' ou 'all') */}
-      {(mode === 'size' || mode === 'all') && (
-        <div className="space-y-4">
-          {clothing.length > 0 && (
-            <div>
-              <p className="text-label text-text-2">TAILLES VÊTEMENTS</p>
-              <div className="mt-2.5 grid grid-cols-5 gap-2">
-                {clothing.map((size) => {
-                  const count = getSizeFacetCount(size);
-                  const isSelected = stagedSizes.includes(size);
-                  const isDisabled = count === 0 && !isSelected;
-                  return (
-                    <button
-                      key={size}
-                      type="button"
-                      disabled={isDisabled}
-                      onClick={() => toggleStagedSize(size)}
-                      aria-pressed={isSelected}
-                      className={cn(
-                        'flex h-12 flex-col items-center justify-center rounded-[var(--radius-md)] border text-small font-bold transition-colors',
-                        isDisabled
-                          ? 'cursor-not-allowed border-silver bg-surface text-silver line-through opacity-60'
-                          : isSelected
-                            ? 'border-ink bg-ink text-white'
-                            : 'border-silver bg-white text-ink hover:border-ink',
-                      )}
-                    >
-                      <span>{size}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {shoes.length > 0 && (
-            <div>
-              <p className="text-label text-text-2">POINTURES CHAUSSURES & BABOUCHES</p>
-              <div className="mt-2.5 grid grid-cols-4 gap-2">
-                {shoes.map((size) => {
-                  const count = getSizeFacetCount(size);
-                  const isSelected = stagedSizes.includes(size);
-                  const isDisabled = count === 0 && !isSelected;
-                  return (
-                    <button
-                      key={size}
-                      type="button"
-                      disabled={isDisabled}
-                      onClick={() => toggleStagedSize(size)}
-                      aria-pressed={isSelected}
-                      className={cn(
-                        'flex h-12 flex-col items-center justify-center rounded-[var(--radius-md)] border text-small font-bold transition-colors',
-                        isDisabled
-                          ? 'cursor-not-allowed border-silver bg-surface text-silver line-through opacity-60'
-                          : isSelected
-                            ? 'border-ink bg-ink text-white'
-                            : 'border-silver bg-white text-ink hover:border-ink',
-                      )}
-                    >
-                      <span>{size}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Sélection de la fourchette de prix (mode 'price' ou 'all') */}
-      {(mode === 'price' || mode === 'all') && (
-        <div>
-          <p className="text-label text-text-2">FOURCHETTE DE PRIX</p>
-          <div role="radiogroup" aria-label="Fourchette de prix" className="mt-2.5 space-y-2">
-            {PRICE_RANGE_KEYS.map((priceKey) => {
-              const isSelected = stagedPrice === priceKey;
-              const count = getPriceFacetCount(priceKey);
-              return (
-                <button
-                  key={priceKey}
-                  type="button"
-                  role="radio"
-                  aria-checked={isSelected}
-                  onClick={() =>
-                    setStagedPrice((prev) => (prev === priceKey ? undefined : priceKey))
-                  }
-                  className={cn(
-                    'flex min-h-[48px] w-full items-center justify-between rounded-[var(--radius-md)] border px-4 py-2.5 text-left text-small font-semibold transition-colors',
-                    isSelected
-                      ? 'border-ink bg-ink text-white'
-                      : 'border-silver bg-white text-ink hover:bg-surface',
-                  )}
-                >
-                  <span>{PRICE_RANGE_LABELS[priceKey]}</span>
-                  {typeof count === 'number' && (
-                    <span
-                      className={cn(
-                        'text-xs tabular-nums',
-                        isSelected ? 'text-silver' : 'text-text-2',
-                      )}
-                    >
-                      ({count})
-                    </span>
-                  )}
-                </button>
-              );
-            })}
+            >
+              <span
+                className={cn(
+                  'inline-block h-5 w-5 rounded-[var(--radius-full)] bg-white transition-transform',
+                  stagedAvailable ? 'translate-x-6' : 'translate-x-1',
+                )}
+              />
+            </button>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Pied de tiroir : Tout effacer + Voir X articles */}
-      <div className="flex items-center gap-3 pt-2">
+        {/* Sélection des tailles (mode 'size' ou 'all') */}
+        {(mode === 'size' || mode === 'all') && (
+          <div className="space-y-4">
+            {clothing.length > 0 && (
+              <div>
+                <p className="text-label text-text-2">TAILLES VÊTEMENTS</p>
+                <div className="mt-2.5 grid grid-cols-5 gap-2">
+                  {clothing.map((size) => {
+                    const count = getSizeFacetCount(size);
+                    const isSelected = stagedSizes.includes(size);
+                    const isDisabled = count === 0 && !isSelected;
+                    return (
+                      <button
+                        key={size}
+                        type="button"
+                        disabled={isDisabled}
+                        onClick={() => toggleStagedSize(size)}
+                        aria-pressed={isSelected}
+                        className={cn(
+                          'flex h-12 flex-col items-center justify-center rounded-[var(--radius-md)] border text-small font-bold transition-colors',
+                          isDisabled
+                            ? 'cursor-not-allowed border-silver bg-surface text-silver line-through opacity-60'
+                            : isSelected
+                              ? 'border-ink bg-ink text-white'
+                              : 'border-silver bg-white text-ink hover:border-ink',
+                        )}
+                      >
+                        <span>{size}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {shoes.length > 0 && (
+              <div>
+                <p className="text-label text-text-2">POINTURES CHAUSSURES & BABOUCHES</p>
+                <div className="mt-2.5 grid grid-cols-4 gap-2">
+                  {shoes.map((size) => {
+                    const count = getSizeFacetCount(size);
+                    const isSelected = stagedSizes.includes(size);
+                    const isDisabled = count === 0 && !isSelected;
+                    return (
+                      <button
+                        key={size}
+                        type="button"
+                        disabled={isDisabled}
+                        onClick={() => toggleStagedSize(size)}
+                        aria-pressed={isSelected}
+                        className={cn(
+                          'flex h-12 flex-col items-center justify-center rounded-[var(--radius-md)] border text-small font-bold transition-colors',
+                          isDisabled
+                            ? 'cursor-not-allowed border-silver bg-surface text-silver line-through opacity-60'
+                            : isSelected
+                              ? 'border-ink bg-ink text-white'
+                              : 'border-silver bg-white text-ink hover:border-ink',
+                        )}
+                      >
+                        <span>{size}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Sélection de la fourchette de prix (mode 'price' ou 'all') */}
+        {(mode === 'price' || mode === 'all') && (
+          <div>
+            <p className="text-label text-text-2">FOURCHETTE DE PRIX</p>
+            <div role="radiogroup" aria-label="Fourchette de prix" className="mt-2.5 space-y-2">
+              {PRICE_RANGE_KEYS.map((priceKey) => {
+                const isSelected = stagedPrice === priceKey;
+                const count = getPriceFacetCount(priceKey);
+                return (
+                  <button
+                    key={priceKey}
+                    type="button"
+                    role="radio"
+                    aria-checked={isSelected}
+                    onClick={() =>
+                      setStagedPrice((prev) => (prev === priceKey ? undefined : priceKey))
+                    }
+                    className={cn(
+                      'flex min-h-[48px] w-full items-center justify-between rounded-[var(--radius-md)] border px-4 py-2.5 text-left text-small font-semibold transition-colors',
+                      isSelected
+                        ? 'border-ink bg-ink text-white'
+                        : 'border-silver bg-white text-ink hover:bg-surface',
+                    )}
+                  >
+                    <span>{PRICE_RANGE_LABELS[priceKey]}</span>
+                    {typeof count === 'number' && (
+                      <span
+                        className={cn(
+                          'text-xs tabular-nums',
+                          isSelected ? 'text-silver' : 'text-text-2',
+                        )}
+                      >
+                        ({count})
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Pied de tiroir : Tout effacer + Voir X articles (le second prend la place restante, sans déborder) */}
+      <div className="flex shrink-0 items-center gap-3 pt-4">
         <Button
           variant="outline"
           size="md"
@@ -349,9 +353,9 @@ function FilterSheetBody({
         <Button
           variant="primary"
           size="md"
-          fullWidth
           disabled={previewTotal === 0}
           onClick={handleApply}
+          className="min-w-0 flex-1 shrink text-center whitespace-normal"
         >
           {previewTotal === 0
             ? 'Aucun article pour ces critères'

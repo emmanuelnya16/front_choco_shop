@@ -110,7 +110,7 @@ export function PullToRefresh({ onRefresh, disabled = false, children }: PullToR
     <>
       <div
         aria-hidden="true"
-        className="pointer-events-none fixed top-[calc(var(--header-h)+env(safe-area-inset-top,0px)-28px)] left-1/2 z-sticky -translate-x-1/2 lg:hidden"
+        className="pointer-events-none fixed top-[calc(var(--header-h)+env(safe-area-inset-top,0px)-28px)] left-1/2 z-sticky -translate-x-1/2 lg:hidden [html[data-mobile-header=hidden]_&]:top-[calc(env(safe-area-inset-top,0px)-28px)]"
       >
         <m.div
           style={{ y: pull, opacity, scale }}

@@ -8,7 +8,7 @@ import {
   ShoppingBag,
   User,
 } from 'lucide-react';
-import { type FormEvent, lazy, type MouseEvent, Suspense, useRef, useState } from 'react';
+import { type FormEvent, lazy, type MouseEvent, Suspense, useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
 import { Button } from '@/components/ui/Button';
 import { IconButton } from '@/components/ui/IconButton';
@@ -79,6 +79,17 @@ export function AppHeader() {
   const [isPast40, setIsPast40] = useState(false);
   const [isPast80, setIsPast80] = useState(false);
   const [isMobileHidden, setIsMobileHidden] = useState(false);
+  // En-tête mobile masqué au défilement : état exposé sur <html> pour que les barres collantes
+  // placées dessous (filtres d'Explorer…) remontent avec lui au lieu de laisser une bande vide.
+  const mobileHeaderHidden = !reducedMotion && isMobileHidden;
+  useEffect(() => {
+    const root = document.documentElement;
+    if (mobileHeaderHidden) root.dataset.mobileHeader = 'hidden';
+    else delete root.dataset.mobileHeader;
+    return () => {
+      delete root.dataset.mobileHeader;
+    };
+  }, [mobileHeaderHidden]);
 
   const lastScrollY = useRef(0);
   const megaTriggerRef = useRef<HTMLButtonElement>(null);

@@ -1,6 +1,7 @@
 import {
   AlertCircle,
   ArrowUp,
+  ArrowUpDown,
   ChevronDown,
   ChevronRight,
   SlidersHorizontal,
@@ -286,7 +287,7 @@ export function ExplorePage() {
             <button
               type="button"
               onClick={() => setFilter('look', undefined)}
-              className="inline-flex min-h-[40px] items-center gap-2 rounded-[var(--radius-md)] border border-white/25 bg-ink-2 px-3.5 py-2 text-xs font-bold text-white transition-colors hover:bg-white hover:text-ink"
+              className="inline-flex min-h-[44px] items-center gap-2 rounded-[var(--radius-md)] border border-white/25 bg-ink-2 px-3.5 py-2 text-xs font-bold text-white transition-colors hover:bg-white hover:text-ink"
             >
               <span>Voir tout le catalogue</span>
               <X className="h-3.5 w-3.5" aria-hidden="true" />
@@ -329,12 +330,12 @@ export function ExplorePage() {
 
         {/* Pastilles de sous-catégorie sur mobile (§5.1) */}
         {subcategories.length > 0 && (
-          <div className="no-scrollbar mt-3 flex items-center gap-2 overflow-x-auto py-1 lg:hidden">
+          <div className="no-scrollbar mt-3 flex items-center gap-2 overflow-x-auto lg:hidden">
             <button
               type="button"
               onClick={() => setFilter('sub', undefined)}
               className={cn(
-                'shrink-0 rounded-[var(--radius-md)] border px-3 py-1.5 text-xs font-bold transition-colors',
+                'inline-flex min-h-[44px] shrink-0 items-center rounded-[var(--radius-md)] border px-3 py-1.5 text-xs font-bold transition-colors',
                 !filters.sub
                   ? 'border-ink bg-ink text-white'
                   : 'border-silver bg-surface text-ink',
@@ -352,7 +353,7 @@ export function ExplorePage() {
                     setFilter('sub', active ? undefined : subItem.slug)
                   }
                   className={cn(
-                    'shrink-0 rounded-[var(--radius-md)] border px-3 py-1.5 text-xs font-bold transition-colors',
+                    'inline-flex min-h-[44px] shrink-0 items-center rounded-[var(--radius-md)] border px-3 py-1.5 text-xs font-bold transition-colors',
                     active
                       ? 'border-ink bg-ink text-white'
                       : 'border-silver bg-surface text-ink',
@@ -367,82 +368,89 @@ export function ExplorePage() {
       </Container>
 
       {/* Barre de filtres et tri collante sur mobile (§5.1) */}
-      <div className="sticky top-[calc(var(--header-h)+env(safe-area-inset-top,0px))] z-sticky mt-2 border-b border-silver/60 bg-white/95 py-2.5 backdrop-blur-md lg:hidden">
-        <Container className="no-scrollbar flex items-center gap-2 overflow-x-auto">
-          <button
-            type="button"
-            onClick={() => setActiveSheet('all')}
-            className={cn(
-              'inline-flex min-h-[38px] shrink-0 items-center gap-1.5 rounded-[var(--radius-md)] border px-3 py-1.5 text-xs font-bold transition-colors',
-              activeCount > 0
-                ? 'border-ink bg-ink text-white'
-                : 'border-silver bg-white text-ink',
-            )}
-          >
-            <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden="true" />
-            <span>Filtres</span>
-            {activeCount > 0 && (
-              <span className="ml-0.5 inline-flex h-4 min-w-[16px] items-center justify-center rounded-[var(--radius-full)] bg-red px-1 text-[10px] font-bold text-white">
-                {activeCount}
+      <div className="sticky top-[calc(var(--header-h)+env(safe-area-inset-top,0px))] z-sticky mt-2 border-b border-silver/60 bg-white/95 py-1.5 backdrop-blur-md transition-transform duration-200 ease-out motion-reduce:transition-none lg:hidden [html[data-mobile-header=hidden]_&]:-translate-y-[var(--header-h)]">
+        {/* Tri toujours visible à droite ; les pastilles de filtre défilent à sa gauche (à 360 px, « Trier » sortait de l'écran) */}
+        <Container className="flex items-center gap-2">
+          <div className="no-scrollbar flex min-w-0 flex-1 items-center gap-2 overflow-x-auto">
+            <button
+              type="button"
+              onClick={() => setActiveSheet('all')}
+              className={cn(
+                'inline-flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-[var(--radius-md)] border px-3 py-1.5 text-xs font-bold transition-colors',
+                activeCount > 0
+                  ? 'border-ink bg-ink text-white'
+                  : 'border-silver bg-white text-ink',
+              )}
+            >
+              <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden="true" />
+              <span>Filtres</span>
+              {activeCount > 0 && (
+                <span className="ml-0.5 inline-flex h-4 min-w-[16px] items-center justify-center rounded-[var(--radius-full)] bg-red px-1 text-[10px] font-bold text-white">
+                  {activeCount}
+                </span>
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveSheet('size')}
+              className={cn(
+                'inline-flex min-h-[44px] shrink-0 items-center gap-1 rounded-[var(--radius-md)] border px-3 py-1.5 text-xs font-semibold transition-colors',
+                filters.sizes.length > 0
+                  ? 'border-ink bg-ink text-white'
+                  : 'border-silver bg-white text-ink',
+              )}
+            >
+              <span>
+                {filters.sizes.length > 0
+                  ? `Taille (${filters.sizes.join(', ')})`
+                  : 'Taille'}
               </span>
-            )}
-          </button>
+              <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />
+            </button>
 
-          <button
-            type="button"
-            onClick={() => setActiveSheet('size')}
-            className={cn(
-              'inline-flex min-h-[38px] shrink-0 items-center gap-1 rounded-[var(--radius-md)] border px-3 py-1.5 text-xs font-semibold transition-colors',
-              filters.sizes.length > 0
-                ? 'border-ink bg-ink text-white'
-                : 'border-silver bg-white text-ink',
-            )}
-          >
-            <span>
-              {filters.sizes.length > 0
-                ? `Taille (${filters.sizes.join(', ')})`
-                : 'Taille'}
-            </span>
-            <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />
-          </button>
+            <button
+              type="button"
+              onClick={() => setActiveSheet('price')}
+              className={cn(
+                'inline-flex min-h-[44px] shrink-0 items-center gap-1 rounded-[var(--radius-md)] border px-3 py-1.5 text-xs font-semibold transition-colors',
+                filters.price
+                  ? 'border-ink bg-ink text-white'
+                  : 'border-silver bg-white text-ink',
+              )}
+            >
+              <span>
+                {filters.price ? PRICE_RANGE_LABELS[filters.price] : 'Prix'}
+              </span>
+              <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />
+            </button>
 
-          <button
-            type="button"
-            onClick={() => setActiveSheet('price')}
-            className={cn(
-              'inline-flex min-h-[38px] shrink-0 items-center gap-1 rounded-[var(--radius-md)] border px-3 py-1.5 text-xs font-semibold transition-colors',
-              filters.price
-                ? 'border-ink bg-ink text-white'
-                : 'border-silver bg-white text-ink',
-            )}
-          >
-            <span>
-              {filters.price ? PRICE_RANGE_LABELS[filters.price] : 'Prix'}
-            </span>
-            <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />
-          </button>
-
-          <button
-            type="button"
-            aria-pressed={filters.available}
-            onClick={() => setFilter('available', !filters.available)}
-            className={cn(
-              'inline-flex min-h-[38px] shrink-0 items-center gap-1.5 rounded-[var(--radius-md)] border px-3 py-1.5 text-xs font-semibold transition-colors',
-              filters.available
-                ? 'border-ink bg-ink text-white'
-                : 'border-silver bg-white text-ink',
-            )}
-          >
-            <span>Disponible</span>
-          </button>
+            <button
+              type="button"
+              aria-pressed={filters.available}
+              onClick={() => setFilter('available', !filters.available)}
+              className={cn(
+                'inline-flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-[var(--radius-md)] border px-3 py-1.5 text-xs font-semibold transition-colors',
+                filters.available
+                  ? 'border-ink bg-ink text-white'
+                  : 'border-silver bg-white text-ink',
+              )}
+            >
+              <span>Disponible</span>
+            </button>
+          </div>
 
           <button
             type="button"
             onClick={() => setActiveSheet('sort')}
-            className="ml-auto inline-flex min-h-[38px] shrink-0 items-center gap-1 rounded-[var(--radius-md)] border border-silver bg-surface px-3 py-1.5 text-xs font-semibold text-ink"
+            aria-label={`Trier : ${SORT_OPTION_LABELS[filters.sort]}`}
+            className="inline-flex min-h-[44px] shrink-0 items-center gap-1 rounded-[var(--radius-md)] border border-silver bg-surface px-3 py-1.5 text-xs font-semibold text-ink"
           >
-            <span>Trier : {SORT_OPTION_LABELS[filters.sort]}</span>
-            <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />
+            <ArrowUpDown className="h-3.5 w-3.5 sm:hidden" aria-hidden="true" />
+            <span>
+              Trier<span className="hidden sm:inline"> : {SORT_OPTION_LABELS[filters.sort]}</span>
+            </span>
+            <ChevronDown className="hidden h-3.5 w-3.5 sm:block" aria-hidden="true" />
           </button>
         </Container>
       </div>
@@ -491,7 +499,7 @@ export function ExplorePage() {
             <button
               type="button"
               onClick={reset}
-              className="ml-1 text-xs font-bold text-red underline-offset-2 hover:underline"
+              className="ml-1 inline-flex min-h-[44px] items-center px-1 text-xs font-bold text-red underline-offset-2 hover:underline"
             >
               Tout effacer
             </button>
@@ -514,7 +522,7 @@ export function ExplorePage() {
           <div className="min-w-0 flex-1">
             {/* État de chargement initial : 6 squelettes (§5.5) */}
             {isLoading && items.length === 0 ? (
-              <div className="grid grid-cols-2 gap-x-3 gap-y-5 lg:grid-cols-3 lg:gap-6 xl:grid-cols-4">
+              <div className="grid grid-cols-2 gap-x-3 gap-y-5 md:grid-cols-3 md:gap-x-4 lg:gap-6 xl:grid-cols-4">
                 {Array.from({ length: 6 }).map((_, idx) => (
                   <ProductCardSkeleton key={idx} />
                 ))}
@@ -568,7 +576,7 @@ export function ExplorePage() {
                     <h3 id="empty-popular-heading" className="text-h2 text-ink">
                       VOUS AIMEREZ PEUT-ÊTRE
                     </h3>
-                    <div className="mt-4 grid grid-cols-2 gap-x-3 gap-y-5 lg:grid-cols-4 lg:gap-6">
+                    <div className="mt-4 grid grid-cols-2 gap-x-3 gap-y-5 md:grid-cols-4 md:gap-x-4 lg:gap-6">
                       {popularFallback.items.slice(0, 4).map((product) => (
                         <ProductCard key={product.id} product={product} />
                       ))}
@@ -579,7 +587,7 @@ export function ExplorePage() {
             ) : (
               /* Grille de cartes produits + pagination infinie (§5.4) */
               <div>
-                <div className="grid grid-cols-2 gap-x-3 gap-y-5 lg:grid-cols-3 lg:gap-6 xl:grid-cols-4">
+                <div className="grid grid-cols-2 gap-x-3 gap-y-5 md:grid-cols-3 md:gap-x-4 lg:gap-6 xl:grid-cols-4">
                   <AnimatePresence mode="popLayout">
                     {items.map((product) => (
                       <m.div
@@ -672,7 +680,7 @@ export function ExplorePage() {
               })
             }
             aria-label="Remonter en haut de la page"
-            className="fixed bottom-[calc(var(--bottom-nav-h)+18px+env(safe-area-inset-bottom,0px))] left-4 z-sticky inline-flex min-h-[42px] items-center gap-1.5 rounded-[var(--radius-full)] bg-ink px-4 py-2 text-xs font-bold text-white shadow-[var(--shadow-sheet)] lg:bottom-6 lg:left-6"
+            className="fixed bottom-[calc(var(--bottom-nav-h)+18px+env(safe-area-inset-bottom,0px))] left-4 z-sticky inline-flex min-h-[44px] items-center gap-1.5 rounded-[var(--radius-full)] bg-ink px-4 py-2 text-xs font-bold text-white shadow-[var(--shadow-sheet)] lg:bottom-6 lg:left-6"
           >
             <ArrowUp className="h-3.5 w-3.5" aria-hidden="true" />
             <span>Remonter</span>
@@ -697,7 +705,7 @@ function ActiveFilterPill({
         type="button"
         onClick={onRemove}
         aria-label={`Retirer le filtre ${label}`}
-        className="inline-flex h-4 w-4 items-center justify-center rounded-[var(--radius-full)] text-text-2 hover:bg-silver/50 hover:text-ink"
+        className="relative inline-flex h-4 w-4 items-center justify-center rounded-[var(--radius-full)] text-text-2 before:absolute before:-inset-3.5 before:content-[''] hover:bg-silver/50 hover:text-ink"
       >
         <X className="h-3 w-3" aria-hidden="true" />
       </button>

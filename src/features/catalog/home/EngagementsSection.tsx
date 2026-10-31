@@ -4,6 +4,7 @@ import { Camera, MapPin, PackageCheck, Smartphone } from 'lucide-react';
 import { useRef } from 'react';
 import { Container, Section } from '@/components/ui/Primitives';
 import { SmartImage } from '@/components/ui/SmartImage';
+import { cn } from '@/lib/utils/cn';
 import { fadeUp } from '@/motion/presets';
 import { useReducedMotionPref } from '@/motion/useReducedMotionPref';
 
@@ -88,9 +89,12 @@ function EngagementCard({
 function EngagementPhoto({
   photo,
   reducedMotion,
+  fillCell = false,
 }: {
   photo: (typeof ENGAGEMENT_PHOTOS)[number];
   reducedMotion: boolean;
+  /** Tablette (md) : la photo prend la hauteur de la carte voisine dans la grille 2 colonnes au lieu de son format propre. */
+  fillCell?: boolean;
 }) {
   return (
     <m.div
@@ -98,7 +102,10 @@ function EngagementPhoto({
       initial={reducedMotion ? 'visible' : 'hidden'}
       whileInView="visible"
       viewport={{ once: true, amount: 0.25 }}
-      className="overflow-hidden rounded-[var(--radius-md)]"
+      className={cn(
+        'overflow-hidden rounded-[var(--radius-md)]',
+        fillCell && 'md:relative md:min-h-[12rem]',
+      )}
     >
       <SmartImage
         src={photo.src}
@@ -106,7 +113,8 @@ function EngagementPhoto({
         alt=""
         tone="mood"
         ratio={photo.ratio}
-        sizes="(min-width: 1024px) 380px, 100vw"
+        sizes="(min-width: 1024px) 380px, (min-width: 768px) 50vw, 100vw"
+        className={fillCell ? 'md:absolute md:inset-0 md:aspect-auto md:h-full md:w-full' : undefined}
       />
     </m.div>
   );
@@ -190,8 +198,10 @@ export function EngagementsSection() {
           </m.div>
         </div>
 
-        {/* Mobile single column alternating: card, photo, card, card, photo, card */}
-        <div className="mt-8 space-y-4 lg:hidden">
+        {/* Mobile single column alternating: card, photo, card, card, photo, card.
+            Tablette (md) : grille 2 colonnes (carte + photo, carte + carte, photo + carte) au lieu de
+            photos pleine largeur de 700 à 900 px de haut. */}
+        <div className="mt-8 space-y-4 md:grid md:grid-cols-2 md:gap-4 md:space-y-0 lg:hidden">
           <EngagementCard
             card={ENGAGEMENT_CARDS[0]}
             reducedMotion={reducedMotion}
@@ -199,6 +209,7 @@ export function EngagementsSection() {
           <EngagementPhoto
             photo={ENGAGEMENT_PHOTOS[0]}
             reducedMotion={reducedMotion}
+            fillCell
           />
           <EngagementCard
             card={ENGAGEMENT_CARDS[1]}
@@ -211,6 +222,7 @@ export function EngagementsSection() {
           <EngagementPhoto
             photo={ENGAGEMENT_PHOTOS[1]}
             reducedMotion={reducedMotion}
+            fillCell
           />
           <EngagementCard
             card={ENGAGEMENT_CARDS[3]}

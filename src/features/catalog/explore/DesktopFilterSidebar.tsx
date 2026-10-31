@@ -33,7 +33,7 @@ export interface DesktopFilterSidebarProps {
 }
 
 /**
- * Colonne latérale gauche fixe sur ordinateur (`260 px`, `sticky top-24`, §5.2).
+ * Colonne latérale gauche fixe sur ordinateur (`260 px`, collante sous l'en-tête, §5.2).
  * Expose tous les filtres directement dépliés sans ouvrir de tiroir.
  */
 export function DesktopFilterSidebar({
@@ -64,9 +64,11 @@ export function DesktopFilterSidebar({
   return (
     <aside
       aria-label="Filtres du catalogue"
-      className="hidden w-[260px] shrink-0 lg:block"
+      // self-stretch : la colonne a la hauteur de la grille, sinon le bloc collant n'a aucune place pour coller
+      className="hidden w-[260px] shrink-0 self-stretch lg:block"
     >
-      <div className="sticky top-24 space-y-7 rounded-[var(--radius-md)] border border-silver/70 bg-white p-5">
+      {/* Sous l’en-tête ordinateur replié (et le bandeau rouge s’il est affiché : --desktop-shell-top) ; défile lui-même s’il dépasse l’écran */}
+      <div className="sticky top-[calc(var(--desktop-shell-top)+16px)] max-h-[calc(100dvh-var(--desktop-shell-top)-32px)] space-y-7 overflow-y-auto overscroll-contain rounded-[var(--radius-md)] border border-silver/70 bg-white p-5">
         <div className="flex items-center justify-between">
           <h2 className="text-label text-ink">FILTRES</h2>
           {activeCount > 0 && (

@@ -19,7 +19,10 @@ export function SizeGuideSheet({ open, onClose, sizeGuide }: SizeGuideSheetProps
 
   return (
     <Sheet open={open} onClose={onClose} title={sizeGuide.title}>
-      <div className="space-y-5">
+      {/* Écran peu haut (téléphone à l'horizontale) : le contenu défile dans la feuille au lieu de pousser
+          son titre et sa croix hors de l'écran.
+          HYPOTHÈSE: 9,5rem = marge haute + poignée, titre et marges de la feuille (≈ 131 px en mobile, 123 px en lg) */}
+      <div className="-mx-1 max-h-[calc(100dvh-9.5rem-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px))] space-y-5 overflow-y-auto overscroll-contain px-1">
         <div className="overflow-x-auto rounded-[var(--radius-md)] border border-silver">
           <table className="w-full border-collapse text-left text-small">
             <thead>

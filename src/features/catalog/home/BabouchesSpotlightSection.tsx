@@ -43,7 +43,7 @@ export function BabouchesSpotlightSection() {
                       },
                     }
               }
-              className="relative aspect-[4/5] w-full overflow-hidden rounded-[var(--radius-md)] bg-ink lg:aspect-auto lg:h-full lg:min-h-[460px]"
+              className="relative aspect-[4/5] w-full overflow-hidden rounded-[var(--radius-md)] bg-ink md:aspect-[16/9] lg:aspect-auto lg:h-full lg:min-h-[460px]"
             >
               <SmartImage
                 src="/images/categories/babouches.webp"
@@ -118,12 +118,12 @@ export function BabouchesSpotlightSection() {
                   ))}
                 </m.div>
 
-                {/* Mobile horizontal snap carousel */}
-                <div className="no-scrollbar -mx-page flex snap-x snap-mandatory scroll-px-page gap-3.5 overflow-x-auto px-page lg:hidden">
+                {/* Mobile horizontal snap carousel ; tablette (md) : les 3 modèles côte à côte, sans carte coupée */}
+                <div className="no-scrollbar -mx-page flex snap-x snap-mandatory scroll-px-page gap-3.5 overflow-x-auto px-page md:mx-0 md:grid md:grid-cols-3 md:gap-4 md:overflow-visible md:px-0 lg:hidden">
                   {babouches.map((product) => (
                     <div
                       key={product.id}
-                      className="w-[74vw] max-w-[280px] shrink-0 snap-start"
+                      className="w-[74vw] max-w-[280px] shrink-0 snap-start md:w-auto md:max-w-none"
                     >
                       <ProductCard product={product} />
                     </div>

@@ -3,7 +3,8 @@ import { AnimatePresence } from 'motion/react';
 import * as m from 'motion/react-m';
 import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Link } from 'react-router';
+import { Link, useLocation } from 'react-router';
+import { cn } from '@/lib/utils/cn';
 import { duration, ease, spring } from '@/motion/tokens';
 import { useReducedMotionPref } from '@/motion/useReducedMotionPref';
 import { selectCartCount, useCartStore } from '@/stores/cartStore';
@@ -141,6 +142,8 @@ export function FlyToCartLayer() {
   const flyingItems = useUiStore((s) => s.flyingItems);
   const completeFlyToCart = useUiStore((s) => s.completeFlyToCart);
   const mobileCartPeekVisible = useUiStore((s) => s.mobileCartPeekVisible);
+  // Fiche produit : la pastille passe sous les boutons ronds Favori et Partager (44 px en haut à droite)
+  const onProductPage = useLocation().pathname.startsWith('/produit/');
   const cartCount = useCartStore(selectCartCount);
   const reducedMotion = useReducedMotionPref();
 
@@ -166,7 +169,7 @@ export function FlyToCartLayer() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -8, scale: 0.92 }}
             transition={{ duration: duration.fast, ease: ease.out }}
-            className="fixed top-4 right-4 z-toast pt-safe lg:hidden"
+            className={cn('fixed right-4 z-toast pt-safe lg:hidden', onProductPage ? 'top-[72px]' : 'top-4')}
           >
             <Link
               to="/panier"

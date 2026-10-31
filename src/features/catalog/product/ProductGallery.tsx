@@ -139,11 +139,13 @@ export function ProductGallery({
       {/* =====================================================================
        * GALERIE MOBILE (< lg) : Carrousel plein bord 4:5 scroll-snap
        * ===================================================================== */}
+      {/* Tablette (md → lg) : hauteur limitée et photo entière (object-contain) au lieu d'un 4:5 pleine
+          largeur de 960 à 1 280 px de haut qui cachait le nom et le prix de l'article sous la ligne de flottaison */}
       <div className="relative w-full bg-surface lg:hidden">
         <div
           ref={mobileCarouselRef}
           onScroll={handleMobileScroll}
-          className="no-scrollbar flex aspect-[4/5] w-full snap-x snap-mandatory overflow-x-auto"
+          className="no-scrollbar flex aspect-[4/5] w-full snap-x snap-mandatory overflow-x-auto md:aspect-auto md:h-[min(60svh,600px)]"
         >
           {images.map((img, idx) => (
             <div
@@ -152,7 +154,7 @@ export function ProductGallery({
                 idx === 0 ? { viewTransitionName: `product-${slug}` } : undefined
               }
               onClick={() => onOpenLightbox(idx)}
-              className="relative aspect-[4/5] w-full shrink-0 snap-center cursor-zoom-in overflow-hidden"
+              className="relative aspect-[4/5] w-full shrink-0 snap-center cursor-zoom-in overflow-hidden md:aspect-auto md:h-full"
             >
               <SmartImage
                 src={img.url}
@@ -161,18 +163,24 @@ export function ProductGallery({
                 ratio="4/5"
                 priority={idx === 0}
                 sizes="100vw"
-                className="h-full w-full"
+                className="h-full w-full md:aspect-auto"
+                imgClassName="md:object-contain"
               />
             </div>
           ))}
         </div>
 
-        {/* Pastilles de pagination en bas au centre + compteur 1 / N en bas à droite (§7.2) */}
-        <div className="pointer-events-none absolute right-4 bottom-9 left-4 z-10 flex items-center justify-between">
+        {/* Pastilles de pagination en bas au centre + compteur 1 / N en bas à droite (§7.2).
+            Chaque pastille est un bouton de 44 px de haut ; le fond arrondi reste celui d'origine (18 px). */}
+        <div className="pointer-events-none absolute right-4 bottom-6 left-4 z-10 flex items-center justify-between">
           <div className="w-12" aria-hidden="true" />
 
           {images.length > 1 && (
-            <div className="pointer-events-auto flex items-center gap-1.5 rounded-[var(--radius-full)] bg-[var(--color-scrim-40)] px-2.5 py-1.5 backdrop-blur-xs">
+            <div className="pointer-events-auto relative flex items-center px-1">
+              <span
+                aria-hidden="true"
+                className="absolute inset-x-0 top-1/2 h-[18px] -translate-y-1/2 rounded-[var(--radius-full)] bg-[var(--color-scrim-40)] backdrop-blur-xs"
+              />
               {images.map((_, idx) => {
                 const isActive = idx === safeIndex;
                 return (
@@ -181,11 +189,15 @@ export function ProductGallery({
                     type="button"
                     aria-label={`Voir la photo ${idx + 1}`}
                     onClick={() => onActiveIndexChange(idx)}
-                    className={cn(
-                      'h-1.5 rounded-[var(--radius-full)] transition-all duration-200',
-                      isActive ? 'w-5 bg-red' : 'w-1.5 bg-silver',
-                    )}
-                  />
+                    className="relative flex h-11 items-center justify-center px-[7px]"
+                  >
+                    <span
+                      className={cn(
+                        'block h-1.5 rounded-[var(--radius-full)] transition-all duration-200',
+                        isActive ? 'w-5 bg-red' : 'w-1.5 bg-silver',
+                      )}
+                    />
+                  </button>
                 );
               })}
             </div>

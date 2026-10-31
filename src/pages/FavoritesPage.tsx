@@ -103,13 +103,13 @@ export function FavoritesPage() {
               </Button>
             </div>
           ) : isLoading && items.length === 0 ? (
-            <div className="grid grid-cols-2 gap-x-3 gap-y-5 lg:grid-cols-4 lg:gap-6">
+            <div className="grid grid-cols-2 gap-x-3 gap-y-5 md:grid-cols-3 md:gap-x-4 lg:grid-cols-4 lg:gap-6">
               {Array.from({ length: Math.min(4, count) }).map((_, idx) => (
                 <ProductCardSkeleton key={idx} />
               ))}
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-x-3 gap-y-5 lg:grid-cols-4 lg:gap-6">
+            <div className="grid grid-cols-2 gap-x-3 gap-y-5 md:grid-cols-3 md:gap-x-4 lg:grid-cols-4 lg:gap-6">
               <AnimatePresence mode="popLayout">
                 {items.map((product) => (
                   <m.div

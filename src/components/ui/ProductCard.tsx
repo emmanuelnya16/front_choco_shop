@@ -164,7 +164,8 @@ export function ProductCard({ product, className }: ProductCardProps) {
       tabIndex={0}
       aria-label={`${product.name}, ${product.price} FCFA`}
       className={cn(
-        'group/card flex cursor-pointer flex-col justify-between rounded-[var(--radius-md)] select-none',
+        // h-full : dans une grille, les boutons de cartes voisines restent alignés malgré des titres sur 1 ou 2 lignes
+        'group/card flex h-full cursor-pointer flex-col justify-between rounded-[var(--radius-md)] select-none',
         className,
       )}
     >
@@ -311,15 +312,17 @@ export function ProductCard({ product, className }: ProductCardProps) {
         </div>
       </div>
 
-      {/* Actions en bas de carte */}
-      <div className="mt-3 flex items-center gap-2">
+      {/* Actions en bas de carte : la largeur de la carte (requête de conteneur) décide si le libellé
+          « Ajouter » tient à côté de « Réserver » ; sinon seule l'icône reste, avec son nom accessible.
+          Une carte peut être étroite à toutes les largeurs d'écran (2 colonnes sur téléphone, 6 colonnes du panier). */}
+      <div className="@container mt-3 flex items-center gap-2">
         {isSoldOut ? (
           <Button
             variant="outline"
             size="sm"
             fullWidth
             onClick={handleViewClick}
-            className="min-h-[40px]"
+            className="min-h-[44px]"
           >
             Voir l&rsquo;article
           </Button>
@@ -329,18 +332,25 @@ export function ProductCard({ product, className }: ProductCardProps) {
               variant="dark"
               size="sm"
               onClick={handleReserveClick}
-              className="min-h-[40px] flex-1 px-3"
+              className="min-h-[44px] min-w-0 flex-1 shrink px-3"
             >
               Réserver
             </Button>
             <Button
               variant="ghost"
               size="sm"
-              iconLeft={<ShoppingBag className="h-3.5 w-3.5" aria-hidden="true" />}
               onClick={handleAddClick}
-              className="min-h-[40px] px-2.5"
+              aria-label={`Ajouter ${product.name} au panier`}
+              className="min-h-[44px] min-w-[44px] px-0 @min-[12rem]:px-2.5"
             >
-              Ajouter
+              <span className="inline-flex items-center gap-1.5">
+                <ShoppingBag
+                  className="h-4 w-4 @min-[12rem]:h-3.5 @min-[12rem]:w-3.5"
+                  aria-hidden="true"
+                />
+                {/* 12rem : « Réserver » (≈ 82 px) + écart (8 px) + « Ajouter » (≈ 86 px), avec une marge */}
+                <span className="hidden @min-[12rem]:inline">Ajouter</span>
+              </span>
             </Button>
           </>
         )}
@@ -358,9 +368,9 @@ export function ProductCardSkeleton({ className }: { className?: string }) {
         <Skeleton className="mt-1.5 h-4 w-1/2" />
         <Skeleton className="mt-2 h-5 w-2/5" />
       </div>
-      <div className="mt-3 flex items-center gap-2">
-        <Skeleton className="h-9 flex-1" />
-        <Skeleton className="h-9 w-20" />
+      <div className="@container mt-3 flex items-center gap-2">
+        <Skeleton className="h-11 flex-1" />
+        <Skeleton className="h-11 w-11 @min-[12rem]:w-20" />
       </div>
     </div>
   );

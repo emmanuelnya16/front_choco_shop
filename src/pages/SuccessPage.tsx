@@ -13,11 +13,14 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router';
 import { Button } from '@/components/ui/Button';
 import { pushService } from '@/features/notifications/pushService';
+import { isNetworkError } from '@/features/offline/networkErrors';
+import { OfflineScreen } from '@/features/offline/OfflineScreen';
 import { usePaymentSettings } from '@/features/payment/api/usePaymentQueries';
 import { buildWhatsAppPaymentUrl } from '@/features/payment/whatsapp';
 import { useReservation } from '@/features/reservation/api/useReservationQueries';
 import { CheckoutStepper } from '@/features/reservation/components/CheckoutStepper';
 import { gsap, useGSAP } from '@/lib/gsap';
+import { useOnlineStatus } from '@/lib/hooks/useOnlineStatus';
 import { cn } from '@/lib/utils/cn';
 import { formatDate } from '@/lib/utils/date';
 import { haptic } from '@/lib/utils/haptics';
@@ -38,6 +41,7 @@ export function SuccessPage() {
 
   const reservationQuery = useReservation(ref, { live: true });
   const { payment, whatsappNumber } = usePaymentSettings();
+  const isOnline = useOnlineStatus();
 
   const reservation = reservationQuery.data;
 
@@ -259,7 +263,16 @@ export function SuccessPage() {
     );
   }
 
-  if (reservationQuery.isError || !reservation) {
+  // Données déjà chargées : elles passent avant une relecture échouée (M6 §6.3)
+  if (!reservation && (isNetworkError(reservationQuery.error) || !isOnline)) {
+    return (
+      <div className="px-page pt-10 pb-16">
+        <OfflineScreen onRetry={() => reservationQuery.refetch()} />
+      </div>
+    );
+  }
+
+  if (!reservation) {
     return (
       <div className="mx-auto max-w-content px-page py-12 text-center">
         <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-surface text-danger">

@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
+import { requestPersistentStorage } from '@/features/offline/persistentStorage';
 import { api } from '@/lib/api/client';
 import { endpoints } from '@/lib/api/endpoints';
 import { qk } from '@/lib/api/queryKeys';
@@ -105,6 +106,8 @@ export function useCreateReservation() {
     onSuccess: (created) => {
       queryClient.setQueryData(qk.reservation(created.ref), created);
       setActiveReservation(created, created.serverTime);
+      // Première réservation : le navigateur ne doit plus effacer les données de l'app (M6 §6.4)
+      void requestPersistentStorage();
       queryClient.invalidateQueries({ queryKey: qk.pendingReservations() });
       queryClient.invalidateQueries({ queryKey: qk.reservations() });
     },

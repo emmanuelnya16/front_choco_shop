@@ -6,6 +6,9 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { useSearchParams } from 'react-router';
 import { Button } from '@/components/ui/Button';
 import { Skeleton } from '@/components/ui/Primitives';
+import { useLastUpdateLabel } from '@/features/offline/lastUpdate';
+import { isNetworkError } from '@/features/offline/networkErrors';
+import { OfflineScreen } from '@/features/offline/OfflineScreen';
 import { useReservationsInfinite } from '@/features/tracking/api/useTrackingQueries';
 import { ParcelIllustration } from '@/features/tracking/components/ParcelIllustration';
 import { PullToRefresh } from '@/features/tracking/components/PullToRefresh';
@@ -14,6 +17,7 @@ import {
   ReservationCardSkeleton,
 } from '@/features/tracking/components/ReservationCard';
 import { useOnlineStatus } from '@/lib/hooks/useOnlineStatus';
+import { endpoints } from '@/lib/api/endpoints';
 import { qk } from '@/lib/api/queryKeys';
 import { cn } from '@/lib/utils/cn';
 import { useDocumentTitle } from '@/lib/utils/useDocumentTitle';
@@ -92,6 +96,11 @@ function ReservationsContent() {
   const [direction, setDirection] = useState(1);
 
   const query = useReservationsInfinite(scope);
+  // Dernier état connu hors connexion (M6 §6.3) : date de la dernière réponse du serveur
+  const lastUpdateLabel = useLastUpdateLabel(
+    endpoints.reservations.listScoped(scope, 1),
+    query.dataUpdatedAt,
+  );
   const items = useMemo(() => {
     // Une réservation qui vient de changer peut glisser d'une page à l'autre entre deux chargements
     const seen = new Set<string>();
@@ -138,13 +147,19 @@ function ReservationsContent() {
           </Button>
         </div>
 
-        {!online && (
+        {/* Sans statut enregistré, le contenu « hors connexion » de la liste explique la situation */}
+        {!online && query.data && (
           <div
             role="status"
             className="mt-4 flex items-start gap-2.5 rounded-[var(--radius-md)] bg-surface px-4 py-3 text-small text-ink"
           >
             <WifiOff className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-            Hors connexion : statuts affichés depuis votre dernière visite.
+            <span>
+              Hors connexion : statuts affichés depuis votre dernière visite.
+              {lastUpdateLabel && (
+                <span className="mt-0.5 block text-xs text-text-2">{lastUpdateLabel}.</span>
+              )}
+            </span>
           </div>
         )}
 
@@ -264,6 +279,11 @@ function ReservationsPanel({
         <ReservationCardSkeleton />
       </div>
     );
+  }
+
+  // Liste jamais chargée sur ce téléphone et réseau absent : contenu « hors connexion » (M6 §6.5)
+  if (query.isError && items.length === 0 && isNetworkError(query.error)) {
+    return <OfflineScreen headingLevel="h2" onRetry={() => query.refetch()} className="py-4" />;
   }
 
   if (query.isError && items.length === 0) {

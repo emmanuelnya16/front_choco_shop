@@ -1,11 +1,14 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { AlertCircle, ArrowLeft, Copy, Download, SearchX } from 'lucide-react';
+import { AlertCircle, ArrowLeft, Copy, Download, SearchX, WifiOff } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router';
 import { Button } from '@/components/ui/Button';
 import { Price, Skeleton } from '@/components/ui/Primitives';
 import { usePublicSettings } from '@/features/catalog/api/useCatalogQueries';
 import { ProductLightbox, type LightboxImage } from '@/features/catalog/product/ProductLightbox';
+import { useLastUpdateLabel } from '@/features/offline/lastUpdate';
+import { isNetworkError } from '@/features/offline/networkErrors';
+import { OfflineScreen } from '@/features/offline/OfflineScreen';
 import { useReservation } from '@/features/reservation/api/useReservationQueries';
 import {
   findReservationInListCache,
@@ -36,6 +39,8 @@ import {
   timelineStepLabel,
 } from '@/features/tracking/timeline';
 import { ApiError } from '@/lib/api/client';
+import { endpoints } from '@/lib/api/endpoints';
+import { useOnlineStatus } from '@/lib/hooks/useOnlineStatus';
 import { haptic } from '@/lib/utils/haptics';
 import { useDocumentTitle } from '@/lib/utils/useDocumentTitle';
 import { useAuthStore } from '@/stores/authStore';
@@ -159,6 +164,10 @@ function DetailLoading({ reservationRef }: { reservationRef: string }) {
 function DetailContent({ reservationRef }: { reservationRef: string }) {
   const query = useReservation(reservationRef, { live: true, intervalMs: TRACKING_POLL_INTERVAL_MS });
   const settingsQuery = usePublicSettings();
+  const lastUpdateLabel = useLastUpdateLabel(
+    endpoints.reservations.detail(reservationRef),
+    query.dataUpdatedAt,
+  );
 
   if (query.data) {
     return (
@@ -166,7 +175,18 @@ function DetailContent({ reservationRef }: { reservationRef: string }) {
         reservation={query.data}
         settings={settingsQuery.data}
         onRefresh={query.refetch}
+        lastUpdateLabel={lastUpdateLabel}
       />
+    );
+  }
+
+  // Réservation jamais consultée sur ce téléphone et réseau absent (M6 §6.5)
+  if (query.isError && isNetworkError(query.error)) {
+    return (
+      <PageFrame>
+        <BackLink />
+        <OfflineScreen className="mt-6" onRetry={() => query.refetch()} />
+      </PageFrame>
     );
   }
 
@@ -218,12 +238,16 @@ function DetailView({
   reservation,
   settings,
   onRefresh,
+  lastUpdateLabel,
 }: {
   reservation: Reservation;
   settings?: PublicSettings;
   onRefresh: () => unknown;
+  /** « Mis à jour le … » : affiché hors connexion (dernier état connu, M6 §6.3). */
+  lastUpdateLabel?: string | null;
 }) {
   const ref = reservation.ref;
+  const online = useOnlineStatus();
   const showToast = useToastStore((s) => s.show);
   const markSeen = useSeenStore((s) => s.markSeen);
   const markPhotosRevealed = useSeenStore((s) => s.markPhotosRevealed);
@@ -383,6 +407,21 @@ function DetailView({
       <p role="status" aria-live="polite" className="sr-only">
         {announcement}
       </p>
+
+      {!online && (
+        <div
+          role="status"
+          className="mt-4 flex items-start gap-2.5 rounded-[var(--radius-md)] bg-surface px-4 py-3 text-small text-ink"
+        >
+          <WifiOff className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          <span>
+            Hors connexion : dernier état connu de votre réservation.
+            {lastUpdateLabel && (
+              <span className="mt-0.5 block text-xs text-text-2">{lastUpdateLabel}.</span>
+            )}
+          </span>
+        </div>
+      )}
 
       <div className="mt-5 grid gap-6 lg:grid-cols-[3fr_2fr] lg:items-start lg:gap-8">
         <div className="min-w-0 space-y-6">

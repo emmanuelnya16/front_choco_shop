@@ -1,12 +1,14 @@
-import { Camera, ImageOff, RotateCcw } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { Camera, ImageOff, RotateCcw, WifiOff } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import type { ImageAspectRatio } from '@/components/ui/SmartImage';
 import { formatPackedAt } from '@/features/tracking/format';
 import { packagePhotoAlt, packagePhotoRatio } from '@/features/tracking/packagePhotos';
 import { gsap, useGSAP } from '@/lib/gsap';
+import { useOnlineStatus } from '@/lib/hooks/useOnlineStatus';
 import { cn } from '@/lib/utils/cn';
 import { haptic } from '@/lib/utils/haptics';
 import { prefersReducedMotion } from '@/motion/useReducedMotionPref';
+import { isAppOnline, useNetworkStore } from '@/pwa/networkStore';
 import type { PackagePhoto } from '@/types/domain';
 
 const ASPECT_CLASSES: Partial<Record<ImageAspectRatio, string>> = {
@@ -43,13 +45,30 @@ function PackagePhotoImage({
   onOpen: () => void;
   openLabel: string;
 }) {
-  const [state, setState] = useState<'loading' | 'loaded' | 'error'>('loading');
+  // « offline » : photo privée jamais enregistrée sur le téléphone, réseau absent (M6 §6.3)
+  const [state, setState] = useState<'loading' | 'loaded' | 'error' | 'offline'>('loading');
   const [attempt, setAttempt] = useState(0);
+  const stateRef = useRef(state);
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
+
+  // Retour du réseau : la photo restée indisponible se recharge d'elle-même
+  useEffect(
+    () =>
+      useNetworkStore.subscribe((network, previous) => {
+        if (network.online && !previous.online && stateRef.current === 'offline') {
+          setAttempt((n) => n + 1);
+          setState('loading');
+        }
+      }),
+    [],
+  );
 
   return (
     <div className="relative h-full w-full bg-surface">
       {state === 'loading' && <div aria-hidden="true" className="absolute inset-0 animate-pulse bg-surface" />}
-      {state !== 'error' && (
+      {state !== 'error' && state !== 'offline' && (
         <img
           key={attempt}
           src={photo.url}
@@ -59,6 +78,11 @@ function PackagePhotoImage({
           decoding="async"
           onLoad={() => setState('loaded')}
           onError={() => {
+            // Hors connexion : message propre, sans relancer les liens signés
+            if (!isAppOnline()) {
+              setState('offline');
+              return;
+            }
             // Premier échec : liens probablement expirés, la réservation est rechargée (nouvelle URL = nouvelle image)
             onFailure();
             setState('error');
@@ -69,13 +93,20 @@ function PackagePhotoImage({
           )}
         />
       )}
-      {state !== 'error' && (
+      {state !== 'error' && state !== 'offline' && (
         <button
           type="button"
           onClick={onOpen}
           aria-label={openLabel}
           className="absolute inset-0 rounded-[var(--radius-md)]"
         />
+      )}
+      {state === 'offline' && (
+        <div className="flex h-full w-full flex-col items-center justify-center gap-2 px-4 text-center">
+          <WifiOff className="h-6 w-6 text-text-2" aria-hidden="true" />
+          <p className="text-small font-semibold text-ink">Photo indisponible hors connexion</p>
+          <p className="text-xs text-text-2">Elle s&rsquo;affichera au retour du réseau.</p>
+        </div>
       )}
       {state === 'error' && (
         <div className="flex h-full w-full flex-col items-center justify-center gap-2 px-4 text-center">
@@ -113,6 +144,7 @@ export function PackagePhotos({
 }: PackagePhotosProps) {
   const scopeRef = useRef<HTMLElement | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
+  const online = useOnlineStatus();
   // Figé au montage : une mise à jour du `seenStore` en cours de route n'interrompt pas l'animation
   const [reveal] = useState(() => !alreadyRevealed);
   const active = photos[Math.min(activeIndex, photos.length - 1)] ?? photos[0];
@@ -217,15 +249,22 @@ export function PackagePhotos({
                   index === activeIndex ? 'ring-2 ring-ink' : 'ring-1 ring-silver/70',
                 )}
               >
-                <img
-                  src={photo.thumbnailUrl}
-                  alt=""
-                  width={56}
-                  height={56}
-                  loading="lazy"
-                  decoding="async"
-                  className="h-full w-full object-cover"
-                />
+                {online ? (
+                  <img
+                    src={photo.thumbnailUrl}
+                    alt=""
+                    width={56}
+                    height={56}
+                    loading="lazy"
+                    decoding="async"
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  // Miniature privée non enregistrée : pas d'image cassée hors connexion
+                  <span className="flex h-full w-full items-center justify-center bg-surface">
+                    <ImageOff className="h-4 w-4 text-text-2" aria-hidden="true" />
+                  </span>
+                )}
               </button>
             </li>
           ))}

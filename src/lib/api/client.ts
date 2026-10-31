@@ -1,10 +1,24 @@
 import { env } from '@/lib/env';
+import { useNetworkStore, useSyncStore } from '@/pwa/networkStore';
 import { useAuthStore } from '@/stores/authStore';
 import type { ApiErrorPayload, RefreshTokenResponse } from '@/types/api';
 import { endpoints } from './endpoints';
 
 const DEFAULT_TIMEOUT_MS = 15_000;
 const UPLOAD_TIMEOUT_MS = 30_000;
+
+/**
+ * État du réseau (M6 §6.1) : toute réponse reçue prouve que le serveur est joignable ; une coupure
+ * ou un délai dépassé compte comme un échec (2 échecs successifs = hors connexion).
+ * Renvoie `true` si la réponse vient vraiment du serveur (et non des données enregistrées).
+ */
+function reportResponseReceived(): boolean {
+  return useNetworkStore.getState().reportSuccess();
+}
+
+function reportNetworkFailure(): void {
+  useNetworkStore.getState().reportFailure();
+}
 
 export class ApiError extends Error {
   readonly status: number;
@@ -113,6 +127,7 @@ async function attemptTokenRefresh(): Promise<RefreshOutcome> {
         credentials: 'include',
         signal: controller.signal,
       });
+      reportResponseReceived();
 
       // HYPOTHÈSE: 401 et 403 sur /auth/refresh signifient « jeton de rafraîchissement refusé » ;
       // les erreurs 5xx sont momentanées et ne doivent pas déconnecter le client.
@@ -138,6 +153,7 @@ async function attemptTokenRefresh(): Promise<RefreshOutcome> {
       return { kind: 'rejected' };
     } catch (error) {
       const timedOut = error instanceof Error && error.name === 'AbortError';
+      reportNetworkFailure();
       return { kind: 'unreachable', timedOut };
     } finally {
       clearTimeout(timer);
@@ -185,6 +201,8 @@ async function request<T>(
     headers.set('Authorization', `Bearer ${token}`);
   }
 
+  // Une erreur levée après la réception de la réponse (JSON invalide…) n'est pas une coupure réseau
+  let responseReceived = false;
   try {
     const response = await fetch(buildUrl(path), {
       ...options,
@@ -193,6 +211,12 @@ async function request<T>(
       body: isFormData ? body : body !== undefined ? JSON.stringify(body) : undefined,
       signal: controller.signal,
     });
+    responseReceived = true;
+    const fromServer = reportResponseReceived();
+    if (fromServer && method === 'GET' && response.ok) {
+      // Date affichée hors connexion (« Mis à jour le … ») : seulement pour une vraie réponse du serveur
+      useSyncStore.getState().recordSync(path);
+    }
 
     if (response.status === 401 && !options.skipAuthRefresh && path !== endpoints.auth.refresh) {
       clearTimeout(timeoutId);
@@ -238,6 +262,10 @@ async function request<T>(
   } catch (error) {
     if (error instanceof ApiError) {
       throw error;
+    }
+
+    if (!responseReceived) {
+      reportNetworkFailure();
     }
 
     if (
@@ -287,6 +315,7 @@ function upload<T>(
     }
 
     xhr.onload = () => {
+      reportResponseReceived();
       let parsed: unknown;
       try {
         parsed = xhr.responseText ? JSON.parse(xhr.responseText) : null;
@@ -312,6 +341,7 @@ function upload<T>(
     };
 
     xhr.onerror = () => {
+      reportNetworkFailure();
       reject(
         new ApiError(
           0,
@@ -322,6 +352,7 @@ function upload<T>(
     };
 
     xhr.ontimeout = () => {
+      reportNetworkFailure();
       reject(
         new ApiError(
           408,

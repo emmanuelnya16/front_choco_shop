@@ -8,6 +8,9 @@ import { FloatingWhatsApp } from '@/components/layout/FloatingWhatsApp';
 import { SizePicker } from '@/components/ui/SizePicker';
 import { Toaster } from '@/components/ui/Toast';
 import { FlyToCartLayer } from '@/features/catalog/cart-fly/FlyToCartLayer';
+import { OfflineBanner } from '@/features/offline/OfflineBanner';
+import { OfflineRouteFallback } from '@/features/offline/OfflineRouteFallback';
+import { useIsOfflineChunkError } from '@/features/offline/useOfflineChunkError';
 import { PendingReservationBanner } from '@/features/reservation/components/PendingReservationBanner';
 import { PackageReadyNotifier } from '@/features/tracking/components/PackageReadyNotifier';
 import { refreshSessionSilently } from '@/lib/api/client';
@@ -42,6 +45,9 @@ export function RouteLoadingBar() {
 
 export function RouterErrorBoundary() {
   const error = useRouteError();
+  // Page jamais enregistrée et réseau absent : contenu « hors connexion » plutôt qu'une erreur (M6 §6.5)
+  const offlineChunk = useIsOfflineChunkError(error);
+  if (offlineChunk) return <OfflineRouteFallback />;
   const message =
     error instanceof Error ? error.message : 'Une erreur inattendue est survenue.';
 
@@ -104,6 +110,7 @@ export function RootLayout() {
       </a>
 
       <AppHeader />
+      <OfflineBanner />
       <PendingReservationBanner />
 
       <main id="contenu" className="flex-1">

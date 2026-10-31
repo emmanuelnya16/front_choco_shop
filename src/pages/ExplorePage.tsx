@@ -21,6 +21,8 @@ import {
   useProductsInfinite,
 } from '@/features/catalog/api/useCatalogQueries';
 import { AnimatedCounter } from '@/features/catalog/explore/AnimatedCounter';
+import { OfflineScreen } from '@/features/offline/OfflineScreen';
+import { useOnlineStatus } from '@/lib/hooks/useOnlineStatus';
 import { DesktopFilterSidebar } from '@/features/catalog/explore/DesktopFilterSidebar';
 import {
   FilterSheets,
@@ -101,9 +103,8 @@ export function ExplorePage() {
 
   const [activeSheet, setActiveSheet] = useState<ActiveFilterSheet>(null);
   const [showBackToTop, setShowBackToTop] = useState(false);
-  const [isOffline, setIsOffline] = useState(
-    () => typeof navigator !== 'undefined' && !navigator.onLine,
-  );
+  // État réseau unique de l'app (M6 §6.1)
+  const isOffline = !useOnlineStatus();
 
   const loadMoreSentinelRef = useRef<HTMLDivElement>(null);
 
@@ -144,18 +145,6 @@ export function ExplorePage() {
         : "Explorer le catalogue — DR Choco L'Incompris";
     document.title = docTitle;
   }, [activeLook, activeTab.label, filters.category]);
-
-  // Suivi de l'état réseau hors ligne (§5.5)
-  useEffect(() => {
-    const handleOnline = () => setIsOffline(false);
-    const handleOffline = () => setIsOffline(true);
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, []);
 
   // Bouton flottant « Remonter » après 1200 px de défilement (§5.4)
   useEffect(() => {
@@ -530,6 +519,9 @@ export function ExplorePage() {
                   <ProductCardSkeleton key={idx} />
                 ))}
               </div>
+            ) : isError && items.length === 0 && isOffline ? (
+              /* Catalogue jamais consulté et réseau absent : repli « hors connexion » (M6 §6.5) */
+              <OfflineScreen headingLevel="h2" onRetry={() => refetch()} className="py-6" />
             ) : isError && items.length === 0 ? (
               /* État d'erreur réseau (§5.5) */
               <div className="flex flex-col items-center justify-center rounded-[var(--radius-md)] border border-silver bg-surface px-6 py-14 text-center">

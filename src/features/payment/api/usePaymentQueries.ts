@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePublicSettings } from '@/features/catalog/api/useCatalogQueries';
 import { api, ApiError } from '@/lib/api/client';
 import { endpoints } from '@/lib/api/endpoints';
@@ -11,6 +11,7 @@ import type {
   UploadProofResponse,
 } from '@/types/api';
 import type { PaymentSettings, Reservation } from '@/types/domain';
+import { loadStoredPaymentSettings, saveStoredPaymentSettings } from './paymentSettingsStorage';
 
 const DEFAULT_PAYMENT_SETTINGS: PaymentSettings = {
   operators: [
@@ -50,16 +51,26 @@ const DEFAULT_PAYMENT_SETTINGS: PaymentSettings = {
 
 /**
  * Paramètres de paiement issus de `GET /settings/public` (§3.1 & §3.4).
+ * Hors connexion, les derniers paramètres reçus (conservés sur le téléphone) passent avant les
+ * valeurs fictives par défaut (M6 §6.3).
  */
 export function usePaymentSettings() {
   const query = usePublicSettings();
+  const [stored] = useState(loadStoredPaymentSettings);
+
+  const freshPayment = query.data?.payment;
+  const freshWhatsapp = query.data?.whatsappNumber;
+  useEffect(() => {
+    if (freshPayment) saveStoredPaymentSettings(freshPayment, freshWhatsapp);
+  }, [freshPayment, freshWhatsapp]);
+
   const payment: PaymentSettings =
-    query.data?.payment ?? DEFAULT_PAYMENT_SETTINGS;
+    freshPayment ?? stored?.payment ?? DEFAULT_PAYMENT_SETTINGS;
 
   return {
     ...query,
     payment,
-    whatsappNumber: query.data?.whatsappNumber ?? '+237690000000',
+    whatsappNumber: freshWhatsapp ?? stored?.whatsappNumber ?? '+237690000000',
   };
 }
 

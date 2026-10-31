@@ -17,6 +17,8 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { Button } from '@/components/ui/Button';
 import { Sheet } from '@/components/ui/Sheet';
+import { isNetworkError } from '@/features/offline/networkErrors';
+import { OfflineScreen } from '@/features/offline/OfflineScreen';
 import { usePaymentSettings, useUploadProof } from '@/features/payment/api/usePaymentQueries';
 import { ReservationExpiredOverlay } from '@/features/payment/components/ReservationExpiredOverlay';
 import {
@@ -25,16 +27,19 @@ import {
   ProofPreparationError,
   type PreparedProofResult,
 } from '@/features/payment/proof/prepareProof';
+import { forgetProof, recallProof, rememberProof } from '@/features/payment/proof/proofMemory';
 import { useReservation } from '@/features/reservation/api/useReservationQueries';
 import { CheckoutStepper } from '@/features/reservation/components/CheckoutStepper';
 import { HoldCountdown } from '@/features/reservation/components/HoldCountdown';
 import { ApiError } from '@/lib/api/client';
+import { useOnlineStatus } from '@/lib/hooks/useOnlineStatus';
 import { cn } from '@/lib/utils/cn';
 import { haptic } from '@/lib/utils/haptics';
 import { detectCmOperator } from '@/lib/utils/operator';
 import { formatCmPhone, normalizeCmPhone } from '@/lib/utils/phone';
 import { formatPrice } from '@/lib/utils/price';
 import { useDocumentTitle } from '@/lib/utils/useDocumentTitle';
+import { isAppOnline, useNetworkStore } from '@/pwa/networkStore';
 import { useReservationStore } from '@/stores/reservationStore';
 import { useToastStore } from '@/stores/toastStore';
 
@@ -58,20 +63,8 @@ export function ProofPage() {
 
   const reservation = reservationQuery.data;
 
-  const [isOnline, setIsOnline] = useState<boolean>(() =>
-    typeof navigator !== 'undefined' ? navigator.onLine : true,
-  );
-
-  useEffect(() => {
-    const onOnline = () => setIsOnline(true);
-    const onOffline = () => setIsOnline(false);
-    window.addEventListener('online', onOnline);
-    window.addEventListener('offline', onOffline);
-    return () => {
-      window.removeEventListener('online', onOnline);
-      window.removeEventListener('offline', onOffline);
-    };
-  }, []);
+  // État réseau unique de l'app (M6 §6.1)
+  const isOnline = useOnlineStatus();
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const autoRetriedNetworkRef = useRef(false);
@@ -80,7 +73,9 @@ export function ProofPage() {
     return paramOp === 'orange' || paramOp === 'mtn' ? paramOp : null;
   });
 
-  const [preparedProof, setPreparedProof] = useState<PreparedProofState | null>(null);
+  // Capture déjà préparée pour cette réservation (mémoire seulement, M6 §6.3) : retrouvée après un
+  // aller-retour vers l'écran de paiement pendant une coupure
+  const [preparedProof, setPreparedProof] = useState<PreparedProofState | null>(() => recallProof(ref));
   const [isPreparingSlow, setIsPreparingSlow] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [screenshotHelpOpen, setScreenshotHelpOpen] = useState(false);
@@ -138,15 +133,6 @@ export function ProofPage() {
     return undefined;
   }, [searchParams, setSearchParams]);
 
-  // Nettoyage de l'URL objet en mémoire au démontage
-  useEffect(() => {
-    return () => {
-      if (preparedProof?.previewUrl) {
-        URL.revokeObjectURL(preparedProof.previewUrl);
-      }
-    };
-  }, [preparedProof]);
-
   // Redirection selon le statut de la réservation
   useEffect(() => {
     if (!reservation) return;
@@ -180,17 +166,13 @@ export function ProofPage() {
       try {
         const maxMb = payment.proofMaxSizeMb ?? 10;
         const result = await prepareProof(file, { maxSizeMb: maxMb });
-        const previewUrl = URL.createObjectURL(result.blob);
-        setPreparedProof((prev) => {
-          if (prev?.previewUrl) {
-            URL.revokeObjectURL(prev.previewUrl);
-          }
-          return {
+        // L'aperçu (URL objet) est géré par la mémoire des captures : libéré quand elle est oubliée
+        setPreparedProof(
+          rememberProof(ref, {
             ...result,
-            previewUrl,
             fileName: file.name || `preuve-${ref.toLowerCase()}.jpg`,
-          };
-        });
+          }),
+        );
         haptic('light');
       } catch (err) {
         if (err instanceof ProofPreparationError) {
@@ -245,8 +227,8 @@ export function ProofPage() {
       return;
     }
 
-    if (!navigator.onLine) {
-      setErrorMessage('Reconnectez-vous pour envoyer votre preuve.');
+    if (!isAppOnline()) {
+      setErrorMessage('Reconnectez-vous pour envoyer votre preuve. Votre capture est conservée.');
       return;
     }
 
@@ -273,6 +255,7 @@ export function ProofPage() {
         `/reservation/${reservation.ref}/merci?resent=${isResendMode ? '1' : '0'}&operator=${selectedOperator}`,
         { replace: true },
       );
+      forgetProof(reservation.ref);
     } catch (err) {
       if (err instanceof ApiError) {
         if (err.code === 'UPLOAD_ABORTED') {
@@ -282,10 +265,8 @@ export function ProofPage() {
           const dupMsg =
             'Cette capture a déjà été envoyée pour une autre réservation. Envoyez la capture de ce paiement-ci.';
           setErrorMessage(dupMsg);
-          setPreparedProof((prev) => {
-            if (prev?.previewUrl) URL.revokeObjectURL(prev.previewUrl);
-            return null;
-          });
+          forgetProof(reservation.ref);
+          setPreparedProof(null);
           showToast({ message: dupMsg });
           return;
         }
@@ -308,7 +289,8 @@ export function ProofPage() {
           }
           return;
         }
-        if (err.status === 0 || err.code === 'NETWORK_ERROR') {
+        // Coupure ou délai dépassé (408) : même traitement, la capture est conservée (M6 §6.3)
+        if (isNetworkError(err)) {
           setIsNetworkInterrupted(true);
           setErrorMessage("L'envoi a été interrompu. Votre capture est conservée.");
           return;
@@ -333,17 +315,19 @@ export function ProofPage() {
     reservationQuery,
   ]);
 
-  // Reprise automatique une fois au retour du réseau (online) après coupure pendant l'envoi
-  useEffect(() => {
-    const handleOnline = () => {
-      if (isNetworkInterrupted && preparedProof && !autoRetriedNetworkRef.current) {
-        autoRetriedNetworkRef.current = true;
-        void submitProof();
-      }
-    };
-    window.addEventListener('online', handleOnline);
-    return () => window.removeEventListener('online', handleOnline);
-  }, [isNetworkInterrupted, preparedProof, submitProof]);
+  // Reprise automatique une fois au retour du réseau après coupure pendant l'envoi (évènement du
+  // navigateur ou première requête réussie, M6 §6.1)
+  useEffect(
+    () =>
+      useNetworkStore.subscribe((state, previous) => {
+        if (!state.online || previous.online) return;
+        if (isNetworkInterrupted && preparedProof && !autoRetriedNetworkRef.current) {
+          autoRetriedNetworkRef.current = true;
+          void submitProof();
+        }
+      }),
+    [isNetworkInterrupted, preparedProof, submitProof],
+  );
 
   // Palier de progression annoncé aux lecteurs d'écran par paliers de 25 %
   const announcedProgressMilestone = Math.floor(uploadMutation.progress / 25) * 25;
@@ -366,7 +350,16 @@ export function ProofPage() {
     );
   }
 
-  if (reservationQuery.isError || !reservation) {
+  // Données déjà chargées : elles passent avant une relecture échouée (M6 §6.3)
+  if (!reservation && (isNetworkError(reservationQuery.error) || !isOnline)) {
+    return (
+      <div className="px-page pt-10 pb-16">
+        <OfflineScreen onRetry={() => reservationQuery.refetch()} />
+      </div>
+    );
+  }
+
+  if (!reservation) {
     return (
       <div className="mx-auto max-w-content px-page py-12 text-center">
         <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-surface text-danger">
@@ -448,11 +441,14 @@ export function ProofPage() {
             {reservation.proof?.thumbnailUrl ? (
               <div className="flex items-center gap-3 rounded-[var(--radius-sm)] border border-silver bg-white p-2.5">
                 <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-[var(--radius-sm)] border border-danger/40 bg-surface">
-                  <img
-                    src={reservation.proof.thumbnailUrl}
-                    alt="Capture précédente refusée"
-                    className="h-full w-full object-cover opacity-50 grayscale"
-                  />
+                  {/* Photo privée, jamais enregistrée : pas d'image cassée hors connexion */}
+                  {isOnline ? (
+                    <img
+                      src={reservation.proof.thumbnailUrl}
+                      alt="Capture précédente refusée"
+                      className="h-full w-full object-cover opacity-50 grayscale"
+                    />
+                  ) : null}
                   <div
                     className="pointer-events-none absolute inset-0 flex items-center justify-center"
                     aria-hidden="true"
@@ -744,15 +740,23 @@ export function ProofPage() {
           </div>
 
           {!isOnline && !isUploading ? (
-            <Button
-              variant="primary"
-              size="lg"
-              fullWidth
-              disabled
-              iconLeft={<WifiOff className="h-5 w-5" />}
-            >
-              Reconnectez-vous pour envoyer votre preuve.
-            </Button>
+            <div className="space-y-2">
+              <Button
+                variant="primary"
+                size="lg"
+                fullWidth
+                disabled
+                iconLeft={<WifiOff className="h-5 w-5" />}
+              >
+                Reconnectez-vous pour envoyer votre preuve.
+              </Button>
+              {/* Envoi bloqué hors connexion : explication, la capture reste sur l'écran (M6 §6.3) */}
+              <p role="status" className="text-center text-small text-text-2">
+                {preparedProof
+                  ? 'Votre capture est gardée sur cet écran : vous pourrez l’envoyer dès le retour du réseau.'
+                  : 'Vous pouvez déjà choisir votre capture : elle sera gardée jusqu’au retour du réseau.'}
+              </p>
+            </div>
           ) : isUploading ? (
             <div className="flex flex-col items-center justify-center space-y-3 py-2">
               <m.div

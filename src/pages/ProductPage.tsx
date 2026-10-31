@@ -28,6 +28,9 @@ import { ProductGallery } from '@/features/catalog/product/ProductGallery';
 import { ProductLightbox } from '@/features/catalog/product/ProductLightbox';
 import { ProductSeo } from '@/features/catalog/product/ProductSeo';
 import { SizeGuideSheet } from '@/features/catalog/product/SizeGuideSheet';
+import { isNetworkError } from '@/features/offline/networkErrors';
+import { OfflineScreen } from '@/features/offline/OfflineScreen';
+import { useOnlineStatus } from '@/lib/hooks/useOnlineStatus';
 import { cn } from '@/lib/utils/cn';
 import { haptic } from '@/lib/utils/haptics';
 import { formatPrice } from '@/lib/utils/price';
@@ -35,6 +38,7 @@ import { ease } from '@/motion/tokens';
 import { useReducedMotionPref } from '@/motion/useReducedMotionPref';
 import { useCartStore } from '@/stores/cartStore';
 import { useFavoritesStore } from '@/stores/favoritesStore';
+import { useRecentlyViewedStore } from '@/stores/recentlyViewedStore';
 import { useToastStore } from '@/stores/toastStore';
 import { useUiStore } from '@/stores/uiStore';
 import type { Product, ProductColor, ProductImageEntry } from '@/types/domain';
@@ -72,6 +76,15 @@ export function ProductPage() {
 
   const { data: product, isLoading, isError, error, refetch } = useProduct(slug);
   const { data: popularFallback } = useProducts({ sort: 'popular', pageSize: 4 });
+  const isOnline = useOnlineStatus();
+
+  const handleBack = () => {
+    if (window.history.length > 2) {
+      navigate(-1);
+    } else {
+      navigate('/explorer', { viewTransition: true });
+    }
+  };
 
   if (isLoading && !product) {
     return <ProductPageSkeleton />;
@@ -120,7 +133,26 @@ export function ProductPage() {
     );
   }
 
-  if (isError || !product) {
+  // Données déjà chargées : elles passent avant une relecture échouée (M6 §6.3)
+  if (!product && (isNetworkError(error) || (!isOnline && !isLoading))) {
+    // Fiche jamais consultée et réseau absent : repli « hors connexion » (M6 §6.5)
+    return (
+      <Container className="pt-[calc(env(safe-area-inset-top)+var(--offline-banner-h,0px)+16px)] pb-14 lg:pt-14">
+        {/* Pas d'en-tête sur la fiche mobile : retour explicite (indispensable en mode application) */}
+        <button
+          type="button"
+          onClick={handleBack}
+          className="-ml-2 inline-flex min-h-[44px] items-center gap-2 px-2 text-small font-semibold text-ink lg:hidden"
+        >
+          <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+          Retour
+        </button>
+        <OfflineScreen onRetry={() => refetch()} className="mt-4 lg:mt-0" />
+      </Container>
+    );
+  }
+
+  if (!product) {
     return (
       <Container className="py-14">
         <div className="mx-auto max-w-md rounded-[var(--radius-md)] border border-silver bg-surface p-6 text-center">
@@ -149,13 +181,7 @@ export function ProductPage() {
       key={product.id}
       product={product}
       relatedProducts={product.related ?? []}
-      onBack={() => {
-        if (window.history.length > 2) {
-          navigate(-1);
-        } else {
-          navigate('/explorer', { viewTransition: true });
-        }
-      }}
+      onBack={handleBack}
     />
   );
 }
@@ -186,6 +212,12 @@ function ProductDetailView({
   useEffect(() => {
     setActiveTransitionSlug(product.slug);
   }, [product.slug, setActiveTransitionSlug]);
+
+  // Derniers articles consultés, proposés hors connexion (M6 §6.5)
+  const recordRecentlyViewed = useRecentlyViewedStore((s) => s.record);
+  useEffect(() => {
+    recordRecentlyViewed(product);
+  }, [product, recordRecentlyViewed]);
 
   // Galerie d'images typée (§7.2)
   const galleryImages = useMemo<ProductImageEntry[]>(() => {
@@ -490,7 +522,7 @@ function ProductDetailView({
             animate={{ y: '0%', opacity: 1 }}
             exit={{ y: '-100%', opacity: 0 }}
             transition={{ duration: 0.22, ease: ease.out }}
-            className="fixed top-0 right-0 left-0 z-header flex h-[52px] items-center justify-between border-b border-silver/70 bg-white/95 px-4 pt-safe shadow-[var(--shadow-header)] backdrop-blur-md lg:hidden"
+            className="fixed top-[var(--offline-banner-h,0px)] right-0 left-0 z-header flex h-[52px] items-center justify-between border-b border-silver/70 bg-white/95 px-4 pt-safe shadow-[var(--shadow-header)] backdrop-blur-md lg:hidden"
           >
             <button
               type="button"
@@ -530,7 +562,7 @@ function ProductDetailView({
       {/* =====================================================================
        * BOUTONS RONDS FLOTTANTS SUR LA PHOTO MOBILE (Retour, Favori, Partager, §7.1)
        * ===================================================================== */}
-      <div className="pointer-events-none fixed top-3 right-4 left-4 z-sticky flex items-center justify-between pt-safe lg:hidden">
+      <div className="pointer-events-none fixed top-[calc(0.75rem+var(--offline-banner-h,0px))] right-4 left-4 z-sticky flex items-center justify-between pt-safe lg:hidden">
         <button
           type="button"
           onClick={onBack}

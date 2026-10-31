@@ -19,6 +19,8 @@ import { Button } from '@/components/ui/Button';
 import { Container, Price } from '@/components/ui/Primitives';
 import { Sheet } from '@/components/ui/Sheet';
 import { SmartImage } from '@/components/ui/SmartImage';
+import { isNetworkError } from '@/features/offline/networkErrors';
+import { OfflineScreen } from '@/features/offline/OfflineScreen';
 import {
   useCancelReservation,
   usePaymentSettings,
@@ -33,6 +35,7 @@ import {
 import { useReservation } from '@/features/reservation/api/useReservationQueries';
 import { CheckoutStepper } from '@/features/reservation/components/CheckoutStepper';
 import { HoldCountdown } from '@/features/reservation/components/HoldCountdown';
+import { useOnlineStatus } from '@/lib/hooks/useOnlineStatus';
 import { cn } from '@/lib/utils/cn';
 import { haptic } from '@/lib/utils/haptics';
 import { detectCmOperator } from '@/lib/utils/operator';
@@ -97,9 +100,10 @@ export function PaymentPage() {
   const openAuthSheet = useUiStore((s) => s.openAuthSheet);
   const showToast = useToastStore((s) => s.show);
 
-  const { data: reservation, isLoading, isError } = useReservation(ref, {
+  const { data: reservation, isLoading, error, refetch } = useReservation(ref, {
     live: true,
   });
+  const isOnline = useOnlineStatus();
   const { payment, whatsappNumber } = usePaymentSettings();
   const cancelMutation = useCancelReservation(ref);
 
@@ -197,12 +201,14 @@ export function PaymentPage() {
 
   // Authentification requise (§8 M3)
   useEffect(() => {
+    // Session en cours de restauration (profil connu) : on attend, l'écran reste lisible hors connexion
+    if (authStatus === 'unknown' && authUser) return;
     if (authStatus !== 'authenticated') {
       openAuthSheet(undefined, () => {
         navigate('/panier', { replace: true });
       });
     }
-  }, [authStatus, openAuthSheet, navigate]);
+  }, [authStatus, authUser, openAuthSheet, navigate]);
 
   // Redirections automatiques selon le statut de la réservation (§4.5 & §7.1)
   useEffect(() => {
@@ -268,7 +274,19 @@ export function PaymentPage() {
     );
   }
 
-  if ((isError || !reservation) && !isLoading) {
+  // Données déjà chargées : elles passent avant une relecture échouée (M6 §6.3)
+  if (!reservation && !isLoading && (isNetworkError(error) || !isOnline)) {
+    return (
+      <div>
+        <CheckoutStepper currentStep={2} />
+        <Container className="py-10">
+          <OfflineScreen onRetry={() => refetch()} />
+        </Container>
+      </div>
+    );
+  }
+
+  if (!reservation && !isLoading) {
     return (
       <div>
         <CheckoutStepper currentStep={2} />
@@ -689,6 +707,13 @@ export function PaymentPage() {
                               <span>Composer le code de paiement</span>
                             </a>
                           </div>
+                        )}
+                        {/* Le code USSD passe par le réseau téléphonique : le paiement reste possible sans Internet */}
+                        {!isOnline && (
+                          <p className="mt-2 text-center text-xs font-semibold text-text-2">
+                            Pas besoin d&rsquo;Internet pour payer : le code passe par le réseau
+                            téléphonique. Vous enverrez la capture au retour du réseau.
+                          </p>
                         )}
                       </div>
 

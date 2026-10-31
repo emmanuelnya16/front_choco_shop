@@ -3,6 +3,7 @@ import {
   Clock,
   Search as SearchIcon,
   TrendingUp,
+  WifiOff,
   X,
 } from 'lucide-react';
 import * as m from 'motion/react-m';
@@ -29,6 +30,7 @@ import {
   POPULAR_SEARCH_CHIPS,
   useRecentSearches,
 } from '@/features/catalog/search/recentSearches';
+import { useOnlineStatus } from '@/lib/hooks/useOnlineStatus';
 import { cn } from '@/lib/utils/cn';
 import { useReducedMotionPref } from '@/motion/useReducedMotionPref';
 import { useUiStore } from '@/stores/uiStore';
@@ -68,6 +70,7 @@ export function SearchPage() {
 
   const { data: categoriesData } = useCategories();
   const { data: suggestData, isFetching } = useSearchSuggest(query, 250);
+  const isOnline = useOnlineStatus();
 
   // Si un paramètre `?q=` est validé dans l'URL, charge aussi la grille complète
   const committedQuery = searchParams.get('q')?.trim() ?? '';
@@ -219,6 +222,19 @@ export function SearchPage() {
       </div>
 
       <Container className="pt-6">
+        {/* Recherche en direct bloquée hors connexion, avec explication (M6 §6.3) */}
+        {!isOnline && (
+          <p
+            role="status"
+            className="mb-6 flex items-start gap-2.5 rounded-[var(--radius-md)] border border-white/15 bg-ink-2 px-4 py-3 text-small text-white"
+          >
+            <WifiOff className="mt-0.5 h-4 w-4 shrink-0 text-silver" aria-hidden="true" />
+            <span>
+              Hors connexion : la recherche en direct reprendra au retour du réseau. Les articles
+              déjà consultés restent visibles dans le catalogue.
+            </span>
+          </p>
+        )}
         {!hasTypedEnough ? (
           /* ÉTAT 1 : AVANT LA FRAPPE (< 2 caractères, §6.1) */
           <div className="space-y-8">
@@ -324,6 +340,25 @@ export function SearchPage() {
                 ))}
               </div>
             </section>
+          </div>
+        ) : !isOnline && !suggestData ? (
+          /* Hors connexion sans résultat enregistré : pas de faux « Aucun article trouvé » */
+          <div className="rounded-[var(--radius-md)] border border-white/15 bg-ink-2 px-6 py-12 text-center">
+            <WifiOff className="mx-auto h-9 w-9 text-silver" aria-hidden="true" />
+            <h2 className="mt-3 text-h2 text-white">Recherche indisponible hors connexion</h2>
+            <p className="mt-1.5 text-small text-silver">
+              Réessayez au retour du réseau ou parcourez le catalogue déjà enregistré.
+            </p>
+            <div className="mt-6">
+              <Link
+                to="/explorer"
+                viewTransition
+                className="inline-flex min-h-[44px] items-center gap-2 rounded-[var(--radius-md)] bg-red px-5 py-2.5 text-small font-bold text-white"
+              >
+                <span>Voir le catalogue</span>
+                <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              </Link>
+            </div>
           </div>
         ) : suggestions.length === 0 && !isFetching ? (
           /* ÉTAT VIDE : Aucun résultat pour la requête (§6.1) */

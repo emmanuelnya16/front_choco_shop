@@ -140,12 +140,14 @@ export function CheckoutPage() {
   // Garde d'authentification : si le client n'est pas connecté, ouvre AuthSheet par-dessus (§8)
   useEffect(() => {
     if (items.length === 0 || confirmedRef) return;
+    // Session en cours de restauration (profil connu) : le formulaire reste remplissable hors connexion
+    if (authStatus === 'unknown' && user) return;
     if (authStatus !== 'authenticated') {
       openAuthSheet(undefined, () => {
         navigate('/panier', { replace: true });
       });
     }
-  }, [authStatus, items.length, confirmedRef, openAuthSheet, navigate]);
+  }, [authStatus, user, items.length, confirmedRef, openAuthSheet, navigate]);
 
   const initialDraft = useMemo(() => loadReservationDraft(), []);
 
@@ -1225,7 +1227,8 @@ export function CheckoutPage() {
 
               {!isOnline && (
                 <p role="alert" className="mt-3 text-xs font-bold text-warning">
-                  Vous êtes hors connexion. Reconnectez-vous pour réserver.
+                  Vous êtes hors connexion. Reconnectez-vous pour réserver : vos informations
+                  restent enregistrées.
                 </p>
               )}
 
@@ -1262,7 +1265,8 @@ export function CheckoutPage() {
           <div className="fixed right-0 bottom-0 left-0 z-40 border-t border-silver/70 bg-white px-4 pt-3 pb-[calc(12px+env(safe-area-inset-bottom))] shadow-[var(--shadow-nav)] lg:hidden">
             {!isOnline && (
               <p role="alert" className="mb-2 text-xs font-bold text-warning">
-                Vous êtes hors connexion. Reconnectez-vous pour réserver.
+                Vous êtes hors connexion. Reconnectez-vous pour réserver : vos informations
+                restent enregistrées.
               </p>
             )}
             <div className="flex items-center justify-between gap-3">

@@ -1,7 +1,7 @@
 import { AnimatePresence } from 'motion/react';
 import * as m from 'motion/react-m';
 import { useEffect, useState } from 'react';
-import { Logo } from '@/components/ui/Logo';
+import { LOGO_EMBLEM_SRC } from '@/components/ui/logoAssets';
 import { ease } from '@/motion/tokens';
 import {
   decideSplash,
@@ -45,7 +45,8 @@ export function SplashScreen() {
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: SPLASH_LOGO_IN_MS / 1000, ease: ease.out }}
           >
-            <Logo variant="light" size="lg" />
+            {/* Même emblème que l'écran de démarrage du système, centré sur fond ink */}
+            <img src={LOGO_EMBLEM_SRC} alt="" width={160} height={160} className="h-40 w-40" />
           </m.div>
         </m.div>
       )}

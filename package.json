@@ -16,7 +16,7 @@
     "analyze": "vite build --mode analyze",
     "mock:api": "tsx server/mock-api.ts",
     "preview:pwa": "tsc -b && vite build --mode pwa && vite preview --mode pwa --port 4173 --strictPort --host 127.0.0.1",
-    "icons": "pwa-assets-generator && node scripts/generate-extra-icons.mjs",
+    "icons": "node scripts/prepare-logo.mjs && pwa-assets-generator && node scripts/generate-extra-icons.mjs",
     "screenshots": "node scripts/capture-manifest-screenshots.mjs"
   },
   "dependencies": {

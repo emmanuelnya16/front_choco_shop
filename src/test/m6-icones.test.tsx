@@ -92,10 +92,10 @@ describe('M6 · Icônes · index.html', () => {
     expect(meta('viewport')).toContain('viewport-fit=cover');
   });
 
-  it('favicon.ico, favicon.svg et apple-touch-icon pointent vers des fichiers existants', () => {
+  it('favicon.ico, icône 64 px et apple-touch-icon pointent vers des fichiers existants', () => {
     const icons = links('icon');
-    expect(icons.map((icon) => icon.href)).toEqual(['/favicon.ico', '/favicon.svg']);
-    expect(icons[1].type).toBe('image/svg+xml');
+    expect(icons.map((icon) => icon.href)).toEqual(['/favicon.ico', '/pwa-64x64.png']);
+    expect(icons[1].type).toBe('image/png');
     const apple = links('apple-touch-icon');
     expect(apple.map((icon) => icon.href)).toEqual(['/apple-touch-icon-180x180.png']);
     for (const { href } of [...icons, ...apple]) expect(PUBLIC_FILES.has(href)).toBe(true);

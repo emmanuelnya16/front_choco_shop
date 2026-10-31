@@ -80,7 +80,7 @@ drchoco-app/
 ├─ index.html                       # Point d'entrée HTML (lang="fr", theme-color #1A1A18)
 ├─ public/
 │  ├─ mockServiceWorker.js          # Service Worker généré par MSW
-│  ├─ favicon.svg                   # Monogramme "C" blanc sur carré anthracite
+│  ├─ favicon.ico, pwa-*.png        # Icônes générées depuis le logo officiel (npm run icons)
 │  ├─ _redirects                    # Redirection SPA pour Netlify
 │  └─ mock/                         # Silhouettes produits 4:5 et photos de colis en SVG local
 ├─ src/

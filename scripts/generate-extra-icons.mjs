@@ -1,8 +1,9 @@
 // Icônes complémentaires de l'application installable (M6 §4.2), lancé par `npm run icons`
 // après pwa-assets-generator (pwa-assets.config.ts) :
-//   - public/pwa-64x64.png et public/favicon.ico : monogramme de public/favicon.svg (le logotype
-//     complet devient illisible sous 64 px) ;
-//   - public/badge-96.png : silhouette blanche sur fond transparent (pastille des notifications Android) ;
+//   - public/pwa-64x64.png et public/favicon.ico : logo du client (public/brand/logo-choco-white.png,
+//     préparé par scripts/prepare-logo.mjs) sur fond ink ;
+//   - public/badge-96.png : silhouette blanche du logo sur fond transparent (pastille des notifications
+//     Android, qui n'utilise que l'opacité) ;
 //   - public/shortcuts/*-96.png : pictogrammes des raccourcis du manifeste, ceux de la barre de navigation.
 // Vérifie aussi que index.html référence exactement les écrans de démarrage de public/splash/.
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -20,17 +21,6 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const PUBLIC = join(ROOT, 'public');
 // Sans palette : couleurs exactes (fond #1A1A18), les fichiers restent minuscules
 const PNG = { compressionLevel: 9 };
-
-/** Monogramme (« C » et point rouge) lu dans public/favicon.svg, en unités 64 × 64. */
-function readMonogram() {
-  const svg = readFileSync(join(PUBLIC, 'favicon.svg'), 'utf8');
-  const letter = /<path[^>]*\sd="([^"]+)"/.exec(svg)?.[1];
-  const dot = /<circle[^>]*\scx="([\d.]+)"[^>]*\scy="([\d.]+)"[^>]*\sr="([\d.]+)"/.exec(svg);
-  if (!letter || !dot) {
-    throw new Error('public/favicon.svg : tracé du « C » (<path d>) ou point (<circle cx cy r>) introuvable.');
-  }
-  return { svg, letter, dot: { cx: Number(dot[1]), cy: Number(dot[2]), r: Number(dot[3]) } };
-}
 
 /** Encode un fichier .ico à partir d'images PNG (format accepté depuis Windows Vista). */
 function encodeIco(images) {
@@ -52,22 +42,6 @@ function encodeIco(images) {
     offset += data.length;
   });
   return Buffer.concat([header, ...images.map((image) => image.data)]);
-}
-
-/** Pastille : « C » blanc échancré autour du point, pour que le point reste visible en silhouette. */
-function badgeSvg({ letter, dot }) {
-  // Contenu (x 16→52, y 10,5→53,5 en unités 64) ramené à 80 px de haut, centré dans 96 px
-  const scale = 80 / 43;
-  const tx = 48 - 34 * scale;
-  const ty = 48 - 32 * scale;
-  const gap = 2;
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96">
-  <defs><mask id="notch"><rect width="64" height="64" fill="#FFFFFF"/><circle cx="${dot.cx}" cy="${dot.cy}" r="${dot.r + gap}" fill="#000000"/></mask></defs>
-  <g transform="translate(${tx.toFixed(3)} ${ty.toFixed(3)}) scale(${scale.toFixed(5)})" fill="${WHITE}">
-    <path d="${letter}" mask="url(#notch)"/>
-    <circle cx="${dot.cx}" cy="${dot.cy}" r="${dot.r}"/>
-  </g>
-</svg>`;
 }
 
 function iconNodeToSvg(node) {
@@ -120,23 +94,34 @@ function checkSplashLinks() {
   }
 }
 
-const monogram = readMonogram();
+const LOGO = join(PUBLIC, 'brand', 'logo-choco-white.png');
 mkdirSync(join(PUBLIC, 'shortcuts'), { recursive: true });
 
-// Fond transparent des coins arrondis remplacé par ink : carré plein comme les icônes 192 et 512
-await writePng(monogram.svg, join(PUBLIC, 'pwa-64x64.png'), { size: 64, flatten: INK });
+/** Logo blanc centré sur carré ink plein (marge de chaque côté : padding × taille). */
+async function logoOnInk(size, padding) {
+  const inner = Math.round(size * (1 - 2 * padding));
+  const logo = await sharp(LOGO).resize(inner, inner, { kernel: 'lanczos3' }).toBuffer();
+  return sharp({ create: { width: size, height: size, channels: 4, background: INK } })
+    .composite([{ input: logo, gravity: 'center' }])
+    .png(PNG)
+    .toBuffer();
+}
+
+writeFileSync(join(PUBLIC, 'pwa-64x64.png'), await logoOnInk(64, 0.04));
+console.log(`Créé : ${join(PUBLIC, 'pwa-64x64.png')}`);
 
 const icoSizes = [16, 32, 48];
-const icoImages = await Promise.all(
-  icoSizes.map(async (size) => ({
-    size,
-    data: await sharp(Buffer.from(monogram.svg), { density: 288 }).resize(size, size).png(PNG).toBuffer(),
-  })),
-);
+const icoImages = await Promise.all(icoSizes.map(async (size) => ({ size, data: await logoOnInk(size, 0) })));
 writeFileSync(join(PUBLIC, 'favicon.ico'), encodeIco(icoImages));
 console.log(`Créé : ${join(PUBLIC, 'favicon.ico')} (${icoSizes.join(', ')} px)`);
 
-await writePng(badgeSvg(monogram), join(PUBLIC, 'badge-96.png'), { size: 96 });
+// Pastille : silhouette blanche du logo (opacité conservée), 88 px centrés dans 96 px
+const badgeLogo = await sharp(LOGO).resize(88, 88, { kernel: 'lanczos3' }).toBuffer();
+await sharp({ create: { width: 96, height: 96, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } })
+  .composite([{ input: badgeLogo, gravity: 'center' }])
+  .png(PNG)
+  .toFile(join(PUBLIC, 'badge-96.png'));
+console.log(`Créé : ${join(PUBLIC, 'badge-96.png')}`);
 
 const shortcuts = { explorer: layoutGridIcon, reservations: receiptTextIcon, panier: shoppingBagIcon };
 for (const [name, node] of Object.entries(shortcuts)) {

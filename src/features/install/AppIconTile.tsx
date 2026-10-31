@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { cn } from '@/lib/utils/cn';
 
 const APP_ICON_SRC = '/pwa-192x192.png';
-const APP_ICON_FALLBACK_SRC = '/favicon.svg';
+const APP_ICON_FALLBACK_SRC = '/pwa-64x64.png';
 
 interface AppIconTileProps {
   className?: string;

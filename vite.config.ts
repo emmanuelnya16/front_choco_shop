@@ -51,7 +51,7 @@ export default defineConfig(({ mode, command }) => {
       manifest: pwaManifest,
       includeManifestIcons: false,
       injectManifest: {
-        globPatterns: ['**/*.{js,css,html,woff2,svg}', 'pwa-192x192.png', 'badge-96.png'],
+        globPatterns: ['**/*.{js,css,html,woff2,svg}', 'assets/logo-choco-*.webp', 'pwa-192x192.png', 'badge-96.png'],
         globIgnores: [
           '**/*.map',
           '**/stats.html',

@@ -6,12 +6,18 @@ import { extendTailwindMerge } from 'tailwind-merge';
  * Sans cette déclaration, tailwind-merge les prend pour des couleurs de texte :
  * cn('text-small', 'text-ink') supprimait text-small (tailles de texte perdues partout).
  */
-const TYPOGRAPHY_SCALE = ['display', 'h1', 'h2', 'h3', 'body', 'small', 'label', 'price'];
+const TYPOGRAPHY_SCALE = ['display', 'h1', 'h2', 'h3', 'body', 'small', 'caption', 'label', 'price'];
+
+/** Durées et courbes nommées (src/styles/index.css, mêmes valeurs que src/motion/tokens.ts). */
+const DURATIONS = ['tap', 'fast', 'quick', 'base', 'slow', 'reveal', 'story'];
+const EASINGS = ['brand-out', 'brand-in-out'];
 
 const twMerge = extendTailwindMerge({
   extend: {
     classGroups: {
       'font-size': [{ text: TYPOGRAPHY_SCALE }],
+      duration: [{ duration: DURATIONS }],
+      ease: [{ ease: EASINGS }],
     },
   },
 });

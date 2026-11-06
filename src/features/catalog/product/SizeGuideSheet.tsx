@@ -26,7 +26,7 @@ export function SizeGuideSheet({ open, onClose, sizeGuide }: SizeGuideSheetProps
         <div className="overflow-x-auto rounded-[var(--radius-md)] border border-silver">
           <table className="w-full border-collapse text-left text-small">
             <thead>
-              <tr className="border-b border-silver bg-surface text-xs font-bold uppercase text-ink">
+              <tr className="border-b border-silver bg-surface text-label text-ink">
                 {sizeGuide.headers.map((col) => (
                   <th key={col} scope="col" className="px-3.5 py-2.5">
                     {col}

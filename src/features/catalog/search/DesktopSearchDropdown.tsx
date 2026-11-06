@@ -13,6 +13,7 @@ import {
   POPULAR_SEARCH_CHIPS,
   useRecentSearches,
 } from '@/features/catalog/search/recentSearches';
+import { seeResultsLabel } from '@/features/catalog/search/searchLabels';
 import { cn } from '@/lib/utils/cn';
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -72,7 +73,8 @@ export function DesktopSearchDropdown({
   if (!open) return null;
 
   const handleSelectTerm = (term: string, targetUrl?: string) => {
-    addRecent(term);
+    // Raccourci vers un filtre (taille, prix) : pas un terme à garder dans l'historique
+    if (!targetUrl) addRecent(term);
     onClose();
     if (targetUrl) {
       navigate(targetUrl, { viewTransition: true });
@@ -110,7 +112,7 @@ export function DesktopSearchDropdown({
       <div
         aria-hidden="true"
         onClick={onClose}
-        className="fixed inset-0 top-[72px] z-30 bg-[var(--color-scrim-40)]"
+        className="fixed inset-0 top-[var(--desktop-shell-top)] z-header bg-[var(--color-scrim-40)]"
       />
 
       <div
@@ -119,7 +121,7 @@ export function DesktopSearchDropdown({
         role="listbox"
         aria-label="Suggestions de recherche"
         onKeyDown={handleKeyDownInput}
-        className="absolute top-[calc(100%+8px)] left-1/2 z-50 w-[640px] -translate-x-1/2 overflow-hidden rounded-[var(--radius-md)] border border-silver bg-white p-5 text-ink shadow-[var(--shadow-sheet)]"
+        className="absolute top-[calc(100%+8px)] left-1/2 z-overlay w-160 -translate-x-1/2 overflow-hidden rounded-[var(--radius-md)] border border-silver bg-white p-5 text-ink shadow-[var(--shadow-sheet)]"
       >
         {!hasTypedEnough ? (
           <div className="space-y-6">
@@ -131,7 +133,7 @@ export function DesktopSearchDropdown({
                   <button
                     type="button"
                     onClick={clearRecent}
-                    className="text-xs font-bold text-red hover:underline"
+                    className="inline-flex min-h-8 items-center text-caption font-bold text-red hover:underline"
                   >
                     Effacer
                   </button>
@@ -140,7 +142,7 @@ export function DesktopSearchDropdown({
                   {recentSearches.map((item) => (
                     <div
                       key={item}
-                      className="inline-flex items-center gap-1.5 rounded-[var(--radius-md)] border border-silver bg-surface px-3 py-1.5 text-xs font-semibold text-ink"
+                      className="inline-flex items-center gap-1.5 rounded-[var(--radius-md)] border border-silver bg-surface px-3 py-1.5 text-caption font-semibold text-ink"
                     >
                       <button
                         type="button"
@@ -157,7 +159,7 @@ export function DesktopSearchDropdown({
                         type="button"
                         onClick={() => removeRecent(item)}
                         aria-label={`Supprimer ${item} des recherches récentes`}
-                        className="ml-1 text-text-2 hover:text-ink"
+                        className="-my-1 ml-0.5 inline-flex h-6 w-6 items-center justify-center rounded-[var(--radius-full)] text-text-2 hover:text-ink"
                       >
                         <X className="h-3 w-3" aria-hidden="true" />
                       </button>
@@ -184,7 +186,7 @@ export function DesktopSearchDropdown({
                         <SmartImage
                           src={cat.coverImage}
                           fallback={cat.fallbackImage}
-                          alt={cat.name}
+                          alt=""
                           ratio="4/5"
                           className="h-full w-full"
                         />
@@ -193,8 +195,8 @@ export function DesktopSearchDropdown({
                         <p className="truncate text-small font-bold text-ink group-hover:text-red">
                           {cat.name}
                         </p>
-                        <p className="text-xs text-text-2">
-                          {cat.productCount} articles
+                        <p className="text-caption text-text-2">
+                          {cat.productCount} {cat.productCount > 1 ? 'articles' : 'article'}
                         </p>
                       </div>
                     </Link>
@@ -212,7 +214,7 @@ export function DesktopSearchDropdown({
                     key={chip.label}
                     type="button"
                     onClick={() => handleSelectTerm(chip.query, chip.targetUrl)}
-                    className="inline-flex items-center gap-1.5 rounded-[var(--radius-md)] border border-silver bg-white px-3 py-1.5 text-xs font-semibold text-ink transition-colors hover:border-ink hover:bg-surface"
+                    className="inline-flex min-h-8 items-center gap-1.5 rounded-[var(--radius-md)] border border-silver bg-white px-3 py-1.5 text-caption font-semibold text-ink transition-colors hover:border-ink hover:bg-surface"
                   >
                     <TrendingUp className="h-3.5 w-3.5 text-red" aria-hidden="true" />
                     <span>{chip.label}</span>
@@ -226,10 +228,10 @@ export function DesktopSearchDropdown({
           <div className="py-6 text-center">
             <Search className="mx-auto h-7 w-7 text-text-2" aria-hidden="true" />
             <p className="mt-2 text-body font-bold text-ink">
-              Aucun article trouvé pour « {query.trim()} »
+              Aucun article trouvé pour «&nbsp;{query.trim()}&nbsp;»
             </p>
-            <p className="mt-1 text-xs text-text-2">
-              Essayez un terme plus court ou choisissez une suggestion populaire :
+            <p className="mt-1 text-caption text-text-2">
+              Essayez un terme plus court ou choisissez une recherche populaire&nbsp;:
             </p>
             <div className="mt-4 flex flex-wrap justify-center gap-2">
               {POPULAR_SEARCH_CHIPS.map((chip) => (
@@ -237,7 +239,7 @@ export function DesktopSearchDropdown({
                   key={chip.label}
                   type="button"
                   onClick={() => handleSelectTerm(chip.query, chip.targetUrl)}
-                  className="rounded-[var(--radius-md)] border border-silver bg-surface px-3 py-1.5 text-xs font-semibold text-ink hover:border-ink"
+                  className="inline-flex min-h-8 items-center rounded-[var(--radius-md)] border border-silver bg-surface px-3 py-1.5 text-caption font-semibold text-ink hover:border-ink"
                 >
                   {chip.label}
                 </button>
@@ -250,11 +252,11 @@ export function DesktopSearchDropdown({
             <div className="flex items-center justify-between pb-2">
               <span className="text-label text-text-2">ARTICLES SUGGÉRÉS</span>
               {isFetching && (
-                <span className="text-xs text-text-2">Recherche…</span>
+                <span className="text-caption text-text-2">Recherche…</span>
               )}
             </div>
 
-            <ul className="divide-y divide-silver/40">
+            <ul role="none" className="divide-y divide-silver/40">
               {suggestions.map((product, idx) => {
                 const totalStock = product.totalStock ?? 5;
                 const isSoldOut = totalStock === 0;
@@ -262,7 +264,7 @@ export function DesktopSearchDropdown({
                 const isHighlighted = idx === activeIndex;
 
                 return (
-                  <li key={product.id}>
+                  <li key={product.id} role="none">
                     <button
                       type="button"
                       role="option"
@@ -274,41 +276,39 @@ export function DesktopSearchDropdown({
                       )}
                     >
                       <div className="flex min-w-0 items-center gap-3.5">
-                        <div className="h-[70px] w-[56px] shrink-0 overflow-hidden rounded-[var(--radius-sm)] bg-surface">
+                        <div className="w-14 shrink-0 overflow-hidden rounded-[var(--radius-sm)] bg-surface">
                           <SmartImage
                             src={product.image}
                             fallback={product.fallbackImage}
-                            alt={product.name}
+                            alt=""
                             ratio="4/5"
                             className="h-full w-full"
                           />
                         </div>
                         <div className="min-w-0">
-                          <p className="truncate text-small font-semibold text-ink">
+                          <p className="line-clamp-2 text-small font-semibold text-ink">
                             <HighlightMatch text={product.name} query={query} />
                           </p>
-                          <p className="mt-0.5 text-xs text-text-2">
+                          <p className="mt-0.5 text-caption text-text-2">
                             {CATEGORY_LABELS[product.categorySlug] ??
                               product.categorySlug}
                           </p>
                           <Price
                             amount={product.price}
-                            className="mt-1 block text-small text-ink"
+                            className="mt-1 block text-small font-bold text-ink"
                           />
                         </div>
                       </div>
 
-                      <div className="shrink-0">
-                        {isSoldOut ? (
-                          <Badge variant="sold-out" />
-                        ) : isLowStock ? (
-                          <Badge variant="low-stock" lowStockCount={totalStock} />
-                        ) : (
-                          <span className="text-xs font-semibold text-success">
-                            En stock
-                          </span>
-                        )}
-                      </div>
+                      {(isSoldOut || isLowStock) && (
+                        <div className="shrink-0">
+                          {isSoldOut ? (
+                            <Badge variant="sold-out" />
+                          ) : (
+                            <Badge variant="low-stock" lowStockCount={totalStock} />
+                          )}
+                        </div>
+                      )}
                     </button>
                   </li>
                 );
@@ -320,13 +320,10 @@ export function DesktopSearchDropdown({
                 <button
                   type="button"
                   onClick={() => handleSelectTerm(query.trim())}
-                  className="flex w-full items-center justify-between rounded-[var(--radius-md)] bg-ink px-4 py-2.5 text-small font-bold text-white transition-colors hover:bg-ink-2"
+                  className="flex min-h-11 w-full items-center justify-between gap-3 rounded-[var(--radius-md)] bg-ink px-4 py-2.5 text-left text-small font-bold text-white transition-colors hover:bg-ink-2"
                 >
-                  <span>
-                    Voir les {totalMatches} résultat{totalMatches > 1 ? 's' : ''} pour «{' '}
-                    {query.trim()} »
-                  </span>
-                  <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                  <span>{seeResultsLabel(totalMatches, query.trim())}</span>
+                  <ArrowRight className="h-4 w-4 shrink-0" aria-hidden="true" />
                 </button>
               </div>
             )}

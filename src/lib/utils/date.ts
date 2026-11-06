@@ -66,3 +66,18 @@ export function formatCountdown(ms: number): string {
   const paddedMinutes = String(minutes).padStart(2, '0');
   return `${paddedHours} h ${paddedMinutes} min`;
 }
+
+/**
+ * Horaires au format de la charte : « Lun – Sam · 9 h – 19 h 30 » (« 09h00 » → « 9 h »,
+ * « 19h30 » → « 19 h 30 », « à » ou trait d'union entre deux heures → tiret demi-cadratin),
+ * avec des espaces insécables autour de « h » (l'horaire ne se coupe pas en fin de ligne).
+ */
+export function formatOpeningHours(raw: string): string {
+  const nbsp = String.fromCharCode(0xa0);
+  const normalized = raw.replace(/(\d{1,2})\s*h(?:\s*(\d{2}))?/gi, (_match, h: string, min?: string) => {
+    const hours = String(Number(h));
+    return min && min !== '00' ? [hours, 'h', min].join(nbsp) : [hours, 'h'].join(nbsp);
+  });
+  // « 9 h à 19 h 30 » → « 9 h – 19 h 30 » (l'espace insécable compte comme un blanc)
+  return normalized.replace(/(h(?:\s\d{2})?)\s+(?:à|-|–)\s+(\d)/g, '$1 – $2');
+}

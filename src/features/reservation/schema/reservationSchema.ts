@@ -1,39 +1,19 @@
+import { zodResolver } from '@hookform/resolvers/zod';
+import type { Resolver } from 'react-hook-form';
 import { z } from 'zod';
 import { isValidCmPhone } from '@/lib/utils/phone';
-import { formatPrice } from '@/lib/utils/price';
-import type { DeliveryCity, ReceptionMode } from '@/types/domain';
+import type { DeliveryCity } from '@/types/domain';
+import { isCityLocal, type ReservationFormValues } from './reservationRules';
 
-export interface ReservationFormValues {
-  firstName: string;
-  lastName: string;
-  receptionMode: ReceptionMode;
-  city: string;
-  district: string;
-  landmark: string;
-  agencyId: string;
-  recipientType: 'self' | 'other';
-  recipientName: string;
-  recipientPhone: string;
-  notes: string;
-  saveAddress: boolean;
-  addressLabel: 'Maison' | 'Bureau' | 'Autre';
-}
-
-export function isCityLocal(
-  cityNameOrId: string,
-  cities?: DeliveryCity[],
-): boolean {
-  const cleaned = cityNameOrId.trim().toLowerCase();
-  if (!cleaned) return false;
-  if (cities && cities.length > 0) {
-    const match = cities.find(
-      (c) =>
-        c.name.toLowerCase() === cleaned || c.id.toLowerCase() === cleaned,
-    );
-    if (match) return match.isLocal;
-  }
-  return cleaned === 'douala' || cleaned === 'city-dla';
-}
+// Règles sans zod, réexportées pour les modules existants (profil, tests)
+export {
+  computeReservationAmounts,
+  isCityLocal,
+  minDeliveryFee,
+  type ReservationAmountComputation,
+  type ReservationAmountInput,
+  type ReservationFormValues,
+} from './reservationRules';
 
 /**
  * Schéma Zod du formulaire de réservation (§6.1 à §6.7 & §9.3) :
@@ -47,7 +27,7 @@ export function createReservationFormSchema(cities?: DeliveryCity[]) {
       firstName: z
         .string()
         .trim()
-        .min(1, 'Indiquez votre prénom pour préparer votre commande.'),
+        .min(1, 'Indiquez votre prénom pour préparer votre réservation.'),
       lastName: z.string().trim(),
       receptionMode: z.enum(['delivery', 'pickup']),
       city: z.string().trim(),
@@ -111,7 +91,7 @@ export function addDeliveryAddressIssues(
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['district'],
-        message: 'Indiquez votre quartier (ex. : Bonamoussadi, Akwa).',
+        message: 'Indiquez votre quartier (ex.\u00A0: Bonamoussadi, Akwa).',
       });
     }
     if (data.landmark.length < 5) {
@@ -153,71 +133,10 @@ export function addDeliveryAddressIssues(
 }
 
 
-export interface ReservationAmountInput {
-  subtotal: number;
-  receptionMode: ReceptionMode;
-  selectedCity?: DeliveryCity | null;
-  deliveryFeePayment?: 'upfront' | 'on_delivery';
-}
-
-export interface ReservationAmountComputation {
-  subtotal: number;
-  deliveryFee: number;
-  countedDeliveryFee: number;
-  total: number;
-  deliveryLabel: string;
-  isOnDelivery: boolean;
-}
-
 /**
- * Calcule les montants du récapitulatif de réservation (§6.6 & §9.3).
+ * Validation du formulaire de réservation pour react-hook-form, construite à la demande :
+ * la page Réservation charge ce module (et zod) seulement au moment de valider (M7, poids).
  */
-export function computeReservationAmounts({
-  subtotal,
-  receptionMode,
-  selectedCity,
-  deliveryFeePayment = 'upfront',
-}: ReservationAmountInput): ReservationAmountComputation {
-  if (receptionMode === 'pickup') {
-    return {
-      subtotal,
-      deliveryFee: 0,
-      countedDeliveryFee: 0,
-      total: subtotal,
-      deliveryLabel: 'Gratuit',
-      isOnDelivery: false,
-    };
-  }
-
-  if (!selectedCity) {
-    return {
-      subtotal,
-      deliveryFee: 0,
-      countedDeliveryFee: 0,
-      total: subtotal,
-      deliveryLabel: 'À choisir',
-      isOnDelivery: false,
-    };
-  }
-
-  const fee = selectedCity.fee;
-  if (deliveryFeePayment === 'on_delivery') {
-    return {
-      subtotal,
-      deliveryFee: fee,
-      countedDeliveryFee: 0,
-      total: subtotal,
-      deliveryLabel: 'À payer à la réception',
-      isOnDelivery: true,
-    };
-  }
-
-  return {
-    subtotal,
-    deliveryFee: fee,
-    countedDeliveryFee: fee,
-    total: subtotal + fee,
-    deliveryLabel: formatPrice(fee),
-    isOnDelivery: false,
-  };
+export function buildReservationResolver(cities?: DeliveryCity[]): Resolver<ReservationFormValues> {
+  return zodResolver(createReservationFormSchema(cities));
 }

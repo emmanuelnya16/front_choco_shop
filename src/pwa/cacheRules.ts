@@ -3,15 +3,8 @@
  * importées par src/sw.ts et testées sans navigateur.
  */
 
-export const CACHE_NAMES = {
-  pages: 'pages',
-  catalog: 'api-catalog',
-  user: 'api-user',
-  images: 'images',
-  fonts: 'fonts',
-} as const;
-
-export type CacheName = (typeof CACHE_NAMES)[keyof typeof CACHE_NAMES];
+// Noms des caches et routes protégées des mises à jour : module à part, léger, importé par l'app
+export { CACHE_NAMES, isUpdateBlockedPath, type CacheName } from './cacheNames';
 
 export type CacheStrategy =
   /** Jamais mis en cache : directement au réseau. */
@@ -186,10 +179,4 @@ export function isCacheableResponse(
     if (!EXPECTED_CONTENT_TYPE[strategy].test(contentType)) return false;
   }
   return true;
-}
-
-/** Routes de l'app qui ne doivent jamais proposer ni forcer une mise à jour (M6 §4.7). */
-export function isUpdateBlockedPath(pathname: string): boolean {
-  const path = pathname.replace(/\/+$/, '') || '/';
-  return /^\/reservation$/.test(path) || /^\/reservation\/[^/]+\/(paiement|preuve)$/.test(path);
 }

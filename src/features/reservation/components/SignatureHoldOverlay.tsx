@@ -1,7 +1,8 @@
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/Button';
 import { gsap, SplitText, useGSAP } from '@/lib/gsap';
 import { haptic } from '@/lib/utils/haptics';
+import { delay, duration, gsapEase, staggerStep } from '@/motion/tokens';
 import { useReducedMotionPref } from '@/motion/useReducedMotionPref';
 import type { SourceRect } from '@/stores/uiStore';
 
@@ -18,8 +19,9 @@ export interface SignatureHoldOverlayProps {
  * - 0,9 s : Titre « ARTICLES MIS DE CÔTÉ » monte de derrière son masque (`text-h1`, blanc).
  * - 1,1 s : Numéro `RES-000124` apparaît caractère par caractère (`SplitText chars`, décalage `0,03 s`), en `text-display` réduit, blanc.
  * - 1,35 s : Phrase « Réservés pour vous pendant 24 h. Payez maintenant par Mobile Money. » en fondu.
- * - 2,2 s : Transition automatique vers `/reservation/:ref/paiement`.
- * - Un appui n'importe où passe directement à la page de paiement.
+ * - ≈ 2,2 s : Transition automatique vers `/reservation/:ref/paiement`.
+ * - Un appui n'importe où, ou le bouton « Payer maintenant » (clavier), passe directement au paiement :
+ *   l'animation ne retarde jamais l'action (M7 §4.4). Durées et courbes : src/motion/tokens.ts.
  * - Animations réduites : affichage direct + bouton « Payer maintenant » (pas de transition automatique).
  */
 export function SignatureHoldOverlay({
@@ -30,6 +32,13 @@ export function SignatureHoldOverlay({
   const scopeRef = useRef<HTMLDivElement>(null);
   const reducedMotion = useReducedMotionPref();
   const completedRef = useRef(false);
+
+  // Le focus va au bouton « Payer maintenant » : action possible au clavier dès l'apparition
+  useEffect(() => {
+    scopeRef.current
+      ?.querySelector<HTMLButtonElement>('[data-sig-pay]')
+      ?.focus({ preventScroll: true });
+  }, []);
 
   const triggerComplete = () => {
     if (completedRef.current) return;
@@ -71,20 +80,27 @@ export function SignatureHoldOverlay({
         },
       });
 
-      // 0 s : expansion du calque ink depuis le bouton
+      // Positions de la frise calculées à partir des jetons de mouvement
+      const tCircle = duration.slow; // 0,45 s
+      const tCheck = tCircle + duration.base; // 0,8 s
+      const tTitle = tCircle * 2; // 0,9 s
+      const tRef = tTitle + delay.short * 2; // 1,1 s
+      const tSubtitle = tRef + duration.quick; // 1,35 s
+
+      // 0 s : expansion du calque ink depuis le bouton (rideau)
       tl.fromTo(
         '.sig-backdrop',
         { clipPath: initialClip },
-        { clipPath: finalClip, duration: 0.6, ease: 'power3.inOut' },
+        { clipPath: finalClip, duration: duration.curtain, ease: gsapEase.inOut },
         0,
       );
 
-      // 0,45 s : cercle silver/20 (DrawSVG 0,6 s) puis coche blanche (0,35 s)
+      // Cercle silver/20 puis coche blanche
       tl.fromTo(
         '.sig-circle',
         { drawSVG: '0%' },
-        { drawSVG: '100%', duration: 0.6, ease: 'power2.out' },
-        0.45,
+        { drawSVG: '100%', duration: duration.slow, ease: gsapEase.soft },
+        tCircle,
       );
 
       tl.fromTo(
@@ -92,47 +108,47 @@ export function SignatureHoldOverlay({
         { drawSVG: '0%' },
         {
           drawSVG: '100%',
-          duration: 0.35,
-          ease: 'power2.out',
+          duration: duration.base,
+          ease: gsapEase.soft,
           onStart: () => {
             haptic('success');
           },
         },
-        0.75,
+        tCheck,
       );
 
-      // 0,9 s : titre « ARTICLES MIS DE CÔTÉ » monte de derrière son masque
+      // Titre « ARTICLES MIS DE CÔTÉ » qui monte de derrière son masque
       tl.fromTo(
         '.sig-title-inner',
         { yPercent: 110, autoAlpha: 0 },
-        { yPercent: 0, autoAlpha: 1, duration: 0.45, ease: 'power3.out' },
-        0.9,
+        { yPercent: 0, autoAlpha: 1, duration: duration.slow, ease: gsapEase.base },
+        tTitle,
       );
 
-      // 1,1 s : numéro RES-000124 caractère par caractère
+      // Numéro RES-000124 caractère par caractère
       tl.fromTo(
         splitRef.chars,
         { yPercent: 60, autoAlpha: 0 },
         {
           yPercent: 0,
           autoAlpha: 1,
-          duration: 0.32,
-          stagger: 0.03,
-          ease: 'power3.out',
+          duration: duration.base,
+          stagger: staggerStep / 2,
+          ease: gsapEase.base,
         },
-        1.1,
+        tRef,
       );
 
-      // 1,35 s : phrase d'accompagnement en fondu
+      // Phrase d'accompagnement et bouton en fondu (opacité seule : le bouton reste utilisable)
       tl.fromTo(
         '.sig-subtitle',
-        { autoAlpha: 0, y: 8 },
-        { autoAlpha: 1, y: 0, duration: 0.4, ease: 'power2.out' },
-        1.35,
+        { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: duration.slow, ease: gsapEase.soft },
+        tSubtitle,
       );
 
-      // 2,2 s : maintien jusqu'à 2,2 s avant passage automatique au paiement
-      tl.to({}, { duration: 0.45 }, 1.75);
+      // Courte pause avant le passage automatique au paiement
+      tl.to({}, { duration: duration.slow }, '>');
 
       return () => {
         splitRef.revert();
@@ -148,7 +164,7 @@ export function SignatureHoldOverlay({
       aria-modal="true"
       aria-label="Vos articles sont mis de côté"
       onClick={!reducedMotion ? triggerComplete : undefined}
-      className="sig-backdrop fixed inset-0 z-[80] flex cursor-pointer flex-col items-center justify-center bg-ink px-6 text-center text-white"
+      className="sig-backdrop fixed inset-0 z-overlay flex cursor-pointer flex-col items-center justify-center bg-ink px-page text-center text-white"
     >
       <div className="mx-auto flex max-w-md flex-col items-center">
         {/* Cercle silver 20 % + coche blanche */}
@@ -177,32 +193,42 @@ export function SignatureHoldOverlay({
 
         {/* Titre masqué */}
         <div className="mt-6 overflow-hidden">
-          <h1 className="sig-title-inner text-h1 text-white">
+          {/* h2 : le titre h1 de la page Réservation reste dessous */}
+          <h2 className="sig-title-inner text-h1 text-white">
             ARTICLES MIS DE CÔTÉ
-          </h1>
+          </h2>
         </div>
 
         {/* Référence RES-000124 */}
+        {/* Taille fluide propre à ce moment (choix graphique : la référence à retenir) */}
         <p className="sig-ref-code mt-3 font-mono text-[clamp(2rem,6vw,3.25rem)] font-black tracking-tight text-white">
           {reservationRef}
         </p>
 
         {/* Phrase d'accompagnement */}
         <p className="sig-subtitle mt-3 max-w-sm text-body text-silver">
-          Réservés pour vous pendant 24 h. Payez maintenant par Mobile Money.
+          Réservés pour vous pendant 24&nbsp;h. Payez maintenant par Mobile Money.
         </p>
 
-        {reducedMotion ? (
-          <div className="mt-8">
-            <Button variant="primary" size="lg" onClick={triggerComplete}>
+        <div className={reducedMotion ? 'mt-8' : 'sig-subtitle mt-8'}>
+          {reducedMotion ? (
+            <Button data-sig-pay variant="primary" size="lg" onClick={triggerComplete}>
               Payer maintenant
             </Button>
-          </div>
-        ) : (
-          <span className="mt-8 text-xs font-semibold uppercase tracking-widest text-grey">
-            Touchez l&rsquo;écran pour continuer →
-          </span>
-        )}
+          ) : (
+            <button
+              data-sig-pay
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                triggerComplete();
+              }}
+              className="inline-flex min-h-11 items-center px-4 text-label text-grey underline-offset-4 transition-colors duration-fast hover:text-white hover:underline"
+            >
+              Payer maintenant →
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

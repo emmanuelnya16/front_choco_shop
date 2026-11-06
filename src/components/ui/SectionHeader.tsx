@@ -53,11 +53,11 @@ export function SectionHeader({
         {actionHref && (
           <Link
             to={actionHref}
-            className="group inline-flex min-h-[40px] items-center gap-1.5 text-small font-semibold text-ink whitespace-nowrap [@media(hover:hover)]:hover:underline"
+            className="group inline-flex min-h-11 items-center gap-1.5 text-small font-semibold text-ink whitespace-nowrap [@media(hover:hover)]:hover:underline"
           >
             <span>{actionLabel}</span>
             <ArrowRight
-              className="h-4 w-4 transition-transform duration-200 [@media(hover:hover)]:group-hover:translate-x-1"
+              className="h-4 w-4 transition-transform duration-fast [@media(hover:hover)]:group-hover:translate-x-1"
               aria-hidden="true"
             />
           </Link>

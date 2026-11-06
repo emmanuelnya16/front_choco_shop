@@ -299,5 +299,6 @@ export function resetOverlayHistoryForTests(url = '/'): void {
   syncCurrent();
 }
 
-// Installé dès l'import (Sheet est importé par RootLayout, lui-même importé par le routeur)
+// Installé dès l'import : src/main.tsx l'importe avant l'app, donc avant createBrowserRouter
+// (les feuilles sont chargées à la demande, bien après la création du routeur).
 install();

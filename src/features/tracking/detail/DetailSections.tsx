@@ -1,4 +1,4 @@
-import { Clock, ExternalLink, MapPin, MessageCircle, Phone, Store, Truck, User } from 'lucide-react';
+import { Clock, ExternalLink, LifeBuoy, MapPin, MessageCircle, Phone, Store, Truck, User } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router';
 import { Button } from '@/components/ui/Button';
@@ -29,18 +29,19 @@ export function ItemsSection({ reservation }: { reservation: Reservation }) {
     <SectionCard title={`Articles (${reservation.items.reduce((s, i) => s + i.quantity, 0)})`}>
       <ul className="divide-y divide-silver/60">
         {reservation.items.map((item) => (
-          <li key={item.id} className="flex gap-3 py-3 first:pt-0 last:pb-0">
+          <li key={item.id} className="relative flex gap-3 py-3 first:pt-0 last:pb-0">
             <SmartImage
               src={item.image}
               alt=""
               ratio="4/5"
-              className="h-[70px] w-14 shrink-0 rounded-[var(--radius-sm)]"
+              className="w-14 shrink-0 rounded-[var(--radius-sm)]"
             />
             <div className="min-w-0 flex-1">
               <Link
                 to={`/produit/${item.slug}`}
                 viewTransition
-                className="line-clamp-2 text-small font-semibold text-ink underline-offset-2 hover:underline"
+                // Lien étendu à toute la ligne (cible tactile de la hauteur de la miniature)
+                className="line-clamp-2 text-small font-semibold text-ink underline-offset-2 after:absolute after:inset-0 after:content-[''] hover:underline focus-visible:outline-none focus-visible:after:rounded-[var(--radius-sm)] focus-visible:after:outline-2 focus-visible:after:outline-red"
               >
                 {item.name}
               </Link>
@@ -135,7 +136,7 @@ export function ReceptionSection({
               {agency.phone && (
                 <InfoLine icon={<Phone className="h-4 w-4" />}>
                   <a href={telHref(agency.phone)} className="font-semibold whitespace-nowrap underline">
-                    {agency.phone}
+                    {formatCmPhone(agency.phone)}
                   </a>
                 </InfoLine>
               )}
@@ -144,7 +145,7 @@ export function ReceptionSection({
         )}
         {recipientDiffers && address && (
           <InfoLine icon={<User className="h-4 w-4" />}>
-            Destinataire : {address.recipientName} ·{' '}
+            Destinataire&nbsp;: {address.recipientName} ·{' '}
             <a href={telHref(address.recipientPhone)} className="whitespace-nowrap underline">
               {formatCmPhone(address.recipientPhone)}
             </a>
@@ -152,7 +153,7 @@ export function ReceptionSection({
         )}
         {reservation.notes && (
           <p className="rounded-[var(--radius-sm)] bg-surface px-3 py-2.5 text-small text-text-2">
-            Remarque : {reservation.notes}
+            Remarque&nbsp;: {reservation.notes}
           </p>
         )}
       </div>
@@ -196,19 +197,23 @@ export function PaymentSection({
           </dd>
         </div>
         <div className="flex justify-between gap-3">
-          <dt className="text-text-2">Livraison</dt>
+          <dt className="text-text-2">
+            {reservation.receptionMode === 'pickup' ? 'Retrait en boutique' : 'Livraison'}
+          </dt>
           <dd>
             {amount.deliveryFee > 0 ? (
               <Price amount={amount.deliveryFee} className="font-normal text-ink" />
             ) : (
-              <span className="text-ink">Offerte</span>
+              <span className="text-ink">
+                {reservation.receptionMode === 'pickup' ? 'Gratuit' : 'Offerte'}
+              </span>
             )}
           </dd>
         </div>
         <div className="flex justify-between gap-3 border-t border-silver/60 pt-2">
           <dt className="font-semibold text-ink">Total</dt>
           <dd>
-            <Price amount={amount.total} className="text-[16px] text-ink" />
+            <Price amount={amount.total} className="text-body text-ink" />
           </dd>
         </div>
       </dl>
@@ -218,51 +223,60 @@ export function PaymentSection({
           <button
             type="button"
             onClick={onOpenProof}
-            aria-label="Agrandir la capture de paiement envoyée"
-            className="h-[72px] w-12 shrink-0 overflow-hidden rounded-[var(--radius-sm)] ring-1 ring-silver/70"
+            aria-label="Agrandir la preuve de paiement envoyée"
+            className="h-18 w-12 shrink-0 overflow-hidden rounded-[var(--radius-sm)] ring-1 ring-silver/70"
           >
             <SmartImage src={proof.thumbnailUrl} alt="" ratio="auto" className="h-full w-full" />
           </button>
           <p className="text-small text-text-2">
-            Capture envoyée le {formatStepDateTime(proof.uploadedAt).replace(' · ', ' à ')}
+            Preuve de paiement envoyée le {formatStepDateTime(proof.uploadedAt).replace(' · ', ' à ')}
           </p>
         </div>
       ) : (
-        <p className="mt-4 text-small text-text-2">Aucune capture de paiement envoyée pour l’instant.</p>
+        <p className="mt-4 text-small text-text-2">Aucune preuve de paiement envoyée pour l’instant.</p>
       )}
     </SectionCard>
   );
 }
 
-/** Aide : WhatsApp prérempli et lien discret d'annulation si `cancellable` (§5.1 M5). */
+/**
+ * Aide : WhatsApp prérempli et lien discret d'annulation si `cancellable` (§5.1 M5).
+ * Numéro de la boutique inconnu : centre d'aide à la place (jamais de faux numéro).
+ */
 export function HelpSection({
   reservation,
   whatsappNumber,
   onRequestCancel,
 }: {
   reservation: Reservation;
-  whatsappNumber: string;
+  whatsappNumber: string | null;
   onRequestCancel: () => void;
 }) {
   return (
     <SectionCard title="Aide">
-      <Button
-        variant="outline"
-        size="md"
-        fullWidth
-        href={buildWhatsAppQuestionUrl(whatsappNumber, reservation.ref)}
-        external
-        iconLeft={<MessageCircle className="h-4 w-4" />}
-        iconRight={<ExternalLink className="h-3.5 w-3.5" />}
-      >
-        Contacter la boutique sur WhatsApp
-      </Button>
+      {whatsappNumber ? (
+        <Button
+          variant="outline"
+          size="md"
+          fullWidth
+          href={buildWhatsAppQuestionUrl(whatsappNumber, reservation.ref)}
+          external
+          iconLeft={<MessageCircle className="h-4 w-4" />}
+          iconRight={<ExternalLink className="h-3.5 w-3.5" />}
+        >
+          Contacter la boutique sur WhatsApp
+        </Button>
+      ) : (
+        <Button variant="outline" size="md" fullWidth href="/aide" iconLeft={<LifeBuoy className="h-4 w-4" />}>
+          Consulter le centre d’aide
+        </Button>
+      )}
       {reservation.cancellable && (
         <div className="mt-3 text-center">
           <button
             type="button"
             onClick={onRequestCancel}
-            className="min-h-[44px] px-2 text-small text-text-2 underline underline-offset-2 hover:text-ink"
+            className="min-h-11 px-2 text-small text-text-2 underline underline-offset-2 hover:text-ink"
           >
             Annuler la réservation
           </button>

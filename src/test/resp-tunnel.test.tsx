@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { RouterProvider } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppProviders } from '@/app/providers';
@@ -21,6 +21,9 @@ const JUNIOR: User = {
   lastName: 'Mbarga',
   createdAt: '2026-09-15T10:00:00.000Z',
 };
+
+/** Pages du tunnel chargées à la demande : délai plus large quand toute la suite tourne en parallèle. */
+const LAZY_ROUTE = { timeout: 8000 };
 
 function renderApp(path: string) {
   const router = createTestRouter([path]);
@@ -82,7 +85,7 @@ describe('Responsive tunnel · feuille de connexion au rechargement direct', () 
     useAuthStore.setState({ user: JUNIOR, accessToken: null, status: 'unknown' });
 
     renderApp('/reservation');
-    expect(await screen.findByText('FINALISER LA RÉSERVATION')).toBeInTheDocument();
+    expect(await screen.findByText('FINALISER LA RÉSERVATION', {}, LAZY_ROUTE)).toBeInTheDocument();
     await flushEffects();
 
     expect(useAuthStore.getState().status).toBe('unknown');
@@ -98,7 +101,7 @@ describe('Responsive tunnel · feuille de connexion au rechargement direct', () 
     useAuthStore.setState({ user: JUNIOR, accessToken: null, status: 'unknown' });
 
     renderApp('/reservation/RES-000101/paiement');
-    expect(await screen.findByText('Preuve')).toBeInTheDocument();
+    expect(await screen.findByText('Preuve', {}, LAZY_ROUTE)).toBeInTheDocument();
     await flushEffects();
 
     expect(useUiStore.getState().isAuthSheetOpen).toBe(false);
@@ -109,8 +112,29 @@ describe('Responsive tunnel · feuille de connexion au rechargement direct', () 
     fillCart();
 
     renderApp('/reservation');
-    expect(await screen.findByText('FINALISER LA RÉSERVATION')).toBeInTheDocument();
+    expect(await screen.findByText('FINALISER LA RÉSERVATION', {}, LAZY_ROUTE)).toBeInTheDocument();
     await waitFor(() => expect(useUiStore.getState().isAuthSheetOpen).toBe(true));
+  });
+});
+
+describe('Paiement · aucun paramètre fictif (M7)', () => {
+  it('sans paramètres reçus ni mémorisés : « Paiement momentanément indisponible », aucun code ni bouton « Composer »', async () => {
+    const reservation = createSeedReservations()['RES-000101']!;
+    window.localStorage.removeItem('drc_payment_settings_v1');
+    useAuthStore.getState().setSession('jwt-junior', JUNIOR);
+    useReservationStore.getState().setActiveReservation(reservation, reservation.serverTime);
+    vi.spyOn(globalThis, 'fetch').mockRejectedValue(new TypeError('Failed to fetch'));
+    Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => false });
+    act(() => useNetworkStore.getState().setBrowserOnline(false));
+
+    renderApp('/reservation/RES-000101/paiement');
+
+    const title = await screen.findByText('Paiement momentanément indisponible', {}, LAZY_ROUTE);
+    const card = title.closest('[role="alert"]') as HTMLElement;
+    expect(within(card).getByRole('button', { name: /Réessayer/ })).toBeInTheDocument();
+    expect(screen.queryByTestId('ussd-plain-code')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('ussd-dial-link')).not.toBeInTheDocument();
+    expect(screen.queryByText(/000111|000222/)).not.toBeInTheDocument();
   });
 });
 
@@ -145,11 +169,25 @@ describe('Responsive tunnel · code USSD complet', () => {
 
     renderApp('/reservation/RES-000101/paiement');
 
-    const code = await screen.findByTestId('ussd-plain-code');
+    const code = await screen.findByTestId('ussd-plain-code', {}, LAZY_ROUTE);
     const expected = buildUssdCode('#150*47*{code}*{amount}#', '654321', total) ?? '';
     expect(code.textContent).toBe(expected);
     expect(code).not.toHaveClass('truncate');
     // « #150*47*654321*46500# » : trois « * », donc trois points de coupure
     expect(code.querySelectorAll('wbr')).toHaveLength(expected.split('*').length - 1);
+  });
+});
+
+describe('Responsive tunnel · bouton retour sur /panier (mobile)', () => {
+  it('affiche le bouton Retour sur mobile et renvoie vers /explorer en accès direct', async () => {
+    fillCart();
+    const router = renderApp('/panier');
+
+    expect(await screen.findByRole('heading', { name: 'MON PANIER' }, LAZY_ROUTE)).toBeInTheDocument();
+    const backBtn = screen.getByRole('button', { name: 'Retour' });
+    expect(backBtn).toHaveClass('lg:hidden');
+
+    fireEvent.click(backBtn);
+    await waitFor(() => expect(router.state.location.pathname).toBe('/explorer'));
   });
 });

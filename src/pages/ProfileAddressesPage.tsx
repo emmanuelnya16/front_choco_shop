@@ -1,11 +1,13 @@
 import { AnimatePresence } from 'motion/react';
 import * as m from 'motion/react-m';
-import { MapPin, MoreHorizontal, Pencil, Plus, Star, Trash2, Truck, User } from 'lucide-react';
+import { AlertCircle, MapPin, MoreHorizontal, Pencil, Plus, Star, Trash2, Truck, User } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { BackButton } from '@/components/ui/BackButton';
 import { Button } from '@/components/ui/Button';
 import { Skeleton } from '@/components/ui/Primitives';
 import { Sheet } from '@/components/ui/Sheet';
+import { isNetworkError } from '@/features/offline/networkErrors';
+import { OfflineScreen } from '@/features/offline/OfflineScreen';
 import { useDeleteAddress, useSetDefaultAddress } from '@/features/profile/api/useAddressMutations';
 import { AddressSheet } from '@/features/profile/components/AddressSheet';
 import { ProfileShell } from '@/features/profile/components/ProfileShell';
@@ -46,7 +48,8 @@ export function ProfileAddressesPage() {
 }
 
 function AddressesContent() {
-  const { data: addresses = [], isPending } = useAddresses();
+  const addressesQuery = useAddresses();
+  const { data: addresses = [], isPending } = addressesQuery;
   const setDefault = useSetDefaultAddress();
   const deleteAddress = useDeleteAddress();
   const showToast = useToastStore((s) => s.show);
@@ -92,7 +95,7 @@ function AddressesContent() {
     timersRef.current.set(address.id, timer);
 
     const toastId = showToast({
-      message: `Adresse « ${address.label} » supprimée`,
+      message: `Adresse «\u00A0${address.label}\u00A0» supprimée`,
       actionLabel: 'Annuler',
       durationMs: UNDO_DELAY_MS,
       onAction: () => {
@@ -108,9 +111,29 @@ function AddressesContent() {
 
   if (isPending) {
     return (
-      <div className="mt-6 space-y-3">
+      <div className="mt-6 space-y-3" aria-hidden="true">
         <Skeleton className="h-28 w-full" />
         <Skeleton className="h-28 w-full" />
+        <Skeleton className="h-13 w-52" />
+      </div>
+    );
+  }
+
+  // Adresses jamais chargées sur ce téléphone : réseau absent ou erreur (pas d'état « vide » trompeur)
+  if (addressesQuery.isError && !addressesQuery.data) {
+    if (isNetworkError(addressesQuery.error)) {
+      return <OfflineScreen headingLevel="h2" onRetry={() => addressesQuery.refetch()} className="mt-6 py-4" />;
+    }
+    return (
+      <div className="mt-6 flex flex-col items-center rounded-[var(--radius-md)] bg-surface px-6 py-10 text-center">
+        <AlertCircle className="h-6 w-6 text-red" aria-hidden="true" />
+        <p className="mt-3 text-body font-semibold text-ink">Impossible de charger vos adresses.</p>
+        <p className="mt-1 text-small text-text-2">
+          Un problème est survenu de notre côté. Réessayez dans quelques instants.
+        </p>
+        <Button variant="dark" size="md" className="mt-5" onClick={() => void addressesQuery.refetch()}>
+          Réessayer
+        </Button>
       </div>
     );
   }
@@ -118,9 +141,14 @@ function AddressesContent() {
   return (
     <div className="mt-6">
       {visible.length === 0 ? (
-        <p className="rounded-[var(--radius-md)] bg-surface px-5 py-8 text-center text-body text-text-2">
-          Aucune adresse enregistrée. Elles seront proposées à votre prochaine réservation.
-        </p>
+        <div className="flex flex-col items-center rounded-[var(--radius-md)] bg-surface px-5 py-8 text-center">
+          <MapPin className="h-6 w-6 text-text-2" aria-hidden="true" />
+          <p className="mt-3 text-body font-semibold text-ink">Aucune adresse enregistrée</p>
+          <p className="mt-1 max-w-sm text-small text-text-2">
+            Ajoutez-en une ici ou lors de votre prochaine réservation&nbsp;: elle vous sera proposée
+            automatiquement.
+          </p>
+        </div>
       ) : (
         <ul className="space-y-3">
           <AnimatePresence initial={false}>
@@ -151,7 +179,7 @@ function AddressesContent() {
       </Button>
 
       {/* Menu « ⋯ » d'une adresse */}
-      <Sheet open={Boolean(menuFor)} onClose={() => setMenuFor(null)} title={menuFor ? `Adresse « ${menuFor.label} »` : 'Adresse'}>
+      <Sheet open={Boolean(menuFor)} onClose={() => setMenuFor(null)} title={menuFor ? `Adresse «\u00A0${menuFor.label}\u00A0»` : 'Adresse'}>
         {menuFor && (
           <ul className="-mx-1 divide-y divide-silver/60">
             <li>
@@ -161,7 +189,7 @@ function AddressesContent() {
                   setSheet({ open: true, address: menuFor });
                   setMenuFor(null);
                 }}
-                className="flex min-h-[56px] w-full items-center gap-3 px-1 text-left text-body text-ink"
+                className="flex min-h-14 w-full items-center gap-3 px-1 text-left text-body text-ink"
               >
                 <Pencil className="h-5 w-5 text-text-2" aria-hidden="true" />
                 Modifier
@@ -173,11 +201,12 @@ function AddressesContent() {
                   type="button"
                   onClick={() => {
                     setDefault.mutate(menuFor.id, {
-                      onSuccess: () => showToast({ message: `« ${menuFor.label} » est votre adresse par défaut` }),
+                      onSuccess: () =>
+                        showToast({ message: `«\u00A0${menuFor.label}\u00A0» est votre adresse par défaut` }),
                     });
                     setMenuFor(null);
                   }}
-                  className="flex min-h-[56px] w-full items-center gap-3 px-1 text-left text-body text-ink"
+                  className="flex min-h-14 w-full items-center gap-3 px-1 text-left text-body text-ink"
                 >
                   <Star className="h-5 w-5 text-text-2" aria-hidden="true" />
                   Définir par défaut
@@ -191,7 +220,7 @@ function AddressesContent() {
                   setConfirmDelete(menuFor);
                   setMenuFor(null);
                 }}
-                className="flex min-h-[56px] w-full items-center gap-3 px-1 text-left text-body text-ink"
+                className="flex min-h-14 w-full items-center gap-3 px-1 text-left text-body text-ink"
               >
                 <Trash2 className="h-5 w-5 text-red" aria-hidden="true" />
                 Supprimer
@@ -205,7 +234,11 @@ function AddressesContent() {
       <Sheet
         open={Boolean(confirmDelete)}
         onClose={() => setConfirmDelete(null)}
-        title={confirmDelete ? `Supprimer « ${confirmDelete.label} » ?` : 'Supprimer l’adresse ?'}
+        title={
+          confirmDelete
+            ? `Supprimer «\u00A0${confirmDelete.label}\u00A0»\u00A0?`
+            : 'Supprimer l’adresse\u00A0?'
+        }
       >
         <p className="text-body text-text-2">
           Elle ne sera plus proposée lors de vos prochaines réservations.
@@ -245,7 +278,7 @@ function AddressCard({ address, onOpenMenu }: { address: Address; onOpenMenu: ()
             <m.span
               layoutId="default-address-tag"
               transition={spring.snappy}
-              className="inline-flex h-6 items-center rounded-[var(--radius-full)] bg-ink px-2.5 text-[11px] font-semibold tracking-wide text-white uppercase"
+              className="inline-flex h-6 items-center rounded-[var(--radius-full)] bg-ink px-2.5 text-label text-white"
             >
               Par défaut
             </m.span>
@@ -274,7 +307,7 @@ function AddressCard({ address, onOpenMenu }: { address: Address; onOpenMenu: ()
               <p className="flex items-start gap-2">
                 <User className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
                 <span>
-                  Destinataire : {address.recipientName}
+                  Destinataire&nbsp;: {address.recipientName}
                   {address.recipientPhone ? ` · ${formatCmPhone(address.recipientPhone)}` : ''}
                 </span>
               </p>

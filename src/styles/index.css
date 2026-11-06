@@ -57,6 +57,12 @@
   --shadow-sheet: 0 -12px 36px rgba(26, 26, 24, 0.24);
   --shadow-header: 0 2px 14px rgba(26, 26, 24, 0.06);
   --shadow-card-icon: 0 2px 8px rgba(26, 26, 24, 0.12);
+  /* Panneaux flottants (menu ordinateur, listes déroulantes, bandeau, bouton WhatsApp) */
+  --shadow-pop: 0 12px 32px rgba(26, 26, 24, 0.16);
+
+  /* Courbes d'animation (mêmes valeurs que src/motion/tokens.ts) : génèrent ease-brand-out… */
+  --ease-brand-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-brand-in-out: cubic-bezier(0.76, 0, 0.24, 1);
 
   /* 6.4 Z-index nommés */
   --z-index-base: 0;
@@ -298,6 +304,43 @@
   z-index: 90;
 }
 
+/* ============================================================================
+ * Durées d'animation (M7 §4.4) : mêmes valeurs que duration dans src/motion/tokens.ts.
+ * Variables pour le CSS, utilitaires duration-tap… pour Tailwind.
+ * ============================================================================ */
+:root {
+  --duration-tap: 120ms;
+  --duration-fast: 200ms;
+  --duration-quick: 250ms;
+  --duration-base: 350ms;
+  --duration-slow: 450ms;
+  --duration-reveal: 700ms;
+  --duration-story: 1000ms;
+  --duration-ambient: 1500ms;
+}
+
+@utility duration-tap {
+  transition-duration: var(--duration-tap);
+}
+@utility duration-fast {
+  transition-duration: var(--duration-fast);
+}
+@utility duration-quick {
+  transition-duration: var(--duration-quick);
+}
+@utility duration-base {
+  transition-duration: var(--duration-base);
+}
+@utility duration-slow {
+  transition-duration: var(--duration-slow);
+}
+@utility duration-reveal {
+  transition-duration: var(--duration-reveal);
+}
+@utility duration-story {
+  transition-duration: var(--duration-story);
+}
+
 @utility tabular-nums {
   font-variant-numeric: tabular-nums;
 }
@@ -354,6 +397,14 @@
   font-size: 0.875rem;
   font-weight: 400;
   line-height: 1.45;
+  font-stretch: 100%;
+}
+
+/* Mentions, compteurs et légendes : 12 px sans majuscules (text-label = 12 px en majuscules) */
+@utility text-caption {
+  font-size: 0.75rem;
+  font-weight: 400;
+  line-height: 1.4;
   font-stretch: 100%;
 }
 

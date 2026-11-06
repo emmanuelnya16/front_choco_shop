@@ -94,7 +94,7 @@ function line(
 ): ReservationItem {
   const product = mockProducts.find((p) => p.slug === slug);
   if (!product) {
-    throw new Error(`[fixtures/reservations] Produit inconnu : ${slug}`);
+    throw new Error(`[fixtures/reservations] Produit inconnu\u00A0: ${slug}`);
   }
   const color = product.colors.find((c) => c.code === colorCode) ?? product.colors[0];
   return {
@@ -102,7 +102,7 @@ function line(
     productId: product.id,
     slug: product.slug,
     name: product.name,
-    image: product.fallbackImages[0] ?? '/mock/product-tee.svg',
+    image: product.images[0] ?? product.fallbackImages[0] ?? '/mock/product-tee.svg',
     variantId: `${product.id}-${color.code}-${size.toLowerCase()}`,
     size,
     colorName: color.name,
@@ -116,7 +116,7 @@ function line(
 function agencyById(id: string): Agency {
   const agency = mockAgencies.find((a) => a.id === id);
   if (!agency) {
-    throw new Error(`[fixtures/reservations] Agence inconnue : ${id}`);
+    throw new Error(`[fixtures/reservations] Agence inconnue\u00A0: ${id}`);
   }
   return agency;
 }
@@ -255,7 +255,7 @@ function seedSpecs(): SeedSpec[] {
       status: 'reserved',
       destination: { kind: 'local' },
       items: [line('RES-000101', 1, 'hoodie-barbele-noir', 'noir', 'L')],
-      events: [['reserved', 19, 'Articles mis de côté pendant 24 h.']],
+      events: [['reserved', 19, 'Articles mis de côté pendant 24\u00A0h.']],
       expiresInHours: 5,
     },
     {
@@ -264,7 +264,7 @@ function seedSpecs(): SeedSpec[] {
       destination: { kind: 'agency', agencyId: 'ag-yde-1', ...YAOUNDE_RECIPIENT },
       items: [line('RES-000103', 1, 'sneaker-monolithe-v1', 'noir', '42')],
       events: [
-        ['reserved', 6, 'Articles mis de côté pendant 24 h.'],
+        ['reserved', 6, 'Articles mis de côté pendant 24\u00A0h.'],
         ['pending_validation', 5.5, 'Capture MTN MoMo reçue.'],
         ['payment_rejected', 4.8, 'Montant incorrect', 'shop'],
       ],
@@ -281,7 +281,7 @@ function seedSpecs(): SeedSpec[] {
         line('RES-000104', 2, 'cargo-tactique-bitume', 'noir', 'M'),
       ],
       events: [
-        ['reserved', 3, 'Articles mis de côté pendant 24 h.'],
+        ['reserved', 3, 'Articles mis de côté pendant 24\u00A0h.'],
         ['pending_validation', 2.6, 'Capture Orange Money reçue.'],
         ['payment_rejected', 2.1, 'Capture illisible', 'shop'],
         ['pending_validation', 0.6, 'Nouvelle preuve envoyée.'],
@@ -294,7 +294,7 @@ function seedSpecs(): SeedSpec[] {
       destination: { kind: 'pickup' },
       items: [line('RES-000105', 1, 'babouche-minimal-sable', 'noir', '42')],
       events: [
-        ['reserved', 26, 'Articles mis de côté pendant 24 h.'],
+        ['reserved', 26, 'Articles mis de côté pendant 24\u00A0h.'],
         ['pending_validation', 25.5, 'Capture Orange Money reçue.'],
         ['confirmed', 24.9, 'Paiement validé par la boutique.', 'shop'],
       ],
@@ -313,7 +313,7 @@ function seedSpecs(): SeedSpec[] {
         line('RES-000106', 2, 'tshirt-manches-longues-brut', 'noir', 'L'),
       ],
       events: [
-        ['reserved', 30, 'Articles mis de côté pendant 24 h.'],
+        ['reserved', 30, 'Articles mis de côté pendant 24\u00A0h.'],
         ['pending_validation', 29.6, 'Capture MTN MoMo reçue.'],
         ['confirmed', 28.8, 'Paiement validé par la boutique.', 'shop'],
         ['preparing', 4, undefined, 'shop'],
@@ -326,7 +326,7 @@ function seedSpecs(): SeedSpec[] {
       destination: { kind: 'local' },
       items: [line('RES-000107', 1, 'sneaker-basse-asphalte', 'blanc', '42')],
       events: [
-        ['reserved', 40, 'Articles mis de côté pendant 24 h.'],
+        ['reserved', 40, 'Articles mis de côté pendant 24\u00A0h.'],
         ['pending_validation', 39.5, 'Capture Orange Money reçue.'],
         ['confirmed', 38, 'Paiement validé par la boutique.', 'shop'],
         ['preparing', 20, undefined, 'shop'],
@@ -344,7 +344,7 @@ function seedSpecs(): SeedSpec[] {
         line('RES-000102', 2, 'babouche-royale-akwa-cuir', 'noir', '43'),
       ],
       events: [
-        ['reserved', 52, 'Articles mis de côté pendant 24 h.'],
+        ['reserved', 52, 'Articles mis de côté pendant 24\u00A0h.'],
         ['pending_validation', 51.8, 'Capture Orange Money reçue.'],
         ['confirmed', 51.5, 'Paiement validé par la boutique.', 'shop'],
         ['preparing', 50, undefined, 'shop'],
@@ -362,7 +362,7 @@ function seedSpecs(): SeedSpec[] {
         line('RES-000108', 3, 'bandana-pack-signature', 'noir', 'Unique'),
       ],
       events: [
-        ['reserved', 72, 'Articles mis de côté pendant 24 h.'],
+        ['reserved', 72, 'Articles mis de côté pendant 24\u00A0h.'],
         ['pending_validation', 71.5, 'Capture Orange Money reçue.'],
         ['confirmed', 70, 'Paiement validé par la boutique.', 'shop'],
         ['preparing', 50, undefined, 'shop'],
@@ -384,7 +384,7 @@ function seedSpecs(): SeedSpec[] {
         line('RES-000109', 3, 'tshirt-essentiel-lourd', 'blanc', 'L'),
       ],
       events: [
-        ['reserved', 120, 'Articles mis de côté pendant 24 h.'],
+        ['reserved', 120, 'Articles mis de côté pendant 24\u00A0h.'],
         ['pending_validation', 119.5, 'Capture Orange Money reçue.'],
         ['confirmed', 118, 'Paiement validé par la boutique.', 'shop'],
         ['preparing', 100, undefined, 'shop'],
@@ -400,7 +400,7 @@ function seedSpecs(): SeedSpec[] {
       destination: { kind: 'pickup' },
       items: [line('RES-000110', 1, 'derby-commando-douala', 'noir', '43')],
       events: [
-        ['reserved', 150, 'Articles mis de côté pendant 24 h.'],
+        ['reserved', 150, 'Articles mis de côté pendant 24\u00A0h.'],
         ['pending_validation', 149.7, 'Capture MTN MoMo reçue.'],
         ['confirmed', 148, 'Paiement validé par la boutique.', 'shop'],
         ['preparing', 130, undefined, 'shop'],
@@ -416,8 +416,8 @@ function seedSpecs(): SeedSpec[] {
       destination: { kind: 'local' },
       items: [line('RES-000111', 1, 'short-cargo-beton', 'gris', 'M')],
       events: [
-        ['reserved', 200, 'Articles mis de côté pendant 24 h.'],
-        ['expired', 176, 'Délai de 24 h dépassé : articles remis en vente.', 'system'],
+        ['reserved', 200, 'Articles mis de côté pendant 24\u00A0h.'],
+        ['expired', 176, 'Délai de 24\u00A0h dépassé\u00A0: articles remis en vente.', 'system'],
       ],
     },
     {
@@ -426,7 +426,7 @@ function seedSpecs(): SeedSpec[] {
       destination: { kind: 'pickup' },
       items: [line('RES-000112', 1, 'sneaker-runner-bonapriso', 'noir', '41')],
       events: [
-        ['reserved', 230, 'Articles mis de côté pendant 24 h.'],
+        ['reserved', 230, 'Articles mis de côté pendant 24\u00A0h.'],
         ['pending_validation', 229, 'Capture Orange Money reçue.'],
         ['cancelled', 228, 'J’ai changé d’avis', 'client'],
       ],
@@ -439,7 +439,7 @@ function seedSpecs(): SeedSpec[] {
       destination: { kind: 'pickup' },
       items: [line('RES-000113', 1, 'babouche-quotidienne-souple', 'noir', '41')],
       events: [
-        ['reserved', 10, 'Articles mis de côté pendant 24 h.'],
+        ['reserved', 10, 'Articles mis de côté pendant 24\u00A0h.'],
         ['pending_validation', 9.5, 'Capture Orange Money reçue.'],
         ['confirmed', 9, 'Paiement validé par la boutique.', 'shop'],
       ],
@@ -466,7 +466,7 @@ function archiveSpecs(): SeedSpec[] {
     const start = 24 * (60 - i * 5); // de 60 à 30 jours
     const events: SeedSpec['events'] = pickup
       ? [
-          ['reserved', start, 'Articles mis de côté pendant 24 h.'],
+          ['reserved', start, 'Articles mis de côté pendant 24\u00A0h.'],
           ['pending_validation', start - 0.5, 'Capture Orange Money reçue.'],
           ['confirmed', start - 1.5, 'Paiement validé par la boutique.', 'shop'],
           ['preparing', start - 18, undefined, 'shop'],
@@ -474,7 +474,7 @@ function archiveSpecs(): SeedSpec[] {
           ['picked_up', start - 44, 'Colis retiré à la boutique.', 'shop'],
         ]
       : [
-          ['reserved', start, 'Articles mis de côté pendant 24 h.'],
+          ['reserved', start, 'Articles mis de côté pendant 24\u00A0h.'],
           ['pending_validation', start - 0.5, 'Capture Orange Money reçue.'],
           ['confirmed', start - 1.5, 'Paiement validé par la boutique.', 'shop'],
           ['preparing', start - 18, undefined, 'shop'],

@@ -1,5 +1,6 @@
 import { useCallback, useMemo } from 'react';
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router';
+import { formatPrice } from '@/lib/utils/price';
 import type { CatalogSortOption, PriceRangeKey, ProductFilters } from '@/types/api';
 import type { CategorySlug } from '@/types/domain';
 
@@ -59,12 +60,26 @@ const VALID_SORTS: readonly CatalogSortOption[] = [
   'price_desc',
 ];
 
+/** Montant sans l'unité (« 15 000 »), espaces insécables comprises. */
+function formatAmount(amount: number): string {
+  return formatPrice(amount).replace(/\u00a0FCFA$/, '');
+}
+
+// Montants insécables (formatPrice) : « 15 000 FCFA » ne se coupe jamais en fin de ligne
 export const PRICE_RANGE_LABELS: Record<PriceRangeKey, string> = {
-  '0-15000': 'Moins de 15 000 FCFA',
-  '15000-30000': '15 000 – 30 000 FCFA',
-  '30000-50000': '30 000 – 50 000 FCFA',
-  '50000+': 'Plus de 50 000 FCFA',
+  '0-15000': `Moins de ${formatPrice(15000)}`,
+  '15000-30000': `${formatAmount(15000)}\u00a0– ${formatPrice(30000)}`,
+  '30000-50000': `${formatAmount(30000)}\u00a0– ${formatPrice(50000)}`,
+  '50000+': `Plus de ${formatPrice(50000)}`,
 };
+
+/** Options de tri proposées au client (les alias `price_asc` / `price_desc` servent seulement à lire l'adresse). */
+export const CATALOG_SORT_OPTIONS: readonly CatalogSortOption[] = [
+  'popular',
+  'newest',
+  'price-asc',
+  'price-desc',
+];
 
 export const SORT_OPTION_LABELS: Record<CatalogSortOption, string> = {
   popular: 'Populaires',
@@ -75,14 +90,18 @@ export const SORT_OPTION_LABELS: Record<CatalogSortOption, string> = {
   price_desc: 'Prix décroissant',
 };
 
+/**
+ * Noms des sous-catégories, identiques à ceux de l'API (/categories) : un seul nom partout
+ * (accueil, pastilles, filtres). Les anciens identifiants restent lisibles dans une adresse.
+ */
 export const SUBCATEGORY_LABELS: Record<string, string> = {
   't-shirts': 'T-shirts',
-  hoodies: 'Hoodies & Ensembles',
+  hoodies: 'Hoodies',
   ensembles: 'Ensembles',
   pantalons: 'Pantalons',
   vestes: 'Vestes',
-  sneakers: 'Baskets & Sneakers',
-  derbies: 'Chaussures de ville',
+  sneakers: 'Sneakers',
+  derbies: 'Derbies & Boots',
   baskets: 'Baskets',
   ville: 'Chaussures de ville',
   'cuir-lisse': 'Cuir lisse',
@@ -90,6 +109,16 @@ export const SUBCATEGORY_LABELS: Record<string, string> = {
   cuir: 'Cuir lisse',
   brodees: 'Brodées',
   classiques: 'Classiques',
+};
+
+/**
+ * Sous-catégories de chaque catégorie tant que la liste de l'API (/categories) n'est pas chargée.
+ * Mêmes identifiants que les articles (`subCategorySlug`).
+ */
+export const DEFAULT_SUBCATEGORIES: Record<CategorySlug, readonly string[]> = {
+  vetements: ['t-shirts', 'hoodies', 'pantalons'],
+  chaussures: ['sneakers', 'derbies'],
+  babouches: ['cuir-lisse', 'croco-embosse'],
 };
 
 const CLOTHING_SIZES = ['S', 'M', 'L', 'XL', 'XXL'];

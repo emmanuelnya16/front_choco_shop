@@ -1,8 +1,9 @@
+import { useMotionValueEvent, useScroll } from 'motion/react';
+import * as m from 'motion/react-m';
 import { useRef, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Container, Section } from '@/components/ui/Primitives';
 import { SmartImage } from '@/components/ui/SmartImage';
-import { gsap, ScrollTrigger, useGSAP } from '@/lib/gsap';
 import { cn } from '@/lib/utils/cn';
 import { useReducedMotionPref } from '@/motion/useReducedMotionPref';
 
@@ -12,14 +13,14 @@ const STEPS = [
     label: 'Étape 01',
     title: 'Réservez',
     description:
-      'Choisissez vos articles et votre taille. Ils sont mis de côté pour vous pendant 24 h.',
+      'Choisissez vos articles et votre taille. Ils sont mis de côté pour vous pendant 24\u00A0h.',
   },
   {
     number: '02',
     label: 'Étape 02',
     title: 'Payez par Mobile Money',
     description:
-      'Orange Money ou MTN MoMo. Envoyez la capture de votre paiement en un geste.',
+      'Orange Money ou MTN MoMo. Envoyez votre preuve de paiement en un geste.',
   },
   {
     number: '03',
@@ -30,53 +31,34 @@ const STEPS = [
   },
 ];
 
+/** Avancement du trait (0 à 1) à partir duquel les étapes 2 et 3 s'allument. */
+const STEP_THRESHOLDS = [0, 0.34, 0.72];
+
+/**
+ * « Réservez en 3 étapes » : le trait rouge suit le défilement et allume les étapes une à une
+ * (transform scaleY seul). Les étapes pas encore atteintes restent lisibles (opacité 0,6).
+ * Motion (déjà chargé par l'app) au lieu de GSAP ScrollTrigger : l'accueil n'attend pas GSAP.
+ */
 export function HowItWorksSection() {
-  const scopeRef = useRef<HTMLElement>(null);
   const stepsContainerRef = useRef<HTMLDivElement>(null);
   const reducedMotion = useReducedMotionPref();
   const [activeCount, setActiveCount] = useState(1);
 
-  useGSAP(
-    () => {
-      if (reducedMotion || !stepsContainerRef.current) {
-        gsap.set('.how-progress-line', { scaleY: 1 });
-        return;
-      }
+  const { scrollYProgress } = useScroll({
+    target: stepsContainerRef,
+    offset: ['start 70%', 'end 60%'],
+  });
 
-      gsap.fromTo(
-        '.how-progress-line',
-        { scaleY: 0 },
-        {
-          scaleY: 1,
-          ease: 'none',
-          transformOrigin: 'top center',
-          scrollTrigger: {
-            trigger: stepsContainerRef.current,
-            start: 'top 70%',
-            end: 'bottom 60%',
-            scrub: 0.6,
-            onUpdate: (self) => {
-              const p = self.progress;
-              if (p >= 0.72) {
-                setActiveCount(3);
-              } else if (p >= 0.34) {
-                setActiveCount(2);
-              } else {
-                setActiveCount(1);
-              }
-            },
-          },
-        },
-      );
-    },
-    { scope: scopeRef, dependencies: [reducedMotion] },
-  );
+  useMotionValueEvent(scrollYProgress, 'change', (progress) => {
+    const reached = STEP_THRESHOLDS.filter((threshold) => progress >= threshold).length;
+    setActiveCount(Math.max(1, reached));
+  });
 
   return (
-    <Section id="comment-reserver" ref={scopeRef} className="scroll-mt-20">
+    <Section id="comment-reserver" className="scroll-mt-20">
       <Container>
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-12 lg:items-start lg:gap-12">
-          {/* Mobile photo on top (16:10) */}
+          {/* Photo en haut sur téléphone (16:10) */}
           <div className="overflow-hidden rounded-[var(--radius-md)] lg:hidden">
             <SmartImage
               src="/images/how/how-it-works.webp"
@@ -85,62 +67,58 @@ export function HowItWorksSection() {
               tone="mood"
               ratio="16/10"
               sizes="100vw"
-              onLoadComplete={() => ScrollTrigger.refresh()}
             />
           </div>
 
-          {/* Left Column: Title + 3 Steps + CTA */}
+          {/* Colonne gauche : titre, 3 étapes et bouton */}
           <div className="lg:col-span-6">
             <span className="text-label text-red">Simple &amp; rapide</span>
             <h2 className="mt-2 text-h1 text-ink">RÉSERVEZ EN 3 ÉTAPES</h2>
             <p className="mt-3 max-w-md text-body text-text-2">
               Pas besoin de carte bancaire. Votre réservation bloque votre taille
-              immédiatement pendant 24 heures.
+              immédiatement pendant 24&nbsp;heures.
             </p>
 
-            {/* Steps with vertical connecting line */}
+            {/* Étapes reliées par un trait vertical */}
             <div ref={stepsContainerRef} className="relative mt-10 space-y-10">
-              {/* Vertical track line between step 1 and step 3 */}
+              {/* Trait entre l'étape 1 et l'étape 3, centré sous les carrés de 44 px */}
               <div
                 aria-hidden="true"
-                className="absolute top-5 bottom-8 left-[21px] w-[2px] bg-silver"
+                className="absolute top-5 bottom-8 left-0 flex w-11 justify-center"
               >
-                <div className="how-progress-line h-full w-full origin-top bg-red" />
+                <div className="h-full w-[2px] bg-silver">
+                  <m.div
+                    className="h-full w-full origin-top bg-red"
+                    style={{ scaleY: reducedMotion ? 1 : scrollYProgress }}
+                  />
+                </div>
               </div>
 
               {STEPS.map((step, index) => {
-                const stepIndex = index + 1;
-                const isReached = reducedMotion || activeCount >= stepIndex;
+                const isReached = reducedMotion || activeCount >= index + 1;
 
                 return (
-                  <div
-                    key={step.number}
-                    className="relative flex items-start gap-5"
-                  >
-                    {/* 44px numbered square */}
+                  <div key={step.number} className="relative flex items-start gap-5">
+                    {/* Carré numéroté de 44 px */}
                     <div
                       className={cn(
-                        'relative z-10 flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--radius-sm)] border-2 border-ink font-mono text-small font-bold transition-colors duration-250',
-                        isReached
-                          ? 'bg-ink text-white'
-                          : 'bg-white text-ink',
+                        'relative flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--radius-sm)] border-2 border-ink font-mono text-small font-bold transition-colors duration-quick',
+                        isReached ? 'bg-ink text-white' : 'bg-white text-ink',
                       )}
                     >
                       {step.number}
                     </div>
 
-                    {/* Step content */}
+                    {/* Texte de l'étape */}
                     <div
                       className={cn(
-                        'pt-0.5 transition-opacity duration-300',
-                        isReached ? 'opacity-100' : 'opacity-40',
+                        'pt-1 transition-opacity duration-base',
+                        isReached ? 'opacity-100' : 'opacity-60',
                       )}
                     >
                       <span className="text-label text-text-2">{step.label}</span>
                       <h3 className="mt-1 text-h3 text-ink">{step.title}</h3>
-                      <p className="mt-1.5 max-w-md text-small text-text-2">
-                        {step.description}
-                      </p>
+                      <p className="mt-2 max-w-md text-small text-text-2">{step.description}</p>
                     </div>
                   </div>
                 );
@@ -154,8 +132,8 @@ export function HowItWorksSection() {
             </div>
           </div>
 
-          {/* Right Column (Desktop): Sticky 4:5 mood photo */}
-          <div className="hidden lg:sticky lg:top-24 lg:col-span-6 lg:block">
+          {/* Colonne droite (ordinateur) : photo 4:5 qui reste à l'écran */}
+          <div className="hidden lg:sticky lg:top-[calc(var(--desktop-shell-top)+--spacing(6))] lg:col-span-6 lg:block">
             <div className="overflow-hidden rounded-[var(--radius-md)]">
               <SmartImage
                 src="/images/how/how-it-works.webp"
@@ -164,7 +142,6 @@ export function HowItWorksSection() {
                 tone="mood"
                 ratio="4/5"
                 sizes="580px"
-                onLoadComplete={() => ScrollTrigger.refresh()}
               />
             </div>
           </div>

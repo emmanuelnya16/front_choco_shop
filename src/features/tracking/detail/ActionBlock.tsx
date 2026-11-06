@@ -2,6 +2,7 @@ import { AnimatePresence } from 'motion/react';
 import * as m from 'motion/react-m';
 import { ArrowRight, CheckCircle2, Clock, Hourglass, MapPin, Phone, RotateCcw } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { Link } from 'react-router';
 import { Button } from '@/components/ui/Button';
 import { Price } from '@/components/ui/Primitives';
 import { HoldCountdown } from '@/features/reservation/components/HoldCountdown';
@@ -114,11 +115,8 @@ function getActionBlockContent(
               />
               <div>
                 <p className="text-small text-silver">Montant exact à envoyer</p>
-                {/* Montant insécable : 22 px sous 390 px pour tenir à côté de l'anneau du compte à rebours */}
-                <Price
-                  amount={total}
-                  className="mt-0.5 block whitespace-nowrap text-[22px] leading-tight text-white min-[390px]:text-[26px]"
-                />
+                {/* Montant insécable, à l'échelle des titres (22 px sur mobile) pour tenir à côté de l'anneau */}
+                <Price amount={total} className="mt-0.5 block whitespace-nowrap text-h2 text-white" />
               </div>
             </div>
             <Button
@@ -142,12 +140,13 @@ function getActionBlockContent(
           <>
             <BlockTitle>Paiement non validé</BlockTitle>
             <p className="mt-2 text-body text-ink">
-              <span className="font-semibold">Motif : </span>
+              <span className="font-semibold">Motif&nbsp;: </span>
               {reservation.rejection?.reason ?? reservation.rejectionReason ?? 'non précisé'}
             </p>
             <p className="mt-2 text-small">
               <HoldCountdown variant="inline" expiresAt={reservation.expiresAt} serverTime={reservation.serverTime} />
             </p>
+            {/* Même libellé que la carte de « Mes réservations » */}
             <Button
               variant="primary"
               size="lg"
@@ -156,7 +155,7 @@ function getActionBlockContent(
               href={`/reservation/${ref}/preuve`}
               iconRight={<ArrowRight className="h-4 w-4" />}
             >
-              Envoyer une nouvelle preuve
+              Renvoyer ma preuve
             </Button>
           </>
         ),
@@ -167,20 +166,14 @@ function getActionBlockContent(
         tone: 'surface',
         content: (
           <>
-            <BlockTitle
-              icon={
-                <Hourglass
-                  className="h-6 w-6 shrink-0 animate-[spin_6s_linear_infinite]"
-                  aria-hidden="true"
-                />
-              }
-            >
+            {/* Sablier immobile : pas d'animation en boucle (un seul effet fort par écran) */}
+            <BlockTitle icon={<Hourglass className="h-6 w-6 shrink-0" aria-hidden="true" />}>
               Nous vérifions votre paiement
             </BlockTitle>
             <p className="mt-2 text-body text-text-2">
               {settings?.payment?.validationDelayText
                 ? `Validation ${settings.payment.validationDelayText}.`
-                : 'La boutique vérifie votre capture.'}{' '}
+                : 'La boutique vérifie votre preuve de paiement.'}{' '}
               Vous n’avez rien à faire.
             </p>
           </>
@@ -203,7 +196,10 @@ function getActionBlockContent(
               {reservation.status === 'confirmed' ? 'Paiement validé' : 'En préparation'}
             </BlockTitle>
             <p className="mt-2 text-body text-text-2">
-              Nous préparons votre commande. Vous recevrez la photo de votre colis avant l’envoi.
+              {reservation.status === 'confirmed'
+                ? 'Nous allons préparer votre colis.'
+                : 'Nous préparons votre colis.'}{' '}
+              Vous recevrez sa photo dès qu’il sera prêt.
             </p>
           </>
         ),
@@ -252,8 +248,8 @@ function getActionBlockContent(
               {agency.phone && (
                 <p className="flex items-start gap-2">
                   <Phone className="mt-1 h-4 w-4 shrink-0 text-silver" aria-hidden="true" />
-                  <a href={telHref(agency.phone)} className="font-semibold text-white underline">
-                    {agency.phone}
+                  <a href={telHref(agency.phone)} className="font-semibold whitespace-nowrap text-white underline">
+                    {formatCmPhone(agency.phone)}
                   </a>
                 </p>
               )}
@@ -298,14 +294,21 @@ function getActionBlockContent(
                   )}
                 </>
               ) : (
-                <p className="text-silver">À retirer à la boutique d’Akwa, à Douala.</p>
+                // Réglages de la boutique pas encore reçus : jamais d'adresse écrite en dur
+                <p className="text-silver">
+                  Retrait en boutique, aux heures d’ouverture. Adresse et horaires&nbsp;:{' '}
+                  <Link to="/aide/livraison-retrait" className="font-semibold text-white underline">
+                    Livraison et retrait
+                  </Link>
+                  .
+                </p>
               )}
             </div>
             <div className="mt-4 rounded-[var(--radius-md)] bg-ink-2 px-4 py-4">
               <p className="text-label text-silver">Code de retrait</p>
               <p
                 className="mt-1 font-mono text-[clamp(2.25rem,10vw,3rem)] leading-none font-extrabold tracking-tight text-white [font-stretch:75%]"
-                aria-label={`Code de retrait : ${ref.split('').join(' ')}`}
+                aria-label={`Code de retrait\u00A0: ${ref.split('').join(' ')}`}
               >
                 {ref}
               </p>
@@ -370,7 +373,7 @@ function getActionBlockContent(
             <BlockTitle icon={<CheckCircle2 className="h-6 w-6 shrink-0 text-success" aria-hidden="true" />}>
               {reservation.status === 'delivered' ? 'Livrée' : 'Retirée'} le {formatDayMonth(at)}
             </BlockTitle>
-            <p className="mt-2 text-body text-text-2">Merci pour votre confiance !</p>
+            <p className="mt-2 text-body text-text-2">Merci pour votre confiance&nbsp;!</p>
             <RebookButton reservationRef={ref} />
           </>
         ),
@@ -383,7 +386,9 @@ function getActionBlockContent(
         content: (
           <>
             <BlockTitle>Réservation expirée</BlockTitle>
-            <p className="mt-2 text-body text-text-2">Le délai de 24 h est dépassé.</p>
+            <p className="mt-2 text-body text-text-2">
+              Le délai de {settings?.reservationHoldHours ?? 24}&nbsp;h pour payer est dépassé.
+            </p>
             <RebookButton reservationRef={ref} />
           </>
         ),
@@ -398,6 +403,8 @@ function getActionBlockContent(
             ? 'par la boutique'
             : '';
       const motif = event?.actor === 'client' ? event.note : undefined;
+      const statusBeforeCancel = [...reservation.timeline].reverse().find((e) => e.status !== 'cancelled')?.status;
+      const paidBeforeCancel = statusBeforeCancel === 'pending_validation' || statusBeforeCancel === 'confirmed';
       return {
         tone: 'surface',
         content: (
@@ -412,7 +419,15 @@ function getActionBlockContent(
                   Annulée {by ? `${by} ` : ''}
                   {formatSpokenDateTime(event.at)}
                 </span>
-                {motif ? <> · Motif : {motif}</> : null}
+                {motif ? <> · Motif&nbsp;: {motif}</> : null}
+              </p>
+            )}
+            {/* HYPOTHÈSE: règles de remboursement à confirmer par la boutique (même texte que la feuille
+                d'annulation) ; affiché seulement si la réservation était payée au moment de l'annulation. */}
+            {paidBeforeCancel && (
+              <p className="mt-2 text-body text-text-2">
+                Vous aviez envoyé une preuve de paiement&nbsp;: la boutique vous contacte pour le remboursement
+                selon la politique d’annulation.
               </p>
             )}
             <RebookButton reservationRef={ref} />

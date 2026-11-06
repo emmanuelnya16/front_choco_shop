@@ -1,12 +1,12 @@
 import type { Category } from '@/types/domain';
 
-export const mockCategories: Category[] = [
+const INITIAL_CATEGORIES: Category[] = [
   {
     id: 'cat-vetements',
     slug: 'vetements',
     name: 'Vêtements',
     description: 'Coupes lourdes, coton épais et sérigraphies brutes signées DR Choco.',
-    image: '/mock/product-hoodie.svg',
+    image: '/images/categories/vetements.webp',
     coverImage: '/images/categories/vetements.webp',
     fallbackImage: '/images/fallback/mood-vetements.svg',
     productCount: 13,
@@ -42,7 +42,7 @@ export const mockCategories: Category[] = [
     slug: 'chaussures',
     name: 'Chaussures',
     description: 'Sneakers urbaines, derbies revisitées et semelles massives tout-terrain.',
-    image: '/mock/product-shoes.svg',
+    image: '/images/categories/chaussures.webp',
     coverImage: '/images/categories/chaussures.webp',
     fallbackImage: '/images/fallback/mood-chaussures.svg',
     productCount: 5,
@@ -70,7 +70,7 @@ export const mockCategories: Category[] = [
     slug: 'babouches',
     name: 'Babouches',
     description: 'Cuir véritable travaillé à la main, finitions contemporaines et confort royal.',
-    image: '/mock/product-babouches.svg',
+    image: '/images/categories/babouches.webp',
     coverImage: '/images/categories/babouches.webp',
     fallbackImage: '/images/fallback/mood-babouches.svg',
     productCount: 6,
@@ -94,3 +94,16 @@ export const mockCategories: Category[] = [
     ],
   },
 ];
+
+export function cloneCategories(source: Category[] = INITIAL_CATEGORIES): Category[] {
+  return source.map((cat) => ({
+    ...cat,
+    subCategories: cat.subCategories.map((sub) => ({ ...sub })),
+  }));
+}
+
+export const mockCategories: Category[] = cloneCategories();
+
+export function resetMockCategories(): void {
+  mockCategories.splice(0, mockCategories.length, ...cloneCategories());
+}

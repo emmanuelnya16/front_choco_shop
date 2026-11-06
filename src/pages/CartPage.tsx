@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router';
+import { BackButton } from '@/components/ui/BackButton';
 import { Button } from '@/components/ui/Button';
 import { Container } from '@/components/ui/Primitives';
 import { ProductCard } from '@/components/ui/ProductCard';
@@ -19,6 +20,7 @@ import { CartItemRow } from '@/features/cart/components/CartItemRow';
 import { EmptyCartState } from '@/features/cart/components/EmptyCartState';
 import { useProducts } from '@/features/catalog/api/useCatalogQueries';
 import { useOnlineStatus } from '@/lib/hooks/useOnlineStatus';
+import { useDocumentTitle } from '@/lib/utils/useDocumentTitle';
 import {
   selectCartCount,
   selectCartSubtotal,
@@ -56,9 +58,8 @@ export function CartPage() {
   const validateCart = useValidateCart();
   const mutateValidateCart = validateCart.mutate;
 
-  useEffect(() => {
-    document.title = "Panier · DR Choco L'Incompris";
-  }, []);
+  // Titre unique et « noindex » (page privée) par l'API de référencement (M7 §7)
+  useDocumentTitle('Panier');
 
   // Déclenche la vérification du stock à l'ouverture si > 2 min (§4.4)
   useEffect(() => {
@@ -153,7 +154,8 @@ export function CartPage() {
 
   if (items.length === 0) {
     return (
-      <Container>
+      <Container className="pt-4 lg:pt-0">
+        <BackButton fallback="/explorer" className="lg:hidden" />
         <EmptyCartState />
       </Container>
     );
@@ -162,12 +164,15 @@ export function CartPage() {
   return (
     <div className="pb-28 lg:pb-16">
       <Container className="py-6 lg:py-10">
+        {/* Retour (M6 §8) : écran précédent de l'app, sinon le catalogue */}
+        <BackButton fallback="/explorer" className="mb-2 lg:hidden" />
+
         {/* 1. Titre + nombre d'articles (§4.1) */}
         <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-silver/70 pb-4">
           <div className="flex items-baseline gap-3">
             <h1 className="text-h1 text-ink">MON PANIER</h1>
             <span className="text-body font-semibold text-text-2">
-              {count} article{count > 1 ? 's' : ''}
+              {count}&nbsp;article{count > 1 ? 's' : ''}
             </span>
           </div>
         </div>
@@ -221,7 +226,7 @@ export function CartPage() {
                     className="h-4 w-4 shrink-0 text-red"
                     aria-hidden="true"
                   />
-                  <span>Mis de côté 24 h dès la réservation</span>
+                  <span>Mis de côté 24&nbsp;h dès la réservation</span>
                 </li>
                 <li className="flex items-center gap-3">
                   <Smartphone
@@ -242,7 +247,8 @@ export function CartPage() {
           </div>
 
           {/* Colonne droite collante sur ordinateur (36 % -> 5/12 ou 4/12, §4.3) */}
-          <aside className="space-y-4 md:col-span-5 lg:sticky lg:top-24 xl:col-span-4">
+          {/* Collé sous l'en-tête (et sous le bandeau rouge s'il est affiché) : --desktop-shell-top */}
+          <aside className="space-y-4 md:col-span-5 lg:sticky lg:top-[calc(var(--desktop-shell-top)+24px)] xl:col-span-4">
             <div className="rounded-[var(--radius-md)] border border-silver/70 bg-white p-5 sm:p-6">
               <h2 className="text-h3 text-ink">RÉCAPITULATIF</h2>
 
@@ -270,13 +276,13 @@ export function CartPage() {
               </div>
 
               {hasUnavailable && (
-                <p role="alert" className="mt-3 text-xs font-bold text-danger">
+                <p role="alert" className="mt-3 text-caption font-bold text-danger">
                   Retirez les articles épuisés pour continuer.
                 </p>
               )}
 
               {!isOnline && (
-                <p role="alert" className="mt-3 text-xs font-bold text-warning">
+                <p role="alert" className="mt-3 text-caption font-bold text-warning">
                   Vous êtes hors connexion. Reconnectez-vous pour réserver.
                 </p>
               )}
@@ -315,7 +321,7 @@ export function CartPage() {
                     className="h-4 w-4 shrink-0 text-red"
                     aria-hidden="true"
                   />
-                  <span>Mis de côté 24 h dès la réservation</span>
+                  <span>Mis de côté 24&nbsp;h dès la réservation</span>
                 </li>
                 <li className="flex items-center gap-3">
                   <Smartphone
@@ -352,7 +358,7 @@ export function CartPage() {
               {recommendedProducts.map((product) => (
                 <div
                   key={product.id}
-                  className="w-[210px] shrink-0 snap-start lg:w-auto"
+                  className="w-52 shrink-0 snap-start lg:w-auto"
                 >
                   <ProductCard product={product} />
                 </div>
@@ -363,20 +369,20 @@ export function CartPage() {
       </Container>
 
       {/* Barre d'action collée en bas sur mobile (à la place de la barre de navigation, §4.1) */}
-      <div className="fixed right-0 bottom-0 left-0 z-40 border-t border-silver/70 bg-white px-4 pt-3 pb-[calc(12px+env(safe-area-inset-bottom))] shadow-[var(--shadow-nav)] lg:hidden">
+      <div className="fixed right-0 bottom-0 left-0 z-nav border-t border-silver/70 bg-white px-page pt-3 pb-[calc(12px+env(safe-area-inset-bottom))] shadow-[var(--shadow-nav)] lg:hidden">
         {hasUnavailable && (
-          <p role="alert" className="mb-2 text-xs font-bold text-danger">
+          <p role="alert" className="mb-2 text-caption font-bold text-danger">
             Retirez les articles épuisés pour continuer.
           </p>
         )}
         {!isOnline && (
-          <p role="alert" className="mb-2 text-xs font-bold text-warning">
+          <p role="alert" className="mb-2 text-caption font-bold text-warning">
             Vous êtes hors connexion. Reconnectez-vous pour réserver.
           </p>
         )}
         <div className="flex items-center justify-between gap-4">
           <div>
-            <span className="block text-xs font-semibold uppercase tracking-wider text-text-2">
+            <span className="block text-label text-text-2">
               Total
             </span>
             <AnimatedPriceCounter
@@ -389,7 +395,7 @@ export function CartPage() {
             size="lg"
             disabled={!isOnline || hasUnavailable || validateCart.isPending}
             onClick={handleReserve}
-            className="min-w-[180px]"
+            className="min-w-45"
           >
             {validateCart.isPending ? (
               <span className="inline-flex items-center gap-2">

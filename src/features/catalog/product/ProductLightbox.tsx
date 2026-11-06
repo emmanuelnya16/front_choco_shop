@@ -19,6 +19,9 @@ import type { ProductImageEntry } from '@/types/domain';
 /** Photo de la visionneuse : `ratio` permet d'afficher une photo au format d'origine (photos du colis, M5). */
 export type LightboxImage = ProductImageEntry & { ratio?: ImageAspectRatio; fit?: 'cover' | 'contain' };
 
+/** Retour de la photo après un glissé ou un zoom (jetons de mouvement, M7 §4.4). */
+const FRAME_TRANSITION = `transform ${duration.fast * 1000}ms cubic-bezier(${ease.out.join(', ')})`;
+
 /**
  * Largeur du cadre photo selon son format : la plus petite entre la place disponible, 560 px et la hauteur
  * de la zone centrale (100cqh) multipliée par le format. La photo entière tient ainsi dans l'écran, même
@@ -238,7 +241,7 @@ function LightboxDialog({
       <m.div
         role="dialog"
         aria-modal="true"
-        aria-label={label ?? `Visionneuse photo : ${productName}`}
+        aria-label={label ?? `Visionneuse photo\u00a0: ${productName}`}
         initial={{ opacity: 0 }}
         animate={{ opacity: backdropOpacity }}
         exit={{ opacity: 0 }}
@@ -249,7 +252,7 @@ function LightboxDialog({
             Sous 640 px, les actions supplémentaires (« Enregistrer la photo ») passent sur une 2e ligne
             sous Zoom et Fermer : à 360 px, tout ne tient pas sur une ligne. */}
         <div className="relative z-10 flex flex-wrap items-center gap-2 px-4 pt-[calc(12px+env(safe-area-inset-top,0px))] pb-3">
-          <span className="order-1 shrink-0 rounded-[var(--radius-full)] bg-ink-2 px-3 py-1 text-xs font-bold whitespace-nowrap text-white tabular-nums">
+          <span className="order-1 shrink-0 rounded-[var(--radius-full)] bg-ink-2 px-3 py-1 text-caption font-bold whitespace-nowrap text-white tabular-nums">
             {currentIndex + 1} / {images.length}
           </span>
 
@@ -259,11 +262,17 @@ function LightboxDialog({
             </div>
           )}
 
-          <div className="order-2 ml-auto flex shrink-0 items-center gap-2 sm:order-3 sm:ml-0">
+          {/* Zoom et Fermer toujours en haut à droite, après les actions supplémentaires s'il y en a */}
+          <div
+            className={cn(
+              'order-2 ml-auto flex shrink-0 items-center gap-2',
+              renderActions && 'sm:order-3 sm:ml-0',
+            )}
+          >
             <button
               type="button"
               onClick={() => handleToggleZoom()}
-              aria-label={zoom > 1 ? 'Réduire le zoom' : 'Zoomer à 2,5x'}
+              aria-label={zoom > 1 ? 'Réduire le zoom' : 'Zoomer sur la photo'}
               className="inline-flex h-11 w-11 items-center justify-center rounded-[var(--radius-full)] bg-ink-2 text-white hover:bg-white/20"
             >
               {zoom > 1 ? (
@@ -314,7 +323,7 @@ function LightboxDialog({
               })`,
               transition: isDragging
                 ? 'none'
-                : 'transform 220ms cubic-bezier(0.22, 1, 0.36, 1)',
+                : FRAME_TRANSITION,
             }}
             className={cn(
               'max-h-full cursor-zoom-in overflow-hidden rounded-[var(--radius-md)]',
@@ -349,8 +358,14 @@ function LightboxDialog({
 
         {/* Pied de visionneuse : légende + miniatures */}
         <div className="relative z-10 flex flex-col items-center gap-2 px-4 pt-4 pb-[calc(16px+env(safe-area-inset-bottom,0px))]">
-          <p className="text-xs text-silver">
-            Double-touchez pour zoomer · Glissez vers le bas pour fermer
+          {/* Aide selon l'appareil : gestes au doigt sur écran tactile, souris et clavier sur ordinateur */}
+          <p className="text-caption text-silver">
+            <span className="pointer-fine:hidden">
+              Double-touchez pour zoomer · Glissez vers le bas pour fermer
+            </span>
+            <span className="hidden pointer-fine:inline">
+              Double-cliquez pour zoomer · Échap pour fermer
+            </span>
           </p>
         </div>
       </m.div>

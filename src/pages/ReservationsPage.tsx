@@ -22,7 +22,7 @@ import { qk } from '@/lib/api/queryKeys';
 import { cn } from '@/lib/utils/cn';
 import { useDocumentTitle } from '@/lib/utils/useDocumentTitle';
 import { fadeUp } from '@/motion/presets';
-import { duration, ease, spring } from '@/motion/tokens';
+import { duration, ease, spring, staggerStep } from '@/motion/tokens';
 import { useAuthStore } from '@/stores/authStore';
 import { useUiStore } from '@/stores/uiStore';
 import type { ReservationListItem, ReservationScope } from '@/types/api';
@@ -155,9 +155,9 @@ function ReservationsContent() {
           >
             <WifiOff className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
             <span>
-              Hors connexion : statuts affichés depuis votre dernière visite.
+              Hors connexion&nbsp;: statuts affichés depuis votre dernière visite.
               {lastUpdateLabel && (
-                <span className="mt-0.5 block text-xs text-text-2">{lastUpdateLabel}.</span>
+                <span className="mt-0.5 block text-caption text-text-2">{lastUpdateLabel}.</span>
               )}
             </span>
           </div>
@@ -191,7 +191,7 @@ function ReservationsContent() {
                   }
                 }}
                 className={cn(
-                  'relative min-h-[44px] flex-1 px-2 pb-3 text-[15px] font-semibold transition-colors sm:flex-none sm:px-5',
+                  'relative min-h-11 flex-1 px-2 pb-3 text-body font-semibold transition-colors sm:flex-none sm:px-5',
                   selected ? 'text-ink' : 'text-text-2 [@media(hover:hover)]:hover:text-ink',
                 )}
               >
@@ -291,7 +291,9 @@ function ReservationsPanel({
       <div className="flex flex-col items-center rounded-[var(--radius-md)] bg-surface px-6 py-10 text-center">
         <AlertCircle className="h-6 w-6 text-red" aria-hidden="true" />
         <p className="mt-3 text-body font-semibold text-ink">Impossible de charger vos réservations.</p>
-        <p className="mt-1 text-small text-text-2">Vérifiez votre connexion puis réessayez.</p>
+        <p className="mt-1 text-small text-text-2">
+          Un problème est survenu de notre côté. Réessayez dans quelques instants.
+        </p>
         <Button variant="dark" size="md" className="mt-5" onClick={() => void query.refetch()}>
           Réessayer
         </Button>
@@ -323,7 +325,7 @@ function ReservationsPanel({
           className="mb-4 flex items-center justify-between gap-3 rounded-[var(--radius-md)] border border-red bg-white px-4 py-3 text-small text-ink"
         >
           <span>La mise à jour a échoué. Les statuts affichés peuvent dater un peu.</span>
-          <Button variant="outline" size="sm" onClick={() => void query.refetch()}>
+          <Button variant="outline" size="md" className="shrink-0" onClick={() => void query.refetch()}>
             Réessayer
           </Button>
         </div>
@@ -339,7 +341,7 @@ function ReservationsPanel({
             variants={fadeUp}
             initial="hidden"
             animate="visible"
-            transition={{ delay: (index % 10) * 0.04, layout: spring.sheet }}
+            transition={{ delay: (index % 10) * staggerStep, layout: spring.sheet }}
           >
             <ReservationCard item={item} />
           </m.li>

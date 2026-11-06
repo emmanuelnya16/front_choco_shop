@@ -187,15 +187,15 @@
 
 | # | Point | Décision par | Statut | Origine |
 | --- | --- | --- | --- | --- |
-| SP-108 | Valider ou rejeter une preuve de paiement, avec un motif affiché tel quel au client. Le simulateur de `/_dev` reproduit ces actions et sert de référence. | Back-end | Ouvert | RAPPORT_M5 §6 ; RAPPORT_M4 §1.1 |
-| SP-109 | Faire avancer une réservation selon son parcours (livraison locale, agence, Retrait en boutique), chaque changement daté et attribué à la boutique ; annuler côté boutique avec une note ; marquer livrée ou retirée. | Back-end | Ouvert | RAPPORT_M5 §6 |
-| SP-110 | Joindre 1 à 3 photos du colis (réduites, stockées en privé) avec la date d’emballage, au passage à « Remise à l’agence » ou « Prête pour retrait ». | Back-end | Ouvert | RAPPORT_M5 §6 |
-| SP-111 | Gérer le catalogue : articles, couleurs, tailles, stock, photos par couleur, guides des tailles, looks. | Back-end | Ouvert | RAPPORT_M1 §1.1 ; `src/types/domain.ts` |
-| SP-112 | Voir le motif choisi par le client quand il annule. | Back-end | Ouvert | RAPPORT_M5 §6 |
-| SP-113 | Renseigner les villes, les frais, les délais et les agences (adresse, horaires, téléphone). Par défaut : saisis directement par le back-end au lancement (voir SP-031 et SP-032). | Back-end | Ouvert | RAPPORT_M5 §6 ; RAPPORT_M3 §4.1 |
-| SP-114 | Modifier les moyens de paiement (codes marchands, USSD, QR, étapes, délai de validation) sans redéployer. Par défaut : saisis par le back-end. | Back-end | Ouvert | `src/types/domain.ts` ; `src/mocks/fixtures/settings.ts` |
-| SP-115 | Le message WhatsApp de l’écran Merci contient le lien `<domaine>/admin/reservations/RES-…` : à confirmer quand l’adresse de l’administration sera connue. | Back-end, Front | Ouvert | RAPPORT_M4 §1.4 ; `src/features/payment/whatsapp.ts` |
-| SP-116 | Données d’administration sous `/api/admin` et pages sous `/admin` : jamais gardées en cache par l’application, aucun écran `/admin` dans l’application client. | Back-end, Front | Décidé | RAPPORT_M6 §4.9 ; `src/pwa/cacheRules.ts` |
+| SP-108 | Valider ou rejeter une preuve de paiement, avec un motif affiché tel quel au client. Le simulateur de `/_dev` reproduit ces actions et sert de référence. Résolu côté front en A2 (`ProofVerificationPanel`, `/admin/reservations/:ref`). | Back-end, Front | Résolu (A2 côté front) | RAPPORT_M5 §6 ; RAPPORT_M4 §1.1 ; RAPPORT_A2 |
+| SP-109 | Faire avancer une réservation selon son parcours (livraison locale, agence, Retrait en boutique), chaque changement daté et attribué à la boutique ; annuler côté boutique avec une note ; marquer livrée ou retirée. Résolu côté front en A2 (`/admin/reservations/:ref`). | Back-end, Front | Résolu (A2 côté front) | RAPPORT_M5 §6 ; RAPPORT_A2 |
+| SP-110 | Joindre 1 à 3 photos du colis (réduites, stockées en privé) avec la date d’emballage, au passage à « Remise à l’agence » ou « Prête pour retrait ». Résolu côté front en A2 (`PackagePhotosUploader`). | Back-end, Front | Résolu (A2 côté front) | RAPPORT_M5 §6 ; RAPPORT_A2 |
+| SP-111 | Gérer le catalogue : articles, couleurs, tailles, stock, photos par couleur, guides des tailles, looks. Résolu côté front en A3 (`/admin/catalogue`, `/admin/categories`, `/admin/looks`). | Back-end, Front | Résolu (A3 côté front) | RAPPORT_M1 §1.1 ; `src/types/domain.ts` ; RAPPORT_A3 |
+| SP-112 | Voir le motif choisi par le client quand il annule. Résolu côté front en A2 (affiché dans le journal de suivi `timeline` et l’en-tête de `/admin/reservations/:ref`). | Back-end, Front | Résolu (A2 côté front) | RAPPORT_M5 §6 ; RAPPORT_A2 |
+| SP-113 | Renseigner les villes, les frais, les délais et les agences (adresse, horaires, téléphone). Résolu côté front en A4 (`/admin/parametres/livraison`). | Back-end, Front | Résolu (A4 côté front) | RAPPORT_M5 §6 ; RAPPORT_M3 §4.1 ; RAPPORT_A4 |
+| SP-114 | Modifier les moyens de paiement (codes marchands, USSD, QR, étapes, délai de validation) sans redéployer. Résolu côté front en A4 (`/admin/parametres/paiement`). | Back-end, Front | Résolu (A4 côté front) | `src/types/domain.ts` ; `src/mocks/fixtures/settings.ts` ; RAPPORT_A4 |
+| SP-115 | Le message WhatsApp de l’écran Merci contient le lien `<domaine>/admin/reservations/RES-…` : route `/admin/reservations/:ref` livrée en A1–A2 avec redirection après connexion (`?redirect=`). | Back-end, Front | Résolu (A1–A2 côté front) | RAPPORT_M4 §1.4 ; `src/features/payment/whatsapp.ts` ; RAPPORT_A1 |
+| SP-116 | Données d’administration sous `/api/admin` et pages sous `/admin` : jamais gardées en cache par l’application, aucun écran `/admin` dans l’application client (`assets/admin-*` isolés). | Back-end, Front | Résolu (A1–A4) | RAPPORT_M6 §4.9 ; `src/pwa/cacheRules.ts` ; RAPPORT_A1 |
 
 ## 11. Interface et accessibilité
 

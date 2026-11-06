@@ -21,7 +21,7 @@ export function ProfileShell({ children }: { children: ReactNode }) {
   return (
     <div className="mx-auto w-full max-w-content pb-12 lg:grid lg:grid-cols-[232px_minmax(0,1fr)] lg:gap-10 lg:px-page lg:pt-10">
       <nav aria-label="Mon espace" className="hidden lg:block">
-        <ul className="sticky top-[136px] space-y-1">
+        <ul className="sticky top-[calc(var(--desktop-shell-top)+4rem)] space-y-1">
           {NAV_ITEMS.map((item) => {
             const active = item.match(location.pathname, location.search, location.hash);
             const Icon = item.icon;
@@ -31,11 +31,11 @@ export function ProfileShell({ children }: { children: ReactNode }) {
                   to={item.to}
                   aria-current={active ? 'page' : undefined}
                   className={cn(
-                    'flex min-h-[44px] items-center gap-3 rounded-[var(--radius-md)] px-3 text-small font-semibold transition-colors',
+                    'flex min-h-11 items-center gap-3 rounded-[var(--radius-md)] px-3 text-small font-semibold transition-colors',
                     active ? 'bg-ink text-white' : 'text-ink hover:bg-surface',
                   )}
                 >
-                  <Icon className="h-[18px] w-[18px]" aria-hidden="true" />
+                  <Icon className="h-5 w-5" aria-hidden="true" />
                   {item.label}
                 </Link>
               </li>

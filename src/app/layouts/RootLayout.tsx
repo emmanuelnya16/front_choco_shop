@@ -9,9 +9,6 @@ import {
 } from '@/components/errors/ErrorBoundary';
 import { AppHeader } from '@/components/layout/AppHeader';
 import { BottomNav } from '@/components/layout/BottomNav';
-import { FloatingWhatsApp } from '@/components/layout/FloatingWhatsApp';
-import { Toaster } from '@/components/ui/Toast';
-import { OfflineBanner } from '@/features/offline/OfflineBanner';
 import { FlyToCartLayer } from '@/features/catalog/cart-fly/FlyToCartLayer';
 import { PackageReadyNotifier } from '@/features/tracking/components/PackageReadyNotifier';
 import { refreshSessionSilently } from '@/lib/api/client';
@@ -68,6 +65,28 @@ const LazyAppFooter = lazy(() =>
   })),
 );
 
+// Bouton WhatsApp flottant : il n'apparaît qu'après l'arrivée sur la page, hors du JavaScript de démarrage
+const LazyFloatingWhatsApp = lazy(() =>
+  import('@/components/layout/FloatingWhatsApp').then((m) => ({
+    default: m.FloatingWhatsApp,
+  })),
+);
+
+// Bandeau hors connexion et notifications (toasts) : toujours montés, mais leur code arrive juste
+// après le premier affichage (hors du JavaScript de démarrage, budget M7). Le service worker les
+// enregistre avec le reste de l'app : ils restent disponibles hors connexion.
+const LazyOfflineBanner = lazy(() =>
+  import('@/features/offline/OfflineBanner').then((m) => ({
+    default: m.OfflineBanner,
+  })),
+);
+
+const LazyToaster = lazy(() =>
+  import('@/components/ui/Toast').then((m) => ({
+    default: m.Toaster,
+  })),
+);
+
 const LazyNotificationsBridge = lazy(() =>
   import('@/features/notifications/NotificationsBridge').then((m) => ({
     default: m.NotificationsBridge,
@@ -95,7 +114,12 @@ export function RouteLoadingBar() {
  * - page jamais enregistrée et réseau absent → contenu « hors connexion » (M6 §6.5) ;
  * - sinon → écran d'erreur générale (l'erreur est signalée par la zone).
  */
-function LayoutErrorFallback({ variant, resolution, reset }: ErrorFallbackProps) {
+function LayoutErrorFallback({
+  variant,
+  resolution,
+  reset,
+  fromRouter = false,
+}: ErrorFallbackProps & { fromRouter?: boolean }) {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const fullScreen = variant === 'route';
@@ -115,29 +139,45 @@ function LayoutErrorFallback({ variant, resolution, reset }: ErrorFallbackProps)
   }
   if (resolution === 'reloading') return <RouteLoadingBar />;
 
-  // Déjà sur l'accueil : la zone « page » réaffiche son contenu, le routeur recharge l'app
-  const goHome = () => (pathname !== '/' ? void navigate('/') : fullScreen ? pageReload.reload() : reset());
+  // Déjà sur l'accueil : la zone « page » réaffiche son contenu ; une erreur gardée par le routeur
+  // (page impossible à charger) ne part qu'en rechargeant l'app
+  const goHome = () =>
+    pathname !== '/' ? void navigate('/') : fullScreen || fromRouter ? pageReload.reload() : reset();
   return <ErrorScreen fullScreen={fullScreen} animated onGoHome={goHome} />;
 }
 
 const renderLayoutFallback = (props: ErrorFallbackProps) => <LayoutErrorFallback {...props} />;
+const renderRouterFallback = (props: ErrorFallbackProps) => <LayoutErrorFallback {...props} fromRouter />;
 
 /** Renvoie l'erreur du routeur à la zone d'erreur, qui décide du repli. */
 function Rethrow({ error }: { error: unknown }): never {
   throw error;
 }
 
-/**
- * Erreur au niveau du routeur (page impossible à charger, erreur de la mise en page) : traitée
- * par la même zone d'erreur que le reste de l'app (rechargement unique, hors connexion, remontée).
- */
-export function RouterErrorBoundary() {
+/** Erreur gardée par le routeur, renvoyée à la zone d'erreur commune. */
+function RouterErrorZone({ variant }: { variant: 'route' | 'page' }) {
   const error = useRouteError();
   return (
-    <ErrorBoundary variant="route" resetKey={error} fallback={renderLayoutFallback}>
+    <ErrorBoundary variant={variant} zone="route" resetKey={error} fallback={renderRouterFallback}>
       <Rethrow error={error} />
     </ErrorBoundary>
   );
+}
+
+/**
+ * Erreur de la mise en page elle-même (au niveau du routeur) : écran plein, traité par la même zone
+ * d'erreur que le reste de l'app (rechargement unique, hors connexion, remontée).
+ */
+export function RouterErrorBoundary() {
+  return <RouterErrorZone variant="route" />;
+}
+
+/**
+ * Page impossible à charger (morceau introuvable, erreur au chargement de la route) : affichée sous
+ * l'en-tête, la coquille (en-tête, barre basse, pied de page) reste visible et utilisable.
+ */
+export function PageRouterErrorBoundary() {
+  return <RouterErrorZone variant="page" />;
 }
 
 /**
@@ -201,13 +241,15 @@ export function RootLayout() {
     <div className="flex min-h-dvh flex-col bg-white text-ink">
       <a
         href="#contenu"
-        className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[100] focus:rounded-[var(--radius-md)] focus:bg-red focus:px-4 focus:py-2.5 focus:text-small focus:font-semibold focus:text-white"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-splash focus:rounded-[var(--radius-md)] focus:bg-red focus:px-4 focus:py-2.5 focus:text-small focus:font-semibold focus:text-white"
       >
         Aller au contenu
       </a>
 
       <AppHeader />
-      <OfflineBanner />
+      <Suspense fallback={null}>
+        <LazyOfflineBanner />
+      </Suspense>
       <Suspense fallback={null}>
         <LazyPendingReservationBanner />
       </Suspense>
@@ -226,8 +268,12 @@ export function RootLayout() {
         <LazyAppFooter />
       </Suspense>
       <BottomNav />
-      <FloatingWhatsApp />
-      <Toaster />
+      <Suspense fallback={null}>
+        <LazyFloatingWhatsApp />
+      </Suspense>
+      <Suspense fallback={null}>
+        <LazyToaster />
+      </Suspense>
       <UpdateBanner />
       <SplashScreen />
       <PackageReadyNotifier />

@@ -343,7 +343,8 @@ export async function refreshPushStatus(): Promise<PushStatus> {
  * désactivé les notifications :
  * - 'login' (connexion) : abonnement renvoyé au serveur, qui l'associe au compte ;
  * - 'startup' (démarrage, session restaurée) : renvoyé seulement s'il a changé
- *   (point de terminaison mémorisé différent de l'actuel) ou s'il a disparu.
+ *   (point de terminaison mémorisé différent de l'actuel, clé VAPID du serveur différente de celle
+ *   de l'abonnement) ou s'il a disparu.
  */
 export async function syncPushSubscription(trigger: 'login' | 'startup'): Promise<void> {
   if (!isPushAvailable() || Notification.permission !== 'granted' || isOptedOut()) {
@@ -357,9 +358,14 @@ export async function syncPushSubscription(trigger: 'login' | 'startup'): Promis
   }
   const current = await getCurrentSubscription(registration);
   const stored = readStorage(PUSH_ENDPOINT_KEY);
+  // Clé VAPID du serveur changée depuis l'abonnement (nouvelle paire générée par le back-end) :
+  // l'ancien abonnement ne recevrait plus rien. subscribe() le remplace et prévient le serveur.
+  const keyChanged = Boolean(
+    current && !hasSameKey(current.options?.applicationServerKey, urlBase64ToUint8Array(env.vapidPublicKey)),
+  );
   // HYPOTHÈSE: permission accordée sans abonnement (accordée avant M6, ou abonnement perdu) et sans
   // désactivation explicite : on (ré)abonne, le client attend ses notifications.
-  if (trigger === 'login' || !current || current.endpoint !== stored) {
+  if (trigger === 'login' || !current || current.endpoint !== stored || keyChanged) {
     await subscribe();
     return;
   }

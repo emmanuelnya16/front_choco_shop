@@ -40,7 +40,7 @@ export function PackageReadyNotifier() {
             durationMs: 6000,
           }
         : {
-            message: `${pending.length} colis sont prêts : leurs photos vous attendent`,
+            message: `${pending.length} colis sont prêts\u00A0: leurs photos vous attendent`,
             actionLabel: 'Voir',
             actionHref: '/reservations',
             durationMs: 6000,

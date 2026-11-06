@@ -25,7 +25,7 @@ const DEFAULT_LABELS: Record<BadgeVariant, string> = {
 };
 
 /**
- * Badge produit (§5.4) : hauteur 22 px, rayon complet, text-label.
+ * Badge produit (§5.4) : hauteur 24 px, rayon complet, text-label.
  */
 export function Badge({
   variant = 'new',
@@ -43,7 +43,7 @@ export function Badge({
   return (
     <span
       className={cn(
-        'inline-flex h-[22px] shrink-0 items-center justify-center rounded-[var(--radius-full)] px-2.5 text-label leading-none whitespace-nowrap',
+        'inline-flex h-6 shrink-0 items-center justify-center rounded-[var(--radius-full)] px-2.5 text-label leading-none whitespace-nowrap',
         BADGE_STYLES[variant],
         className,
       )}
@@ -65,7 +65,7 @@ export interface ChipProps extends ButtonHTMLAttributes<HTMLButtonElement> {
  */
 export function Chip({ active = false, href, children, className, ...props }: ChipProps) {
   const chipClasses = cn(
-    'inline-flex h-9 shrink-0 items-center justify-center rounded-[var(--radius-full)] border px-4 text-small font-semibold whitespace-nowrap transition-colors',
+    'inline-flex h-9 shrink-0 items-center justify-center rounded-[var(--radius-full)] border px-4 text-small font-semibold whitespace-nowrap transition-colors duration-fast',
     active
       ? 'border-ink bg-ink text-white'
       : 'border-silver bg-white text-ink [@media(hover:hover)]:hover:bg-surface',
@@ -74,7 +74,7 @@ export function Chip({ active = false, href, children, className, ...props }: Ch
 
   if (href) {
     return (
-      <Link to={href} className="inline-flex min-h-[44px] items-center">
+      <Link to={href} className="inline-flex min-h-11 items-center">
         <span className={chipClasses}>{children}</span>
       </Link>
     );
@@ -84,7 +84,7 @@ export function Chip({ active = false, href, children, className, ...props }: Ch
     <button
       type="button"
       aria-pressed={active}
-      className="inline-flex min-h-[44px] items-center"
+      className="inline-flex min-h-11 items-center"
       {...props}
     >
       <span className={chipClasses}>{children}</span>

@@ -22,7 +22,6 @@ import { OfflineScreen } from '@/features/offline/OfflineScreen';
 import { usePaymentSettings, useUploadProof } from '@/features/payment/api/usePaymentQueries';
 import { ReservationExpiredOverlay } from '@/features/payment/components/ReservationExpiredOverlay';
 import {
-  formatFileSizeFr,
   prepareProof,
   ProofPreparationError,
   type PreparedProofResult,
@@ -40,9 +39,29 @@ import { detectCmOperator } from '@/lib/utils/operator';
 import { formatCmPhone, normalizeCmPhone } from '@/lib/utils/phone';
 import { formatPrice } from '@/lib/utils/price';
 import { useDocumentTitle } from '@/lib/utils/useDocumentTitle';
+import { duration } from '@/motion/tokens';
+import { useReducedMotionPref } from '@/motion/useReducedMotionPref';
 import { isAppOnline, useNetworkStore } from '@/pwa/networkStore';
 import { useReservationStore } from '@/stores/reservationStore';
 import { useToastStore } from '@/stores/toastStore';
+
+/**
+ * Conseil affiché sous la preuve refusée, selon le motif donné par la boutique (texte libre).
+ * HYPOTHÈSE: motifs usuels « montant », « destinataire / numéro », « illisible » ; sinon conseil général.
+ */
+function rejectionAdvice(reason: string): string {
+  const r = reason.toLowerCase();
+  if (r.includes('montant')) {
+    return 'Vérifiez le montant exact attendu ci-dessus, puis envoyez la capture du paiement correspondant.';
+  }
+  if (r.includes('destinataire') || r.includes('marchand') || r.includes('numéro')) {
+    return 'Vérifiez le destinataire indiqué dans les instructions de paiement, puis envoyez la capture du bon paiement.';
+  }
+  if (r.includes('illisible') || r.includes('flou') || r.includes('nette') || r.includes('coupée')) {
+    return 'Envoyez une nouvelle capture nette, qui montre toute la transaction.';
+  }
+  return 'Envoyez une nouvelle capture qui montre toute la transaction.';
+}
 
 interface PreparedProofState extends PreparedProofResult {
   previewUrl: string;
@@ -54,8 +73,9 @@ export function ProofPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const showToast = useToastStore((s) => s.show);
+  const reducedMotion = useReducedMotionPref();
 
-  useDocumentTitle(`Preuve de paiement ${ref}`);
+  useDocumentTitle(`Preuve de paiement ${ref.toUpperCase()}`);
 
   const reservationQuery = useReservation(ref, { live: true });
   const { payment, whatsappNumber } = usePaymentSettings();
@@ -112,9 +132,9 @@ export function ProofPage() {
 
   const operatorConfig = useMemo(
     () =>
-      payment.operators.find((op) => op.id === selectedOperator) ??
-      payment.operators[0],
-    [payment.operators, selectedOperator],
+      payment?.operators.find((op) => op.id === selectedOperator) ??
+      payment?.operators[0],
+    [payment, selectedOperator],
   );
 
   const operatorLabel =
@@ -126,9 +146,10 @@ export function ProofPage() {
       const nextParams = new URLSearchParams(searchParams);
       nextParams.delete('openPicker');
       setSearchParams(nextParams, { replace: true });
+      // Laisse la page se poser avant d'ouvrir la galerie (le navigateur refuse sinon parfois l'ouverture)
       const timer = window.setTimeout(() => {
         fileInputRef.current?.click();
-      }, 150);
+      }, duration.tap * 1000);
       return () => window.clearTimeout(timer);
     }
     return undefined;
@@ -154,6 +175,8 @@ export function ProofPage() {
     }
   }, [reservation, navigate]);
 
+  const proofMaxSizeMb = payment?.proofMaxSizeMb ?? 10;
+
   const handleSelectFile = useCallback(
     async (file: File | null | undefined) => {
       if (!file) return;
@@ -165,8 +188,7 @@ export function ProofPage() {
       }, 300);
 
       try {
-        const maxMb = payment.proofMaxSizeMb ?? 10;
-        const result = await prepareProof(file, { maxSizeMb: maxMb });
+        const result = await prepareProof(file, { maxSizeMb: proofMaxSizeMb });
         // L'aperçu (URL objet) est géré par la mémoire des captures : libéré quand elle est oubliée
         setPreparedProof(
           rememberProof(ref, {
@@ -181,7 +203,7 @@ export function ProofPage() {
           showToast({ message: err.message });
         } else {
           const fallbackMsg =
-            "Impossible de préparer cette image. Essayez avec une capture d'écran classique.";
+            "Impossible de préparer cette image. Essayez avec une capture d’écran classique.";
           setErrorMessage(fallbackMsg);
           showToast({ message: fallbackMsg });
         }
@@ -193,7 +215,7 @@ export function ProofPage() {
         }
       }
     },
-    [payment.proofMaxSizeMb, ref, showToast],
+    [proofMaxSizeMb, ref, showToast],
   );
 
   // Collage depuis le presse-papiers (ordinateur)
@@ -222,7 +244,7 @@ export function ProofPage() {
     if (!reservation) return;
     if (!preparedProof) {
       showToast({
-        message: "Ajoutez d'abord votre capture d'écran",
+        message: 'Ajoutez d’abord la capture d’écran de votre paiement.',
       });
       fileInputRef.current?.click();
       return;
@@ -277,7 +299,7 @@ export function ProofPage() {
           return;
         }
         if (err.status === 413 || err.code === 'FILE_TOO_LARGE') {
-          setErrorMessage('Image trop lourde.');
+          setErrorMessage('Cette image est trop lourde. Choisissez une capture d’écran plus légère.');
           return;
         }
         if (err.status === 422 || err.code === 'INVALID_STATUS') {
@@ -293,13 +315,13 @@ export function ProofPage() {
         // Coupure ou délai dépassé (408) : même traitement, la capture est conservée (M6 §6.3)
         if (isNetworkError(err)) {
           setIsNetworkInterrupted(true);
-          setErrorMessage("L'envoi a été interrompu. Votre capture est conservée.");
+          setErrorMessage("L’envoi a été interrompu. Votre capture est conservée.");
           return;
         }
         setErrorMessage(err.message);
       } else {
         setIsNetworkInterrupted(true);
-        setErrorMessage("L'envoi a été interrompu. Votre capture est conservée.");
+        setErrorMessage("L’envoi a été interrompu. Votre capture est conservée.");
       }
     }
   }, [
@@ -344,11 +366,15 @@ export function ProofPage() {
 
   if (reservationQuery.isLoading) {
     return (
-      <div className="mx-auto max-w-[600px] px-page py-6 space-y-6">
-        <div className="h-10 w-full animate-pulse rounded-[var(--radius-md)] bg-surface" />
-        <div className="h-12 w-full animate-pulse rounded-[var(--radius-md)] bg-surface" />
-        <div className="aspect-[4/3] w-full animate-pulse rounded-[var(--radius-md)] bg-surface" />
-        <div className="h-14 w-full animate-pulse rounded-[var(--radius-md)] bg-surface" />
+      <div className="min-h-dvh bg-white pb-32">
+        <CheckoutStepper currentStep={3} />
+        <div className="mx-auto max-w-150 space-y-5 px-page pt-4" aria-busy="true">
+          <div className="h-11 w-48 animate-pulse rounded-[var(--radius-md)] bg-surface" />
+          <div className="h-8 w-3/4 animate-pulse rounded-[var(--radius-md)] bg-surface" />
+          <div className="h-12 w-full animate-pulse rounded-[var(--radius-md)] bg-surface" />
+          <div className="aspect-[4/3] w-full animate-pulse rounded-[var(--radius-md)] bg-surface" />
+          <div className="h-13 w-full animate-pulse rounded-[var(--radius-md)] bg-surface" />
+        </div>
       </div>
     );
   }
@@ -363,18 +389,40 @@ export function ProofPage() {
   }
 
   if (!reservation) {
+    // 404 : introuvable ; autre erreur : message humain et « Réessayer » (M7 §4.5)
+    const loadError = reservationQuery.error;
+    const isNotFound = !loadError || (loadError instanceof ApiError && loadError.status === 404);
     return (
       <div className="mx-auto max-w-content px-page py-12 text-center">
         <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-surface text-danger">
           <AlertTriangle className="h-6 w-6" aria-hidden="true" />
         </div>
-        <h1 className="mt-4 text-h2 text-ink">Réservation introuvable</h1>
+        <h1 className="mt-4 text-h2 text-ink">
+          {isNotFound ? 'Réservation introuvable' : 'Envoi momentanément indisponible'}
+        </h1>
         <p className="mt-2 text-small text-text-2">
-          Impossible de retrouver la réservation {ref}.
+          {isNotFound ? (
+            <>
+              Impossible de retrouver la réservation{' '}
+              <span className="whitespace-nowrap font-mono font-bold text-ink">{ref}</span>.
+            </>
+          ) : (
+            'Votre réservation n’a pas pu être affichée. Réessayez dans un instant.'
+          )}
         </p>
-        <div className="mt-6 flex justify-center">
-          <Button variant="primary" onClick={() => navigate('/')}>
-            Retour à l&apos;accueil
+        <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
+          {!isNotFound && (
+            <Button
+              variant="primary"
+              size="lg"
+              iconLeft={<RefreshCw className="h-4 w-4" aria-hidden="true" />}
+              onClick={() => void reservationQuery.refetch()}
+            >
+              Réessayer
+            </Button>
+          )}
+          <Button variant={isNotFound ? 'primary' : 'outline'} size="lg" href="/reservations">
+            Mes réservations
           </Button>
         </div>
       </div>
@@ -384,13 +432,15 @@ export function ProofPage() {
   const totalAmount = reservation.amount?.total ?? reservation.total;
   const rejectionReason =
     reservation.rejection?.reason ?? reservation.rejectionReason ?? 'Capture illisible';
+  // Conseil selon le motif (« Montant incorrect » ne demande pas une capture plus nette)
+  const rejectionHelp = rejectionAdvice(rejectionReason);
 
   return (
     <div className="min-h-dvh bg-white pb-32">
       {/* 1. Indicateur d'étapes sur Preuve (étape 3) */}
       <CheckoutStepper currentStep={3} />
 
-      <div className="mx-auto max-w-[600px] px-page pt-4">
+      <div className="mx-auto max-w-150 px-page pt-4">
         <div className="mb-4">
           {/* Retour (M6 §8) : écran précédent de l'app, sinon les instructions de paiement */}
           <BackButton
@@ -398,6 +448,11 @@ export function ProofPage() {
             label="Instructions de paiement"
           />
         </div>
+
+        {/* Titre de la page (en mode renvoi, le titre « Paiement non validé » du bandeau en tient lieu) */}
+        {!isResendMode && (
+          <h1 className="mb-4 text-h2 text-ink">Envoyez votre preuve de paiement</h1>
+        )}
 
         {/* Mode renvoi (7.2) : Bandeau danger en haut */}
         {isResendMode ? (
@@ -412,8 +467,9 @@ export function ProofPage() {
                 <div>
                   <h1 className="text-h3 font-bold text-danger">Paiement non validé</h1>
                   <p className="mt-0.5 text-small font-semibold text-ink">
-                    Motif : {rejectionReason}
+                    Motif&nbsp;: {rejectionReason}
                   </p>
+                  <p className="mt-1 text-small text-text-2">{rejectionHelp}</p>
                 </div>
               </div>
               <HoldCountdown
@@ -425,14 +481,14 @@ export function ProofPage() {
 
             <div className="flex flex-wrap items-center justify-between gap-2 border-t border-danger/20 pt-2.5 text-small">
               <span className="text-text-2">
-                Montant exact attendu :{' '}
+                Montant exact attendu&nbsp;:{' '}
                 <strong className="font-mono font-bold text-ink">
                   {formatPrice(totalAmount)}
                 </strong>
               </span>
               <Link
                 to={`/reservation/${reservation.ref}/paiement`}
-                className="font-bold text-ink underline underline-offset-4 hover:text-red"
+                className="inline-flex min-h-11 items-center font-bold text-ink underline underline-offset-4 transition-colors duration-fast hover:text-red"
               >
                 Revoir les instructions de paiement
               </Link>
@@ -446,7 +502,7 @@ export function ProofPage() {
                   {isOnline ? (
                     <img
                       src={reservation.proof.thumbnailUrl}
-                      alt="Capture précédente refusée"
+                      alt="Preuve de paiement précédente, refusée"
                       className="h-full w-full object-cover opacity-50 grayscale"
                     />
                   ) : null}
@@ -459,11 +515,9 @@ export function ProofPage() {
                 </div>
                 <div className="min-w-0">
                   <span className="inline-flex rounded-[var(--radius-sm)] bg-danger px-2 py-0.5 text-label text-white">
-                    Capture refusée
+                    Preuve refusée
                   </span>
-                  <p className="mt-1 text-xs text-text-2">
-                    Veuillez envoyer une nouvelle capture nette montrant la transaction complète.
-                  </p>
+                  <p className="mt-1 text-caption text-text-2">{rejectionHelp}</p>
                 </div>
               </div>
             ) : null}
@@ -475,12 +529,7 @@ export function ProofPage() {
           <p className="text-small font-bold text-ink">
             <span className="font-mono">{reservation.ref}</span>
             <span className="mx-1.5 text-text-2">·</span>
-            <span
-              className="text-price"
-              aria-label={`${totalAmount.toLocaleString('fr-FR')} francs CFA`}
-            >
-              {formatPrice(totalAmount)}
-            </span>
+            <span className="text-price whitespace-nowrap">{formatPrice(totalAmount)}</span>
             <span className="mx-1.5 text-text-2">·</span>
             <span>{operatorLabel}</span>
           </p>
@@ -491,9 +540,9 @@ export function ProofPage() {
               setManualOperator(nextOp);
               haptic('light');
             }}
-            className="min-h-[36px] text-small font-bold text-ink underline underline-offset-4 hover:text-red"
+            className="inline-flex min-h-11 items-center text-small font-bold text-ink underline underline-offset-4 transition-colors duration-fast hover:text-red"
           >
-            Changer
+            Changer d&rsquo;opérateur
           </button>
         </div>
 
@@ -536,7 +585,7 @@ export function ProofPage() {
                   void handleSelectFile(droppedFile);
                 }}
                 className={cn(
-                  'flex aspect-[4/3] w-full cursor-pointer flex-col items-center justify-center rounded-[var(--radius-md)] border-2 p-6 text-center transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink',
+                  'flex aspect-[4/3] w-full cursor-pointer flex-col items-center justify-center rounded-[var(--radius-md)] border-2 p-6 text-center transition-colors duration-fast focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink',
                   isDragging
                     ? 'border-solid border-ink bg-surface'
                     : 'border-dashed border-silver bg-white hover:border-ink hover:bg-surface/50',
@@ -546,17 +595,17 @@ export function ProofPage() {
                   <ImagePlus className="h-10 w-10" aria-hidden="true" />
                 </div>
                 <p id={dropzoneLabelId} className="mt-4 text-h3 font-bold text-ink">
-                  {isResendMode ? 'Envoyer une nouvelle capture' : "Ajouter ma capture d'écran"}
+                  {isResendMode ? 'Envoyer une nouvelle capture' : "Ajouter ma capture d’écran"}
                 </p>
                 <p className="mt-1.5 max-w-xs text-small text-text-2">
                   Le message de confirmation Orange Money ou MTN MoMo
                 </p>
-                <p className="mt-3 hidden text-xs text-text-2 lg:block">
+                <p className="mt-3 hidden text-caption text-text-2 lg:block">
                   Glissez-déposez une image ici ou collez-la avec Ctrl+V
                 </p>
                 {isPreparingSlow ? (
                   <p className="mt-3 text-small font-semibold text-ink" aria-live="polite">
-                    Préparation de l&apos;image…
+                    Préparation de l&rsquo;image…
                   </p>
                 ) : null}
               </div>
@@ -565,24 +614,24 @@ export function ProofPage() {
                 <button
                   type="button"
                   onClick={() => setScreenshotHelpOpen(true)}
-                  className="inline-flex min-h-[44px] items-center gap-1.5 text-small font-semibold text-text-2 underline underline-offset-4 hover:text-ink"
+                  className="inline-flex min-h-11 items-center gap-1.5 text-small font-semibold text-text-2 underline underline-offset-4 transition-colors duration-fast hover:text-ink"
                 >
                   <HelpCircle className="h-4 w-4" aria-hidden="true" />
-                  Comment faire une capture d&apos;écran ?
+                  Comment faire une capture d&rsquo;écran&nbsp;?
                 </button>
               </div>
             </div>
           ) : (
             <div className="space-y-3">
               <h2 id={dropzoneLabelId} className="sr-only">
-                Aperçu de votre capture d&apos;écran
+                Aperçu de votre capture d&rsquo;écran
               </h2>
               <div className="relative aspect-[4/3] w-full overflow-hidden rounded-[var(--radius-md)] border border-silver bg-surface">
                 <img
                   src={preparedProof.previewUrl}
                   alt="Aperçu de la preuve de paiement"
                   className={cn(
-                    'h-full w-full object-contain transition-opacity duration-200',
+                    'h-full w-full object-contain transition-opacity duration-fast',
                     isUploading ? 'opacity-70' : 'opacity-100',
                   )}
                 />
@@ -593,27 +642,23 @@ export function ProofPage() {
                   />
                 ) : null}
 
-                {/* Poids final affiché (« 284 Ko ») */}
-                <div className="absolute left-3 top-3 rounded-[var(--radius-sm)] bg-ink/85 px-2.5 py-1 font-mono text-xs font-bold text-white">
-                  {formatFileSizeFr(preparedProof.finalSizeBytes)}
-                </div>
               </div>
 
-              {/* Boutons « Changer » et « Agrandir » */}
-              <div className="flex items-center justify-between gap-3">
+              {/* Boutons « Changer de capture » et « Agrandir » (même style, cibles de 44 px) */}
+              <div className="flex flex-wrap items-center justify-between gap-3">
                 <Button
                   variant="outline"
-                  size="sm"
+                  size="md"
                   disabled={isUploading}
-                  iconLeft={<RefreshCw className="h-4 w-4" />}
+                  iconLeft={<RefreshCw className="h-4 w-4" aria-hidden="true" />}
                   onClick={() => fileInputRef.current?.click()}
                 >
-                  Changer
+                  Changer de capture
                 </Button>
                 <Button
-                  variant="ghost"
-                  size="sm"
-                  iconLeft={<Maximize2 className="h-4 w-4" />}
+                  variant="outline"
+                  size="md"
+                  iconLeft={<Maximize2 className="h-4 w-4" aria-hidden="true" />}
                   onClick={() => setLightboxOpen(true)}
                 >
                   Agrandir
@@ -638,7 +683,8 @@ export function ProofPage() {
                   <div className="mt-3">
                     <Button
                       variant="primary"
-                      size="sm"
+                      size="md"
+                      iconLeft={<RefreshCw className="h-4 w-4" aria-hidden="true" />}
                       onClick={() => {
                         autoRetriedNetworkRef.current = false;
                         void submitProof();
@@ -659,12 +705,12 @@ export function ProofPage() {
             type="button"
             aria-expanded={optionalAccordionOpen}
             onClick={() => setOptionalAccordionOpen((prev) => !prev)}
-            className="flex min-h-[48px] w-full items-center justify-between gap-3 px-4 py-3 text-left text-small font-bold text-ink"
+            className="flex min-h-12 w-full items-center justify-between gap-3 px-4 py-3 text-left text-small font-bold text-ink"
           >
             <span>Aider la boutique à vérifier plus vite</span>
             <ChevronDown
               className={cn(
-                'h-4 w-4 shrink-0 text-text-2 transition-transform duration-200',
+                'h-4 w-4 shrink-0 text-text-2 transition-transform duration-fast',
                 optionalAccordionOpen && 'rotate-180',
               )}
               aria-hidden="true"
@@ -674,11 +720,12 @@ export function ProofPage() {
           <AnimatePresence initial={false}>
             {optionalAccordionOpen ? (
               <m.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.22 }}
-                className="overflow-hidden"
+                // transform et opacité seulement (M7 §4.4) : léger déploiement vertical depuis le haut
+                initial={reducedMotion ? { opacity: 0 } : { opacity: 0, scaleY: 0.92 }}
+                animate={{ opacity: 1, scaleY: 1 }}
+                exit={reducedMotion ? { opacity: 0 } : { opacity: 0, scaleY: 0.92 }}
+                transition={{ duration: duration.fast }}
+                style={{ originY: 0 }}
               >
                 <div className="space-y-4 border-t border-silver/60 px-4 pb-4 pt-3">
                   <div>
@@ -698,10 +745,10 @@ export function ProofPage() {
                         inputMode="tel"
                         value={payerPhone}
                         onChange={(e) => setUserEditedPayerPhone(e.target.value)}
-                        className="min-h-[44px] w-full bg-transparent px-3 font-mono text-body text-ink focus:outline-none"
+                        className="min-h-11 w-full bg-transparent px-3 font-mono text-body text-ink focus:outline-none"
                       />
                     </div>
-                    <p className="mt-1 text-xs text-text-2">
+                    <p className="mt-1 text-caption text-text-2">
                       Utile si un proche a effectué le paiement pour vous.
                     </p>
                   </div>
@@ -719,10 +766,10 @@ export function ProofPage() {
                       value={transactionId}
                       onChange={(e) => setTransactionId(e.target.value)}
                       placeholder="PP241030.1142.A12345"
-                      className="mt-1.5 min-h-[44px] w-full rounded-[var(--radius-md)] border border-silver bg-white px-3.5 font-mono text-small text-ink focus:border-ink focus:outline-none"
+                      className="mt-1.5 min-h-11 w-full rounded-[var(--radius-md)] border border-silver bg-white px-3.5 font-mono text-body text-ink focus:border-ink focus:outline-none"
                     />
-                    <p className="mt-1 text-xs text-text-2">
-                      Il figure dans le SMS de confirmation, ex. : PP241030.1142.A12345
+                    <p className="mt-1 text-caption text-text-2">
+                      Il figure dans le SMS de confirmation, ex.&nbsp;: PP241030.1142.A12345
                     </p>
                   </div>
                 </div>
@@ -736,7 +783,7 @@ export function ProofPage() {
           {/* Annonce vocale par paliers de 25 % */}
           <div className="sr-only" aria-live="polite">
             {isUploading
-              ? `Envoi de la preuve en cours : ${announcedProgressMilestone} pourcent`
+              ? `Envoi de la preuve en cours\u00A0: ${announcedProgressMilestone} pourcent`
               : ''}
           </div>
 
@@ -747,15 +794,15 @@ export function ProofPage() {
                 size="lg"
                 fullWidth
                 disabled
-                iconLeft={<WifiOff className="h-5 w-5" />}
+                iconLeft={<WifiOff className="h-5 w-5" aria-hidden="true" />}
               >
                 Reconnectez-vous pour envoyer votre preuve.
               </Button>
               {/* Envoi bloqué hors connexion : explication, la capture reste sur l'écran (M6 §6.3) */}
               <p role="status" className="text-center text-small text-text-2">
                 {preparedProof
-                  ? 'Votre capture est gardée sur cet écran : vous pourrez l’envoyer dès le retour du réseau.'
-                  : 'Vous pouvez déjà choisir votre capture : elle sera gardée jusqu’au retour du réseau.'}
+                  ? 'Votre capture est gardée sur cet écran\u00A0: vous pourrez l’envoyer dès le retour du réseau.'
+                  : 'Vous pouvez déjà choisir votre capture\u00A0: elle sera gardée jusqu’au retour du réseau.'}
               </p>
             </div>
           ) : isUploading ? (
@@ -784,11 +831,11 @@ export function ProofPage() {
                     strokeLinecap="round"
                     strokeDasharray={ringCircumference}
                     strokeDashoffset={ringStrokeDashoffset}
-                    className="text-red transition-[stroke-dashoffset] duration-150"
+                    className="text-red transition-[stroke-dashoffset] duration-fast"
                   />
                 </svg>
-                <span className="absolute font-mono text-xs font-extrabold tabular-nums text-ink">
-                  {uploadMutation.progress}%
+                <span className="absolute font-mono text-caption font-extrabold tabular-nums text-ink">
+                  {uploadMutation.progress}&nbsp;%
                 </span>
               </m.div>
 
@@ -798,9 +845,9 @@ export function ProofPage() {
                   uploadMutation.cancelUpload();
                   haptic('light');
                 }}
-                className="min-h-[40px] px-3 text-small font-semibold text-text-2 underline underline-offset-4 hover:text-ink"
+                className="min-h-11 px-3 text-small font-semibold text-text-2 underline underline-offset-4 transition-colors duration-fast hover:text-ink"
               >
-                Annuler l&apos;envoi
+                Annuler l&rsquo;envoi
               </button>
             </div>
           ) : (
@@ -809,7 +856,7 @@ export function ProofPage() {
                 variant="primary"
                 size="lg"
                 fullWidth
-                iconLeft={<Upload className="h-5 w-5" />}
+                iconLeft={<Upload className="h-5 w-5" aria-hidden="true" />}
                 onClick={() => void submitProof()}
                 aria-disabled={!preparedProof}
                 className={cn(!preparedProof && 'opacity-60')}
@@ -825,7 +872,7 @@ export function ProofPage() {
       <Sheet
         open={screenshotHelpOpen}
         onClose={() => setScreenshotHelpOpen(false)}
-        title="Comment faire une capture d'écran ?"
+        title="Comment faire une capture d’écran&nbsp;?"
       >
         <div className="space-y-4">
           <div className="flex items-start gap-3 rounded-[var(--radius-md)] border border-silver bg-surface p-4">
@@ -851,7 +898,7 @@ export function ProofPage() {
           </div>
 
           <Button variant="primary" fullWidth onClick={() => setScreenshotHelpOpen(false)}>
-            J&apos;ai compris
+            J&rsquo;ai compris
           </Button>
         </div>
       </Sheet>
@@ -866,6 +913,7 @@ export function ProofPage() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            transition={{ duration: duration.fast }}
             onClick={() => setLightboxOpen(false)}
             className="fixed inset-0 z-sheet flex items-center justify-center bg-ink/85 p-4"
           >
@@ -874,15 +922,12 @@ export function ProofPage() {
               className="relative max-h-[90dvh] w-full max-w-lg overflow-hidden rounded-[var(--radius-md)] bg-white p-3"
             >
               <div className="mb-2 flex items-center justify-between">
-                <span className="font-mono text-xs font-bold text-text-2">
-                  {formatFileSizeFr(preparedProof.finalSizeBytes)} ({preparedProof.width}×
-                  {preparedProof.height})
-                </span>
+                <span className="text-small font-bold text-ink">Votre capture d&rsquo;écran</span>
                 <button
                   type="button"
                   onClick={() => setLightboxOpen(false)}
-                  aria-label="Fermer l'aperçu"
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-full text-ink hover:bg-surface"
+                  aria-label="Fermer l’aperçu"
+                  className="inline-flex size-11 items-center justify-center rounded-full text-ink transition-colors duration-fast hover:bg-surface"
                 >
                   <X className="h-5 w-5" aria-hidden="true" />
                 </button>
@@ -890,7 +935,7 @@ export function ProofPage() {
               <div className="max-h-[75dvh] overflow-auto rounded-[var(--radius-sm)] bg-surface p-2">
                 <img
                   src={preparedProof.previewUrl}
-                  alt="Capture d'écran agrandie"
+                  alt="Capture d’écran agrandie"
                   className="mx-auto max-h-[70dvh] w-auto object-contain"
                 />
               </div>

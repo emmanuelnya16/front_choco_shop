@@ -1,4 +1,3 @@
-import { zodResolver } from '@hookform/resolvers/zod';
 import { AnimatePresence } from 'motion/react';
 import * as m from 'motion/react-m';
 import {
@@ -14,8 +13,8 @@ import {
   Store,
   Truck,
 } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { FormProvider, useForm, useWatch } from 'react-hook-form';
+import { type ComponentType, lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { FormProvider, type Resolver, useForm, useWatch } from 'react-hook-form';
 import { Navigate, useBlocker, useNavigate } from 'react-router';
 import { BackButton } from '@/components/ui/BackButton';
 import { Button } from '@/components/ui/Button';
@@ -33,7 +32,7 @@ import {
 } from '@/features/reservation/api/useReservationQueries';
 import { CheckoutStepper } from '@/features/reservation/components/CheckoutStepper';
 import { DeliveryAddressFields } from '@/features/reservation/components/DeliveryAddressFields';
-import { SignatureHoldOverlay } from '@/features/reservation/components/SignatureHoldOverlay';
+import type { SignatureHoldOverlayProps } from '@/features/reservation/components/SignatureHoldOverlay';
 import {
   clearReservationDraft,
   loadReservationDraft,
@@ -41,10 +40,10 @@ import {
 } from '@/features/reservation/schema/reservationDraftStorage';
 import {
   computeReservationAmounts,
-  createReservationFormSchema,
   isCityLocal,
+  minDeliveryFee,
   type ReservationFormValues,
-} from '@/features/reservation/schema/reservationSchema';
+} from '@/features/reservation/schema/reservationRules';
 import { ApiError } from '@/lib/api/client';
 import { useBlockAppUpdate } from '@/lib/hooks/useBlockAppUpdate';
 import { useOnlineStatus } from '@/lib/hooks/useOnlineStatus';
@@ -55,7 +54,8 @@ import {
   normalizeCmPhone,
 } from '@/lib/utils/phone';
 import { formatPrice } from '@/lib/utils/price';
-import { ease, spring } from '@/motion/tokens';
+import { useDocumentTitle } from '@/lib/utils/useDocumentTitle';
+import { duration, ease, spring } from '@/motion/tokens';
 import { useReducedMotionPref } from '@/motion/useReducedMotionPref';
 import { useAuthStore } from '@/stores/authStore';
 import {
@@ -67,6 +67,37 @@ import { useToastStore } from '@/stores/toastStore';
 import { useUiStore, type SourceRect } from '@/stores/uiStore';
 import type { CartValidationItemResult } from '@/types/api';
 import type { Address } from '@/types/domain';
+
+/**
+ * Moment signature (GSAP) chargé à la demande : gsap ne pèse pas sur l'ouverture de la page (M7).
+ * Préchargé dès l'envoi du formulaire ; si le chargement échoue (réseau), on passe directement
+ * au paiement sans animation.
+ */
+const loadSignatureHoldOverlay = () =>
+  import('@/features/reservation/components/SignatureHoldOverlay').then((mod) => ({
+    default: mod.SignatureHoldOverlay,
+  }));
+
+/** Repli si le moment signature ne se charge pas : passage direct au paiement. */
+function SignatureHoldFallback({ onComplete }: SignatureHoldOverlayProps) {
+  const doneRef = useRef(false);
+  useEffect(() => {
+    if (doneRef.current) return;
+    doneRef.current = true;
+    onComplete();
+  }, [onComplete]);
+  return null;
+}
+
+const SignatureHoldOverlay = lazy<ComponentType<SignatureHoldOverlayProps>>(() =>
+  loadSignatureHoldOverlay().catch(() => ({ default: SignatureHoldFallback })),
+);
+
+/** Validation (zod) chargée à la demande, préchargée à l'ouverture de la page (M7, poids). */
+const loadReservationSchema = () => import('@/features/reservation/schema/reservationSchema');
+
+/** Attente avant une nouvelle tentative automatique après une coupure (pas une animation). */
+const NETWORK_RETRY_DELAY_MS = 900;
 
 const ADDRESS_LABEL_OPTIONS: Array<'Maison' | 'Bureau' | 'Autre'> = [
   'Maison',
@@ -135,9 +166,11 @@ export function CheckoutPage() {
   const mobileConfirmBtnRef = useRef<HTMLDivElement>(null);
   const initializedAddressRef = useRef(false);
 
-  useEffect(() => {
-    document.title = "Réservation · DR Choco L'Incompris";
-  }, []);
+  // Titre unique et « noindex » (page privée) par l'API de référencement (M7 §7)
+  useDocumentTitle('Réservation');
+
+  // Erreur renvoyée par le serveur à la création (422 : données refusées), message de l'API affiché
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   // Garde d'authentification : si le client n'est pas connecté, ouvre AuthSheet par-dessus (§8)
   useEffect(() => {
@@ -153,10 +186,26 @@ export function CheckoutPage() {
 
   const initialDraft = useMemo(() => loadReservationDraft(), []);
 
-  const schema = useMemo(() => createReservationFormSchema(cities), [cities]);
+  // Validation construite à la demande avec la liste des villes à jour (zod hors de la page, M7)
+  const citiesRef = useRef(cities);
+  useEffect(() => {
+    citiesRef.current = cities;
+  }, [cities]);
+  useEffect(() => {
+    void loadReservationSchema().catch(() => undefined);
+  }, []);
+  const resolver = useCallback<Resolver<ReservationFormValues>>(async (values, context, options) => {
+    try {
+      const { buildReservationResolver } = await loadReservationSchema();
+      return buildReservationResolver(citiesRef.current)(values, context, options);
+    } catch {
+      // Module de validation indisponible (rare, hors connexion sans cache) : le serveur valide
+      return { values, errors: {} };
+    }
+  }, []);
 
   const form = useForm<ReservationFormValues>({
-    resolver: zodResolver(schema),
+    resolver,
     mode: 'onTouched',
     defaultValues: {
       firstName: initialDraft?.firstName ?? user?.firstName ?? '',
@@ -283,7 +332,7 @@ export function CheckoutPage() {
   useEffect(() => {
     if (blocker.state === 'blocked') {
       const leave = window.confirm(
-        'Votre réservation est en cours de création. Quitter quand même ?',
+        'Votre réservation est en cours de création. Quitter quand même\u00A0?',
       );
       if (leave) {
         blocker.proceed();
@@ -318,6 +367,9 @@ export function CheckoutPage() {
 
     setNetworkRetryNotice(null);
     setManualRetryAvailable(false);
+    setSubmitError(null);
+    // Le moment signature se charge pendant l'appel au serveur
+    void loadSignatureHoldOverlay().catch(() => undefined);
 
     // Capture la position du bouton Confirmer pour le clipPath du moment signature (§7.2)
     const activeBtnEl =
@@ -334,7 +386,14 @@ export function CheckoutPage() {
       });
     }
 
-    const userPhone = user?.phone ?? '+237690000001';
+    // Numéro vérifié du compte : jamais de numéro de repli (sans numéro, nouvelle connexion)
+    const userPhone = useAuthStore.getState().user?.phone ?? user?.phone;
+    if (!userPhone) {
+      openAuthSheet(() => {
+        executeReservationSubmit(values);
+      });
+      return;
+    }
     const recipientPhoneFormatted =
       values.recipientType === 'other' && values.recipientPhone
         ? (() => {
@@ -432,7 +491,7 @@ export function CheckoutPage() {
             haptic('error');
             showToast({
               message:
-                "Un article n'est plus disponible dans la quantité demandée. Vérifiez votre panier.",
+                "Un article n’est plus disponible dans la quantité demandée. Vérifiez votre panier.",
               durationMs: 5000,
             });
             navigate('/panier', { replace: true });
@@ -456,14 +515,23 @@ export function CheckoutPage() {
             setNetworkRetryNotice(
               'La connexion a été interrompue. Nous vérifions si votre réservation a été créée…',
             );
-            await new Promise((r) => window.setTimeout(r, 900));
+            await new Promise((r) => window.setTimeout(r, NETWORK_RETRY_DELAY_MS));
             continue;
           }
         }
 
         haptic('error');
+        // Données refusées (422) ou autre refus du serveur : son message, pas celui d'une coupure
+        if (err instanceof ApiError && err.status >= 400 && err.status < 500 && err.status !== 408) {
+          setSubmitError(
+            err.message || 'Votre réservation n’a pas pu être créée. Vérifiez vos informations puis réessayez.',
+          );
+          return;
+        }
         setNetworkRetryNotice(
-          'La connexion a été interrompue. Votre panier et vos informations sont conservés.',
+          err instanceof ApiError && err.status >= 500
+            ? 'Un problème est survenu. Votre panier et vos informations sont conservés : réessayez dans un instant.'
+            : 'La connexion a été interrompue. Votre panier et vos informations sont conservés.',
         );
         setManualRetryAvailable(true);
         return;
@@ -510,30 +578,26 @@ export function CheckoutPage() {
     }
   };
 
-  const shopInfo = settings?.shop ?? {
-    name: "Flagship DR Choco L'Incompris",
-    address:
-      'Akwa, Boulevard de la Liberté — À 100 m de la Cathédrale, immeuble anthracite rez-de-chaussée',
-    city: 'Douala',
-    openingHours: 'Lun – Sam · 09 h 30 à 19 h 30',
-    mapsUrl:
-      'https://maps.google.com/?q=Boulevard+de+la+Liberte+Akwa+Douala+Cameroun',
-  };
+  // Boutique : uniquement les informations reçues de l'API (aucune adresse de repli inventée)
+  const shopInfo = settings?.shop ?? null;
+  const lowestDeliveryFee = minDeliveryFee(cities);
 
   return (
     <div className="pb-32 lg:pb-16">
       {/* Moment signature GSAP après création (§7.2) */}
       {confirmedRef && (
-        <SignatureHoldOverlay
-          reservationRef={confirmedRef}
-          buttonRect={confirmButtonRect}
-          onComplete={() => {
-            navigate(`/reservation/${confirmedRef}/paiement`, {
-              replace: true,
-              viewTransition: true,
-            });
-          }}
-        />
+        <Suspense fallback={<div aria-hidden="true" className="fixed inset-0 z-overlay bg-ink" />}>
+          <SignatureHoldOverlay
+            reservationRef={confirmedRef}
+            buttonRect={confirmButtonRect}
+            onComplete={() => {
+              navigate(`/reservation/${confirmedRef}/paiement`, {
+                replace: true,
+                viewTransition: true,
+              });
+            }}
+          />
+        </Suspense>
       )}
 
       {/* 6.1 Indicateur d'étapes : 1 Réception -> 2 Paiement -> 3 Preuve */}
@@ -543,9 +607,19 @@ export function CheckoutPage() {
         <div className="mb-6">
           {/* Retour (M6 §8) : écran précédent de l'app, sinon le panier (HYPOTHÈSE: parent logique) */}
           <BackButton fallback="/panier" className="mb-2 flex w-fit lg:hidden" />
-          <span className="text-label text-text-2">ÉTAPE 1 SUR 3</span>
-          <h1 className="mt-1 text-h1 text-ink">FINALISER LA RÉSERVATION</h1>
+          <h1 className="text-h1 text-ink">FINALISER LA RÉSERVATION</h1>
         </div>
+
+        {/* Refus du serveur (422…) : message de l'API, le client corrige puis confirme à nouveau */}
+        {submitError && (
+          <div
+            role="alert"
+            className="mb-6 flex items-start gap-2.5 rounded-[var(--radius-md)] border border-danger bg-surface p-4 text-small text-ink"
+          >
+            <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-danger" aria-hidden="true" />
+            <span className="font-semibold">{submitError}</span>
+          </div>
+        )}
 
         {/* Bandeau de réessai réseau (§7.1) */}
         {networkRetryNotice && (
@@ -571,7 +645,7 @@ export function CheckoutPage() {
             {manualRetryAvailable && (
               <Button
                 variant="dark"
-                size="sm"
+                size="md"
                 iconLeft={<RefreshCw className="h-4 w-4" aria-hidden="true" />}
                 onClick={(e) => {
                   void handleSubmit(executeReservationSubmit, onInvalidSubmit)(e);
@@ -589,17 +663,17 @@ export function CheckoutPage() {
             type="button"
             aria-expanded={isMobileSummaryOpen}
             onClick={() => setIsMobileSummaryOpen((prev) => !prev)}
-            className="flex min-h-[52px] w-full items-center justify-between gap-3 px-4 py-3 text-left"
+            className="flex min-h-13 w-full items-center justify-between gap-3 px-4 py-3 text-left"
           >
             <span className="text-small font-bold text-ink">
               Récapitulatif ({cartCount} article{cartCount > 1 ? 's' : ''}) ·{' '}
-              <span className="font-extrabold tabular-nums">
+              <span className="whitespace-nowrap font-extrabold tabular-nums">
                 {formatPrice(amounts.total)}
               </span>
             </span>
             <ChevronDown
               className={cn(
-                'h-4 w-4 text-text-2 transition-transform duration-200',
+                'h-4 w-4 text-text-2 transition-transform duration-fast',
                 isMobileSummaryOpen && 'rotate-180',
               )}
               aria-hidden="true"
@@ -612,7 +686,7 @@ export function CheckoutPage() {
                 initial={reducedMotion ? false : { opacity: 0, y: -6 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -6 }}
-                transition={{ duration: 0.2 }}
+                transition={{ duration: duration.fast }}
                 className="space-y-3 border-t border-silver/60 bg-white p-4"
               >
                 <ul className="divide-y divide-silver/40">
@@ -634,7 +708,7 @@ export function CheckoutPage() {
                         <p className="truncate text-small font-bold text-ink">
                           {item.name}
                         </p>
-                        <p className="text-xs text-text-2">
+                        <p className="text-caption text-text-2">
                           {item.color.name} · Taille {item.size} · Qté{' '}
                           {item.quantity}
                         </p>
@@ -647,7 +721,7 @@ export function CheckoutPage() {
                   ))}
                 </ul>
 
-                <dl className="space-y-1.5 border-t border-silver/60 pt-3 text-xs">
+                <dl className="space-y-1.5 border-t border-silver/60 pt-3 text-caption">
                   <div className="flex justify-between">
                     <dt className="text-text-2">Sous-total</dt>
                     <dd className="font-bold text-ink">
@@ -689,7 +763,7 @@ export function CheckoutPage() {
                   ? { x: [0, -6, 6, -4, 4, 0] }
                   : { x: 0 }
               }
-              transition={{ duration: 0.35, ease: ease.out }}
+              transition={{ duration: duration.base, ease: ease.out }}
               aria-labelledby="checkout-contact-heading"
               className="rounded-[var(--radius-md)] border border-silver/60 bg-white p-5 sm:p-6"
             >
@@ -718,7 +792,7 @@ export function CheckoutPage() {
                     placeholder="Junior"
                     {...register('firstName')}
                     className={cn(
-                      'mt-1.5 h-12 w-full rounded-[var(--radius-md)] border bg-white px-3.5 text-[16px] text-ink placeholder:text-text-2 focus:border-ink focus:outline-none',
+                      'mt-1.5 h-12 w-full rounded-[var(--radius-md)] border bg-white px-3.5 text-body text-ink placeholder:text-text-2 focus:border-ink focus:outline-none',
                       errors.firstName ? 'border-danger' : 'border-silver',
                     )}
                   />
@@ -726,7 +800,7 @@ export function CheckoutPage() {
                     <p
                       id="err-firstName"
                       role="alert"
-                      className="mt-1.5 flex items-center gap-1.5 text-xs font-semibold text-danger"
+                      className="mt-1.5 flex items-center gap-1.5 text-caption font-semibold text-danger"
                     >
                       <AlertCircle
                         className="h-3.5 w-3.5 shrink-0"
@@ -752,28 +826,34 @@ export function CheckoutPage() {
                     disabled={isSending}
                     placeholder="Mbarga"
                     {...register('lastName')}
-                    className="mt-1.5 h-12 w-full rounded-[var(--radius-md)] border border-silver bg-white px-3.5 text-[16px] text-ink placeholder:text-text-2 focus:border-ink focus:outline-none"
+                    className="mt-1.5 h-12 w-full rounded-[var(--radius-md)] border border-silver bg-white px-3.5 text-body text-ink placeholder:text-text-2 focus:border-ink focus:outline-none"
                   />
                 </div>
               </div>
 
               {/* Téléphone en lecture seule + lien « Ce n'est pas vous ? Changer de numéro » (§6.2) */}
               <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius-md)] bg-surface px-4 py-3">
-                <div>
-                  <span className="block text-xs font-semibold text-text-2">
-                    Numéro de téléphone vérifié
+                {user?.phone ? (
+                  <div>
+                    <span className="block text-caption font-semibold text-text-2">
+                      Numéro de téléphone vérifié
+                    </span>
+                    <span className="whitespace-nowrap font-mono text-body font-bold text-ink">
+                      +237 {formatCmPhone(user.phone)}
+                    </span>
+                  </div>
+                ) : (
+                  <span className="text-caption font-semibold text-text-2">
+                    Connectez-vous avec votre numéro pour confirmer.
                   </span>
-                  <span className="font-mono text-body font-bold text-ink">
-                    +237 {formatCmPhone(user?.phone ?? '+237690000001')}
-                  </span>
-                </div>
+                )}
                 <button
                   type="button"
                   disabled={isSending}
                   onClick={handleSwitchPhoneAccount}
-                  className="text-xs font-bold text-ink underline hover:text-red"
+                  className="inline-flex min-h-11 items-center text-caption font-bold text-ink underline transition-colors duration-fast hover:text-red"
                 >
-                  Ce n&rsquo;est pas vous ? Changer de numéro
+                  Ce n&rsquo;est pas vous&nbsp;? Changer de numéro
                 </button>
               </div>
             </m.section>
@@ -805,7 +885,7 @@ export function CheckoutPage() {
                     });
                   }}
                   className={cn(
-                    'relative flex min-h-[112px] flex-col items-start justify-between rounded-[var(--radius-md)] p-4 text-left transition-colors',
+                    'relative flex min-h-28 flex-col items-start justify-between rounded-[var(--radius-md)] p-4 text-left transition-colors duration-fast',
                     receptionMode === 'delivery'
                       ? 'border-2 border-red bg-surface'
                       : 'border border-silver bg-white hover:border-ink',
@@ -836,11 +916,14 @@ export function CheckoutPage() {
                     <span className="block text-body font-extrabold text-ink">
                       Livraison
                     </span>
-                    <span className="mt-0.5 block text-xs text-text-2">
+                    <span className="mt-0.5 block text-caption text-text-2">
                       Livraison dans votre ville ou envoi par agence
                     </span>
-                    <span className="mt-1 block text-xs font-bold text-ink">
-                      À partir de 1 500 FCFA
+                    {/* Frais lus dans la liste des villes ; sans liste, formulation neutre */}
+                    <span className="mt-1 block text-caption font-bold text-ink">
+                      {lowestDeliveryFee !== null
+                        ? `À partir de ${formatPrice(lowestDeliveryFee)}`
+                        : 'Frais selon votre ville'}
                     </span>
                   </div>
                 </button>
@@ -858,7 +941,7 @@ export function CheckoutPage() {
                     });
                   }}
                   className={cn(
-                    'relative flex min-h-[112px] flex-col items-start justify-between rounded-[var(--radius-md)] p-4 text-left transition-colors',
+                    'relative flex min-h-28 flex-col items-start justify-between rounded-[var(--radius-md)] p-4 text-left transition-colors duration-fast',
                     receptionMode === 'pickup'
                       ? 'border-2 border-red bg-surface'
                       : 'border border-silver bg-white hover:border-ink',
@@ -887,12 +970,14 @@ export function CheckoutPage() {
                     <span className="block text-body font-extrabold text-ink">
                       Retrait en boutique
                     </span>
-                    <span className="mt-0.5 block text-xs font-bold text-success">
-                      Gratuit · {shopInfo.city}
+                    <span className="mt-0.5 block text-caption font-bold text-success">
+                      Gratuit{shopInfo?.city ? ` · ${shopInfo.city}` : ''}
                     </span>
-                    <span className="mt-1 block text-xs text-text-2">
-                      {shopInfo.openingHours}
-                    </span>
+                    {shopInfo?.openingHours && (
+                      <span className="mt-1 block text-caption text-text-2">
+                        {shopInfo.openingHours}
+                      </span>
+                    )}
                   </div>
                 </button>
               </div>
@@ -910,7 +995,7 @@ export function CheckoutPage() {
                       exit={
                         reducedMotion ? { opacity: 0 } : { opacity: 0, y: -8 }
                       }
-                      transition={{ duration: 0.2, ease: ease.out }}
+                      transition={{ duration: duration.fast, ease: ease.out }}
                       className="space-y-5"
                     >
                       {/* 6.4.1 Adresses enregistrées */}
@@ -931,14 +1016,14 @@ export function CheckoutPage() {
                                   className={cn(
                                     // Largeur bornée : le repère passe en points de suspension au lieu d'élargir la carte
                                     // au-delà de l'écran ; la carte suivante dépasse, ce qui montre que la rangée défile.
-                                    'flex w-[220px] min-w-0 shrink-0 flex-col items-start rounded-[var(--radius-md)] border p-3 text-left transition-colors',
+                                    'flex w-55 min-w-0 shrink-0 flex-col items-start rounded-[var(--radius-md)] border p-3 text-left transition-colors duration-fast',
                                     isSelected
                                       ? 'border-2 border-ink bg-surface'
                                       : 'border-silver bg-white hover:border-ink',
                                   )}
                                 >
                                   <div className="flex w-full items-center justify-between gap-2">
-                                    <span className="min-w-0 truncate text-xs font-extrabold uppercase text-ink">
+                                    <span className="min-w-0 truncate text-caption font-extrabold uppercase text-ink">
                                       {addr.label}
                                     </span>
                                     {isSelected && (
@@ -948,10 +1033,11 @@ export function CheckoutPage() {
                                       />
                                     )}
                                   </div>
-                                  <span className="mt-1 line-clamp-1 w-full text-xs font-bold text-ink">
+                                  <span className="mt-1 line-clamp-1 w-full text-caption font-bold text-ink">
                                     {addr.city} · {addr.district || addr.quarter}
                                   </span>
-                                  <span className="mt-0.5 line-clamp-1 w-full text-[11px] text-text-2">
+                                  {/* Repère sur 2 lignes au plus (au lieu d'une ligne tronquée) */}
+                                  <span className="mt-0.5 line-clamp-2 w-full text-caption text-text-2">
                                     {addr.landmark || addr.details}
                                   </span>
                                 </button>
@@ -969,14 +1055,14 @@ export function CheckoutPage() {
                                 setValue('saveAddress', true);
                               }}
                               className={cn(
-                                'flex min-w-[155px] shrink-0 flex-col items-center justify-center gap-1 rounded-[var(--radius-md)] border border-dashed p-3 text-xs font-bold transition-colors',
+                                'flex min-w-39 shrink-0 flex-col items-center justify-center gap-1 rounded-[var(--radius-md)] border border-dashed p-3 text-caption font-bold transition-colors duration-fast',
                                 !selectedAddressId
                                   ? 'border-ink bg-surface text-ink'
                                   : 'border-silver text-text-2 hover:border-ink hover:text-ink',
                               )}
                             >
                               <Plus className="h-4 w-4" aria-hidden="true" />
-                              <span>+ Nouvelle adresse</span>
+                              <span>Nouvelle adresse</span>
                             </button>
                           </div>
                         </div>
@@ -990,14 +1076,14 @@ export function CheckoutPage() {
                               Livraison à {currentCity} —{' '}
                               {watchedValues.district}
                             </p>
-                            <p className="mt-0.5 text-xs text-text-2">
-                              Repère : {watchedValues.landmark}
+                            <p className="mt-0.5 text-caption text-text-2">
+                              Repère&nbsp;: {watchedValues.landmark}
                             </p>
                           </div>
                           <button
                             type="button"
                             onClick={() => setIsEditingAddressFields(true)}
-                            className="inline-flex min-h-[44px] shrink-0 items-center gap-1.5 px-2 text-xs font-bold text-ink underline hover:text-red"
+                            className="inline-flex min-h-11 shrink-0 items-center gap-1.5 px-2 text-caption font-bold text-ink underline transition-colors duration-fast hover:text-red"
                           >
                             <Edit3 className="h-3.5 w-3.5" aria-hidden="true" />
                             <span>Modifier</span>
@@ -1016,7 +1102,7 @@ export function CheckoutPage() {
                               ? { x: [0, -6, 6, -4, 4, 0] }
                               : { x: 0 }
                           }
-                          transition={{ duration: 0.35, ease: ease.out }}
+                          transition={{ duration: duration.base, ease: ease.out }}
                           className="space-y-4"
                         >
                           {/* 6.4.2 à 6.4.3 : ville, puis quartier + repère ou agence + destinataire (composant partagé avec le profil, M5) */}
@@ -1043,8 +1129,8 @@ export function CheckoutPage() {
 
                               {saveAddressChecked && (
                                 <div className="flex flex-wrap items-center gap-2 pl-8">
-                                  <span className="text-xs font-semibold text-text-2">
-                                    Nom de l&rsquo;adresse :
+                                  <span className="text-caption font-semibold text-text-2">
+                                    Nom de l&rsquo;adresse&nbsp;:
                                   </span>
                                   {ADDRESS_LABEL_OPTIONS.map((labelOpt) => (
                                     <button
@@ -1054,7 +1140,7 @@ export function CheckoutPage() {
                                         setValue('addressLabel', labelOpt)
                                       }
                                       className={cn(
-                                        'min-h-[36px] rounded-[var(--radius-md)] border px-3 py-1 text-xs font-bold transition-colors',
+                                        'min-h-11 rounded-[var(--radius-md)] border px-3 py-1 text-caption font-bold transition-colors duration-fast',
                                         addressLabelValue === labelOpt
                                           ? 'border-ink bg-ink text-white'
                                           : 'border-silver bg-white text-ink hover:bg-surface',
@@ -1081,7 +1167,7 @@ export function CheckoutPage() {
                       exit={
                         reducedMotion ? { opacity: 0 } : { opacity: 0, y: -8 }
                       }
-                      transition={{ duration: 0.2, ease: ease.out }}
+                      transition={{ duration: duration.fast, ease: ease.out }}
                       className="rounded-[var(--radius-md)] border border-silver bg-surface p-4 sm:p-5"
                     >
                       <div className="flex items-start gap-3">
@@ -1090,28 +1176,36 @@ export function CheckoutPage() {
                           aria-hidden="true"
                         />
                         <div className="space-y-2 text-small">
-                          <p className="font-extrabold text-ink">
-                            {shopInfo.name} — {shopInfo.city}
-                          </p>
-                          <p className="text-text-2">{shopInfo.address}</p>
-                          <p className="text-xs font-semibold text-ink">
-                            Horaires : {shopInfo.openingHours}
-                          </p>
-                          <a
-                            href={shopInfo.mapsUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex min-h-[44px] items-center gap-1.5 text-xs font-bold text-ink underline hover:text-red"
-                          >
-                            <span>Ouvrir dans Google Maps</span>
-                            <ExternalLink
-                              className="h-3.5 w-3.5"
-                              aria-hidden="true"
-                            />
-                          </a>
-                          <p className="border-t border-silver/60 pt-2 text-xs text-text-2">
-                            Nous vous prévenons dès que votre commande est
-                            prête, avec la photo de votre colis.
+                          {shopInfo ? (
+                            <>
+                              <p className="font-extrabold text-ink">
+                                {shopInfo.name} — {shopInfo.city}
+                              </p>
+                              <p className="text-text-2">{shopInfo.address}</p>
+                              <p className="text-caption font-semibold text-ink">
+                                Horaires&nbsp;: {shopInfo.openingHours}
+                              </p>
+                              {shopInfo.mapsUrl && (
+                                <a
+                                  href={shopInfo.mapsUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex min-h-11 items-center gap-1.5 text-caption font-bold text-ink underline transition-colors duration-fast hover:text-red"
+                                >
+                                  <span>Ouvrir dans Google Maps</span>
+                                  <ExternalLink
+                                    className="h-3.5 w-3.5"
+                                    aria-hidden="true"
+                                  />
+                                </a>
+                              )}
+                            </>
+                          ) : (
+                            <p className="font-extrabold text-ink">Retrait gratuit à la boutique</p>
+                          )}
+                          <p className="border-t border-silver/60 pt-2 text-caption text-text-2">
+                            Nous vous prévenons dès que votre colis est prêt, avec sa photo.
+                            {!shopInfo && ' L’adresse et les horaires vous sont envoyés par SMS.'}
                           </p>
                         </div>
                       </div>
@@ -1134,7 +1228,7 @@ export function CheckoutPage() {
                 >
                   3. REMARQUES (FACULTATIF)
                 </label>
-                <span className="font-mono text-xs text-text-2">
+                <span className="font-mono text-caption text-text-2">
                   {notesValue.length}/200
                 </span>
               </div>
@@ -1144,14 +1238,14 @@ export function CheckoutPage() {
                 maxLength={200}
                 enterKeyHint="done"
                 disabled={isSending}
-                placeholder="Ex. : appeler avant de passer"
+                placeholder="Ex.&nbsp;: appeler avant de passer"
                 {...register('notes')}
-                className="mt-3 w-full rounded-[var(--radius-md)] border border-silver bg-white p-3 text-[16px] text-ink placeholder:text-text-2 focus:border-ink focus:outline-none"
+                className="mt-3 w-full rounded-[var(--radius-md)] border border-silver bg-white p-3 text-body text-ink placeholder:text-text-2 focus:border-ink focus:outline-none"
               />
               {errors.notes && (
                 <p
                   role="alert"
-                  className="mt-1.5 text-xs font-semibold text-danger"
+                  className="mt-1.5 text-caption font-semibold text-danger"
                 >
                   {errors.notes.message}
                 </p>
@@ -1160,13 +1254,14 @@ export function CheckoutPage() {
           </div>
 
           {/* Colonne droite collante sur ordinateur (40 % -> 5/12, §6.1 & §6.6) */}
-          <aside className="hidden lg:sticky lg:top-24 lg:col-span-5 lg:block">
+          {/* Collé sous l'en-tête (et sous le bandeau rouge s'il est affiché) : --desktop-shell-top */}
+          <aside className="hidden lg:sticky lg:top-[calc(var(--desktop-shell-top)+24px)] lg:col-span-5 lg:block">
             <div className="rounded-[var(--radius-md)] border border-silver/70 bg-white p-6">
               <h2 className="text-h3 text-ink">
                 RÉCAPITULATIF ({cartCount} ARTICLE{cartCount > 1 ? 'S' : ''})
               </h2>
 
-              <ul className="mt-4 max-h-[260px] divide-y divide-silver/50 overflow-y-auto pr-1">
+              <ul className="mt-4 max-h-65 divide-y divide-silver/50 overflow-y-auto pr-1">
                 {items.map((item) => (
                   <li
                     key={item.variantId}
@@ -1185,7 +1280,7 @@ export function CheckoutPage() {
                       <p className="truncate text-small font-bold text-ink">
                         {item.name}
                       </p>
-                      <p className="text-xs text-text-2">
+                      <p className="text-caption text-text-2">
                         {item.color.name} · Taille {item.size} · Qté{' '}
                         {item.quantity}
                       </p>
@@ -1227,15 +1322,15 @@ export function CheckoutPage() {
               </div>
 
               {amounts.isOnDelivery && (
-                <p className="mt-2 text-xs text-text-2">
-                  Note : les frais de livraison ({formatPrice(amounts.deliveryFee)})
+                <p className="mt-2 text-caption text-text-2">
+                  Note&nbsp;: les frais de livraison ({formatPrice(amounts.deliveryFee)})
                   seront réglés directement à la réception du colis.
                 </p>
               )}
 
               {!isOnline && (
-                <p role="alert" className="mt-3 text-xs font-bold text-warning">
-                  Vous êtes hors connexion. Reconnectez-vous pour réserver : vos informations
+                <p role="alert" className="mt-3 text-caption font-bold text-warning">
+                  Vous êtes hors connexion. Reconnectez-vous pour réserver&nbsp;: vos informations
                   restent enregistrées.
                 </p>
               )}
@@ -1254,7 +1349,7 @@ export function CheckoutPage() {
                         className="h-4 w-4 animate-spin"
                         aria-hidden="true"
                       />
-                      <span>Réservation…</span>
+                      <span>Réservation en cours…</span>
                     </span>
                   ) : (
                     'Confirmer la réservation'
@@ -1262,24 +1357,24 @@ export function CheckoutPage() {
                 </Button>
               </div>
 
-              <p className="mt-3 text-center text-xs leading-relaxed text-text-2">
-                En confirmant, vos articles sont mis de côté pendant 24 h. Vous
+              <p className="mt-3 text-center text-caption leading-relaxed text-text-2">
+                En confirmant, vos articles sont mis de côté pendant 24&nbsp;h. Vous
                 paierez à l&rsquo;étape suivante par Mobile Money.
               </p>
             </div>
           </aside>
 
           {/* Barre d'action collée en bas sur mobile (§6.1) */}
-          <div className="fixed right-0 bottom-0 left-0 z-40 border-t border-silver/70 bg-white px-4 pt-3 pb-[calc(12px+env(safe-area-inset-bottom))] shadow-[var(--shadow-nav)] lg:hidden">
+          <div className="fixed right-0 bottom-0 left-0 z-nav border-t border-silver/70 bg-white px-page pt-3 pb-[calc(12px+env(safe-area-inset-bottom))] shadow-[var(--shadow-nav)] lg:hidden">
             {!isOnline && (
-              <p role="alert" className="mb-2 text-xs font-bold text-warning">
-                Vous êtes hors connexion. Reconnectez-vous pour réserver : vos informations
+              <p role="alert" className="mb-2 text-caption font-bold text-warning">
+                Vous êtes hors connexion. Reconnectez-vous pour réserver&nbsp;: vos informations
                 restent enregistrées.
               </p>
             )}
             <div className="flex items-center justify-between gap-3">
               <div>
-                <span className="block text-xs font-semibold uppercase tracking-wider text-text-2">
+                <span className="block text-label text-text-2">
                   Total
                 </span>
                 {/* Total sur une seule ligne : la barre garde sa hauteur sur les petits écrans (360 px) */}
@@ -1303,7 +1398,7 @@ export function CheckoutPage() {
                         className="h-4 w-4 animate-spin"
                         aria-hidden="true"
                       />
-                      <span>Réservation…</span>
+                      <span>Réservation en cours…</span>
                     </span>
                   ) : (
                     'Confirmer la réservation'
@@ -1311,8 +1406,8 @@ export function CheckoutPage() {
                 </Button>
               </div>
             </div>
-            <p className="mt-1.5 text-[11px] text-text-2">
-              En confirmant, vos articles sont mis de côté pendant 24 h. Vous
+            <p className="mt-1.5 text-caption text-text-2">
+              En confirmant, vos articles sont mis de côté pendant 24&nbsp;h. Vous
               paierez à l&rsquo;étape suivante par Mobile Money.
             </p>
           </div>

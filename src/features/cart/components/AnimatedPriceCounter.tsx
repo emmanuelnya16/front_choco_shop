@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils/cn';
 import { formatPrice } from '@/lib/utils/price';
+import { duration } from '@/motion/tokens';
 import { useReducedMotionPref } from '@/motion/useReducedMotionPref';
 
 export interface AnimatedPriceCounterProps {
@@ -32,7 +33,7 @@ export function AnimatedPriceCounter({
       return () => cancelAnimationFrame(id);
     }
 
-    const durationMs = 320;
+    const durationMs = duration.base * 1000;
     const startTime = performance.now();
     let rafId = 0;
 

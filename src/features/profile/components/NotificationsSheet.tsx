@@ -115,16 +115,16 @@ export function NotificationsSheet({ open, onClose, onStateChange }: Notificatio
           </p>
           <ol className="mt-2 list-decimal space-y-1 pl-5 text-small text-text-2">
             <li>Touchez l’icône cadenas à gauche de l’adresse du site.</li>
-            <li>Ouvrez « Autorisations ».</li>
-            <li>Choisissez « Notifications », puis « Autoriser ».</li>
+            <li>Ouvrez «&nbsp;Autorisations&nbsp;».</li>
+            <li>Choisissez «&nbsp;Notifications&nbsp;», puis «&nbsp;Autoriser&nbsp;».</li>
           </ol>
         </div>
       )}
 
       {state === 'ios-install' && (
         <p className="mt-4 text-small text-text-2">
-          Installez d’abord l’application sur votre écran d’accueil : touchez le bouton Partager de
-          Safari, puis « Sur l’écran d’accueil ».
+          Installez d’abord l’application sur votre écran d’accueil&nbsp;: touchez le bouton Partager de
+          Safari, puis «&nbsp;Sur l’écran d’accueil&nbsp;».
         </p>
       )}
 

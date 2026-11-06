@@ -3,7 +3,7 @@ import { setupServer } from 'msw/node';
 import { lazy } from 'react';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { RootLayout, RouterErrorBoundary } from '@/app/layouts/RootLayout';
+import { PageRouterErrorBoundary, RootLayout, RouterErrorBoundary } from '@/app/layouts/RootLayout';
 import { AppProviders } from '@/app/providers';
 import { createTestRouter } from '@/app/router';
 import { clearChunkReloadFlag, pageReload } from '@/components/errors/chunkReload';
@@ -305,6 +305,41 @@ describe('M7 §5.1 · rechargement unique sur morceau introuvable', () => {
     expect(screen.getByText('Aller au contenu')).toBeInTheDocument();
     expect(screen.queryByText(/Oups/)).not.toBeInTheDocument();
     expect(reload).not.toHaveBeenCalled();
+  });
+
+  it('page impossible à charger dans l’app : écran d’erreur sous l’en-tête, la coquille reste visible', async () => {
+    const router = createMemoryRouter(
+      [
+        {
+          path: '/',
+          Component: RootLayout,
+          ErrorBoundary: RouterErrorBoundary,
+          children: [
+            {
+              ErrorBoundary: PageRouterErrorBoundary,
+              children: [
+                { index: true, element: <p>ACCUEIL DE TEST</p> },
+                { path: 'cassee', lazy: () => Promise.reject(new Error('Chargement impossible (test)')) },
+              ],
+            },
+          ],
+        },
+      ],
+      { initialEntries: ['/cassee'] },
+    );
+    render(
+      <AppProviders client={createAppQueryClient()}>
+        <RouterProvider router={router} />
+      </AppProviders>,
+    );
+    const heading = await screen.findByRole('heading', { name: 'Oups, quelque chose s’est mal passé' });
+    // Dans la zone de contenu de la mise en page : en-tête et lien d'évitement toujours là
+    expect(document.getElementById('contenu')).toContainElement(heading);
+    expect(screen.getByText('Aller au contenu')).toBeInTheDocument();
+    expect(screen.queryByText(/Chargement impossible/)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('link', { name: /Revenir à l.accueil/ }));
+    expect(await screen.findByText('ACCUEIL DE TEST')).toBeInTheDocument();
   });
 
   it('page dont le morceau manque, en ligne : rechargement automatique au niveau du routeur', async () => {

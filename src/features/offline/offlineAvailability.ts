@@ -4,8 +4,8 @@ import { api } from '@/lib/api/client';
 import { endpoints } from '@/lib/api/endpoints';
 import { qk } from '@/lib/api/queryKeys';
 import { env } from '@/lib/env';
-import { CACHE_NAMES } from '@/pwa/cacheRules';
-import { isAppOnline } from '@/pwa/networkStore';
+import { CACHE_NAMES } from '@/pwa/cacheNames';
+import { isAppOnline, useNetworkStore } from '@/pwa/networkStore';
 import type { RecentlyViewedItem } from '@/stores/recentlyViewedStore';
 
 function hasCacheApi(): boolean {
@@ -80,5 +80,34 @@ export async function retryNetwork(queryClient: QueryClient): Promise<boolean> {
     queryClient.resumePausedMutations(),
     hasActiveQueries ? Promise.resolve() : api.get(endpoints.settings.public, { timeoutMs: 8000 }),
   ]);
+  if (isAppOnline()) return true;
+  // Données du catalogue servies par le service worker : la réponse du serveur arrive après, par
+  // son message NETWORK_STATUS (M7, défaut D2). On la laisse arriver avant de conclure.
+  if (hasServiceWorkerController()) await waitForOnline(SW_STATUS_WAIT_MS);
   return isAppOnline();
+}
+
+/** Attente maximale du message du service worker après « Réessayer ». */
+// HYPOTHÈSE: 2,5 s couvrent la mise à jour en arrière-plan sur un réseau mobile correct ; au-delà,
+// le bandeau se met à jour tout seul quand le message arrive.
+const SW_STATUS_WAIT_MS = 2500;
+
+function hasServiceWorkerController(): boolean {
+  return typeof navigator !== 'undefined' && Boolean(navigator.serviceWorker?.controller);
+}
+
+function waitForOnline(timeoutMs: number): Promise<void> {
+  return new Promise((resolve) => {
+    let unsubscribe: () => void = () => undefined;
+    const timer = setTimeout(() => {
+      unsubscribe();
+      resolve();
+    }, timeoutMs);
+    unsubscribe = useNetworkStore.subscribe((state) => {
+      if (!state.online) return;
+      clearTimeout(timer);
+      unsubscribe();
+      resolve();
+    });
+  });
 }

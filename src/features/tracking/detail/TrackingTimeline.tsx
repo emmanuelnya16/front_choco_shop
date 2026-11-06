@@ -1,11 +1,11 @@
 import { Check, X } from 'lucide-react';
-import { useRef } from 'react';
+import * as m from 'motion/react-m';
 import { SmartImage } from '@/components/ui/SmartImage';
 import { formatSpokenDateTime, formatStepDateTime } from '@/features/tracking/format';
 import { reachedStepIndex, type TimelineStepView } from '@/features/tracking/timeline';
-import { gsap, useGSAP } from '@/lib/gsap';
 import { cn } from '@/lib/utils/cn';
-import { prefersReducedMotion } from '@/motion/useReducedMotionPref';
+import { delay, duration, ease, spring } from '@/motion/tokens';
+import { useReducedMotionPref } from '@/motion/useReducedMotionPref';
 
 export interface TrackingTimelineProps {
   steps: TimelineStepView[];
@@ -14,7 +14,7 @@ export interface TrackingTimelineProps {
    * `-1` : première ouverture, toute la frise se remplit. `null` : affichage direct.
    */
   animateFromIndex: number | null;
-  /** Miniature de la photo du colis affichée sur l'étape « Remise à l'agence » / « Prête pour retrait ». */
+  /** Miniature de la photo du colis affichée sur l'étape « Remise à l’agence » / « Prête pour retrait ». */
   packageThumbUrl?: string;
   onOpenPackagePhoto?: () => void;
 }
@@ -25,6 +25,32 @@ const STATE_SPOKEN: Record<TimelineStepView['state'], string> = {
   upcoming: 'à venir',
 };
 
+/** Remplissage d'un segment, puis rebond de la pastille suivante (durées de src/motion/tokens.ts). */
+const FILL = duration.tap;
+const POP = duration.quick;
+const STEP = FILL + POP;
+
+interface AnimationPlan {
+  /** Dernière étape déjà vue (-1 : aucune). */
+  from: number;
+  firstDot: number;
+  firstSegment: number;
+  /** Premier rebond : la pastille de départ quand toute la frise se remplit. */
+  lead: number;
+}
+
+function buildPlan(animateFromIndex: number | null, reached: number, reduced: boolean): AnimationPlan | null {
+  if (animateFromIndex === null || reached < 0 || reduced) return null;
+  const from = Math.min(animateFromIndex, reached);
+  if (from === reached && from >= 0) return null; // Rien de nouveau depuis la dernière visite
+  return {
+    from,
+    firstDot: from < 0 ? 0 : from + 1,
+    firstSegment: Math.max(from, 0),
+    lead: from < 0 ? POP : 0,
+  };
+}
+
 function stepNote(step: TimelineStepView): string | undefined {
   if (step.status === 'cancelled') {
     const by = step.actor === 'client' ? 'Par vous' : step.actor === 'shop' ? 'Par la boutique' : undefined;
@@ -34,9 +60,11 @@ function stepNote(step: TimelineStepView): string | undefined {
 }
 
 /**
- * Frise de suivi verticale animée (§5.3 M5) : la ligne se remplit de haut en bas (`scaleY`, origine en haut,
- * ~0,15 s par étape, `power2.inOut`), chaque pastille passe à l'état franchi quand la ligne l'atteint
- * (rebond 0,6 → 1), puis l'étape en cours s'allume. Animations réduites : état final direct.
+ * Frise de suivi verticale animée (§5.3 M5) : la ligne se remplit de haut en bas (`scaleY`, origine en haut),
+ * chaque pastille rebondit (0,6 → 1) quand la ligne l'atteint, puis l'étape en cours s'allume.
+ * Seule la portion nouvelle s'anime, y compris quand le statut change écran ouvert (le segment déjà monté
+ * passe de 0 à 1, la nouvelle étape apparaît). Uniquement transform et opacité ; animations réduites :
+ * état final direct.
  */
 export function TrackingTimeline({
   steps,
@@ -44,44 +72,24 @@ export function TrackingTimeline({
   packageThumbUrl,
   onOpenPackagePhoto,
 }: TrackingTimelineProps) {
-  const scopeRef = useRef<HTMLOListElement | null>(null);
+  const reducedMotion = useReducedMotionPref();
   const reached = reachedStepIndex(steps);
   const total = steps.length;
-  const animationKey = `${steps.map((s) => `${s.key}:${s.state}`).join('|')}#${animateFromIndex ?? 'none'}`;
+  const plan = buildPlan(animateFromIndex, reached, reducedMotion);
 
-  useGSAP(
-    () => {
-      if (animateFromIndex === null || reached < 0 || prefersReducedMotion()) return;
-      const from = Math.min(animateFromIndex, reached);
-      if (from === reached && from >= 0) return; // Rien de nouveau depuis la dernière visite
-
-      const q = gsap.utils.selector(scopeRef);
-      const fill = (i: number) => q(`[data-fill="${i}"]`);
-      const dot = (i: number) => q(`[data-dot="${i}"]`);
-      const halo = q('[data-halo]');
-
-      const firstDot = from < 0 ? 0 : from + 1;
-      const firstSegment = Math.max(from, 0);
-
-      for (let i = firstSegment; i < reached; i += 1) gsap.set(fill(i), { scaleY: 0 });
-      for (let i = firstDot; i <= reached; i += 1) gsap.set(dot(i), { scale: 0.6, autoAlpha: 0 });
-      gsap.set(halo, { autoAlpha: 0 });
-
-      const tl = gsap.timeline({ delay: 0.15 });
-      if (from < 0) {
-        tl.to(dot(0), { scale: 1, autoAlpha: 1, duration: 0.25, ease: 'back.out(2.5)' });
-      }
-      for (let i = firstSegment; i < reached; i += 1) {
-        tl.to(fill(i), { scaleY: 1, duration: 0.15, ease: 'power2.inOut' });
-        tl.to(dot(i + 1), { scale: 1, autoAlpha: 1, duration: 0.25, ease: 'back.out(2.5)' }, '-=0.04');
-      }
-      tl.to(halo, { autoAlpha: 1, duration: 0.3, ease: 'power2.out' });
-    },
-    { scope: scopeRef, dependencies: [animationKey] },
-  );
+  const segmentDelay = (index: number) =>
+    plan ? delay.short + plan.lead + (index - plan.firstSegment) * STEP : 0;
+  const dotDelay = (index: number) => {
+    if (!plan) return 0;
+    if (index === 0 && plan.from < 0) return delay.short;
+    return segmentDelay(index - 1) + FILL;
+  };
+  const animatesSegment = (index: number) =>
+    Boolean(plan) && index >= plan!.firstSegment && index < reached;
+  const animatesDot = (index: number) => Boolean(plan) && index >= plan!.firstDot && index <= reached;
 
   return (
-    <ol ref={scopeRef} aria-label="Suivi de la réservation" className="relative">
+    <ol aria-label="Suivi de la réservation" className="relative">
       {steps.map((step, index) => {
         const isUpcoming = step.state === 'upcoming';
         const isDanger = step.tone === 'danger';
@@ -97,16 +105,18 @@ export function TrackingTimeline({
             aria-current={isCurrent ? 'step' : undefined}
             className="relative flex gap-4 pb-6 last:pb-0"
           >
-            {/* Segment vers l'étape suivante : rail gris + remplissage animé */}
+            {/* Segment vers l'étape suivante : rail gris + remplissage animé, centré sous la pastille */}
             {index < total - 1 && (
               <span
                 aria-hidden="true"
-                className="absolute top-[30px] bottom-[2px] left-[11px] w-[2px] overflow-hidden rounded-[var(--radius-full)] bg-silver/60"
+                className="absolute top-8 bottom-1 left-3 w-0.5 -translate-x-1/2 overflow-hidden rounded-[var(--radius-full)] bg-silver/60"
               >
-                <span
+                <m.span
                   data-fill={index}
                   className="block h-full w-full origin-top bg-ink"
-                  style={{ transform: `scaleY(${index < reached ? 1 : 0})` }}
+                  initial={animatesSegment(index) ? { scaleY: 0 } : false}
+                  animate={{ scaleY: index < reached ? 1 : 0 }}
+                  transition={{ duration: FILL, ease: ease.inOut, delay: segmentDelay(index) }}
                 />
               </span>
             )}
@@ -115,13 +125,25 @@ export function TrackingTimeline({
             <span aria-hidden="true" className="relative mt-0.5 h-6 w-6 shrink-0">
               <span className="absolute inset-0 rounded-[var(--radius-full)] border-2 border-silver bg-white" />
               {isCurrent && (
-                <span data-halo className="absolute -inset-1.5">
-                  <span className="absolute inset-0 animate-[ping_2.2s_cubic-bezier(0,0,0.2,1)_infinite] rounded-[var(--radius-full)] bg-red/30" />
-                </span>
+                <m.span
+                  data-halo
+                  className="absolute -inset-1.5"
+                  initial={plan ? { opacity: 0 } : false}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: duration.base, ease: ease.out, delay: dotDelay(index) + POP }}
+                >
+                  <span className="absolute inset-0 animate-[ping_var(--duration-ambient)_var(--ease-brand-out)_infinite] rounded-[var(--radius-full)] bg-red/30" />
+                </m.span>
               )}
               {!isUpcoming && (
-                <span
+                <m.span
                   data-dot={index}
+                  initial={animatesDot(index) ? { scale: 0.6, opacity: 0 } : false}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{
+                    scale: { ...spring.snappy, delay: dotDelay(index) },
+                    opacity: { duration: duration.fast, ease: ease.out, delay: dotDelay(index) },
+                  }}
                   className={cn(
                     'absolute inset-0 flex items-center justify-center rounded-[var(--radius-full)] text-white',
                     isCurrent || isDanger ? 'bg-red' : 'bg-ink',
@@ -134,7 +156,7 @@ export function TrackingTimeline({
                   ) : (
                     <Check className="h-3.5 w-3.5" strokeWidth={3} />
                   )}
-                </span>
+                </m.span>
               )}
             </span>
 
@@ -151,6 +173,7 @@ export function TrackingTimeline({
             </div>
 
             {showThumb && (
+              // z-[1] local : la miniature passe au-dessus du rail de l'étape (même élément de liste)
               <button
                 type="button"
                 onClick={onOpenPackagePhoto}

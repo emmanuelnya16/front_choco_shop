@@ -169,9 +169,9 @@ export function samplePushPayload(type: PushType, ref = 'RES-000102', image?: st
   const detail = `/reservations/${ref}`;
   switch (type) {
     case 'payment_validated':
-      return { type, title: 'Paiement validé ✓', body: `${ref} est confirmée. Nous préparons votre commande.`, ref, url: detail };
+      return { type, title: 'Paiement validé ✓', body: `${ref} est confirmée. Nous préparons votre colis.`, ref, url: detail };
     case 'payment_rejected':
-      return { type, title: 'Paiement non validé', body: `${ref} : capture illisible. Renvoyez votre preuve avant 23 h 10.`, ref, url: detail };
+      return { type, title: 'Paiement non validé', body: `${ref}\u00A0: preuve de paiement illisible. Renvoyez-la avant 23\u00A0h\u00A010.`, ref, url: detail };
     case 'package_ready':
       return {
         type,
@@ -184,9 +184,9 @@ export function samplePushPayload(type: PushType, ref = 'RES-000102', image?: st
     case 'in_delivery':
       return { type, title: 'Votre colis est en route', body: `${ref} part vers Yaoundé.`, ref, url: detail };
     case 'delivered':
-      return { type, title: 'Livré !', body: 'Merci pour votre confiance.', ref, url: detail };
+      return { type, title: 'Livré\u00A0!', body: 'Merci pour votre confiance.', ref, url: detail };
     case 'expiring_soon':
-      return { type, title: 'Votre réservation expire bientôt', body: `${ref} expire dans 2 h. Payez pour garder vos articles.`, ref, url: detail };
+      return { type, title: 'Votre réservation expire bientôt', body: `${ref} expire dans 2\u00A0h. Payez pour garder vos articles.`, ref, url: detail };
     case 'new_collection':
       return { type, title: 'Nouvelle collection', body: 'Les nouveautés de la semaine sont arrivées.', url: '/explorer?sort=newest' };
   }

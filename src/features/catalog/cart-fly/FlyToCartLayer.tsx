@@ -5,7 +5,7 @@ import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useLocation } from 'react-router';
 import { cn } from '@/lib/utils/cn';
-import { duration, ease, spring } from '@/motion/tokens';
+import { duration, ease, gsapEase, spring } from '@/motion/tokens';
 import { useReducedMotionPref } from '@/motion/useReducedMotionPref';
 import { selectCartCount, useCartStore } from '@/stores/cartStore';
 import { useUiStore, type FlyingCartItem } from '@/stores/uiStore';
@@ -76,11 +76,12 @@ function FlyingClone({
       const deltaX = target.x - startCenterX;
       const deltaY = target.y - startCenterY;
 
-      // Trajectoire parabolique (§7.9) : x en power1.inOut + y en power2.in
+      // Trajectoire en arc (§7.9) : l'horizontale part vite et ralentit, la verticale part lentement
+      // puis accélère (même durée, courbes différentes)
       gsap.to(node, {
         x: deltaX,
-        duration: 0.75,
-        ease: 'power1.inOut',
+        duration: duration.reveal,
+        ease: gsapEase.soft,
       });
 
       gsap.to(node, {
@@ -88,8 +89,8 @@ function FlyingClone({
         scale: 0.12,
         rotation: -8,
         opacity: 0.85,
-        duration: 0.75,
-        ease: 'power2.in',
+        duration: duration.reveal,
+        ease: gsapEase.inOut,
         onComplete: () => {
           if (!cancelled) {
             onComplete(item.id);
@@ -169,12 +170,16 @@ export function FlyToCartLayer() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -8, scale: 0.92 }}
             transition={{ duration: duration.fast, ease: ease.out }}
-            className={cn('fixed right-4 z-toast pt-safe lg:hidden', onProductPage ? 'top-[72px]' : 'top-4')}
+            className={cn(
+              'fixed right-4 z-toast pt-safe lg:hidden',
+              // Fiche : sous les boutons ronds (12 px + 44 px + 16 px d'écart), décalés comme eux par le bandeau hors connexion
+              onProductPage ? 'top-[calc(4.5rem+var(--offline-banner-h,0px))]' : 'top-4',
+            )}
           >
             <Link
               to="/panier"
               viewTransition
-              className="inline-flex min-h-[40px] items-center gap-2 rounded-[var(--radius-full)] bg-ink px-4 py-2 text-xs font-bold text-white shadow-[var(--shadow-sheet)]"
+              className="inline-flex min-h-11 items-center gap-2 rounded-[var(--radius-full)] bg-ink px-4 py-2 text-caption font-bold text-white shadow-pop"
             >
               <ShoppingBag className="h-4 w-4 text-red" aria-hidden="true" />
               <span>Panier</span>
@@ -183,7 +188,7 @@ export function FlyToCartLayer() {
                 initial={reducedMotion ? false : { scale: 0.5 }}
                 animate={{ scale: 1 }}
                 transition={spring.bounce}
-                className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-[var(--radius-full)] bg-red px-1.5 font-mono text-[11px] font-bold text-white"
+                className="inline-flex h-5 min-w-5 items-center justify-center rounded-[var(--radius-full)] bg-red px-1.5 font-mono text-caption font-bold text-white"
               >
                 {cartCount}
               </m.span>

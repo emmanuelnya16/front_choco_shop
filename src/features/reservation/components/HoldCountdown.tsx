@@ -38,7 +38,8 @@ function computeServerClockOffsetMs(
 /**
  * Composant `HoldCountdown` (§7.3) :
  * - Corrige le décalage d'horloge du téléphone grâce à `serverTime`.
- * - Variantes : `'ring'` (anneau SVG 72 px), `'inline'` (« Réservé encore 23 h 58 min »), `'compact'` (« 23:58 »).
+ * - Variantes : `'ring'` (anneau SVG 72 px), `'inline'` (« Réservé encore 23 h 58 min »),
+ *   `'compact'` (« 23 h 58 », puis « 12 min » et « 45 s » : jamais « 04:59 », ambigu).
  * - Couleurs : `ink` (> 2 h), `warning` (entre 2 h et 30 min), `red` (<= 30 min).
  * - Se met en pause lorsque l'onglet est masqué et recalcule dès le retour au premier plan.
  */
@@ -178,15 +179,17 @@ export function HoldCountdown({
   const minutes = totalMinutes % 60;
   const seconds = totalSeconds % 60;
 
-  const paddedHours = String(hours).padStart(2, '0');
   const paddedMinutes = String(minutes).padStart(2, '0');
   const paddedSeconds = String(seconds).padStart(2, '0');
 
   if (variant === 'compact') {
+    // Unités explicites (M7) : « 4 h 59 » ne peut pas se lire « 4 min 59 »
     const compactLabel =
-      remainingMs <= ONE_HOUR_MS && hours === 0
-        ? `${paddedMinutes}:${paddedSeconds}`
-        : `${paddedHours}:${paddedMinutes}`;
+      hours > 0
+        ? `${hours}\u00A0h\u00A0${paddedMinutes}`
+        : minutes > 0
+          ? `${minutes}\u00A0min`
+          : `${seconds}\u00A0s`;
 
     return (
       <span
@@ -225,7 +228,7 @@ export function HoldCountdown({
   const ringCenterLabel =
     remainingMs <= ONE_HOUR_MS && hours === 0
       ? `${paddedMinutes}:${paddedSeconds}`
-      : `${hours} h ${paddedMinutes}`;
+      : `${hours}\u00A0h ${paddedMinutes}`;
 
   return (
     <div
@@ -233,10 +236,10 @@ export function HoldCountdown({
       data-tone={tone}
       className={cn('inline-flex flex-col items-center text-center', className)}
     >
-      <div className="relative flex h-[72px] w-[72px] items-center justify-center">
+      <div className="relative flex size-18 items-center justify-center">
         <svg
           viewBox="0 0 72 72"
-          className="h-[72px] w-[72px] -rotate-90"
+          className="size-18 -rotate-90"
           aria-hidden="true"
         >
           <circle
@@ -252,7 +255,7 @@ export function HoldCountdown({
             cy="36"
             r={radius}
             fill="none"
-            className={cn('transition-[stroke-dashoffset] duration-500', strokeColorClass)}
+            className={cn('transition-[stroke-dashoffset] duration-slow', strokeColorClass)}
             strokeWidth="4.5"
             strokeLinecap="round"
             strokeDasharray={circumference}
@@ -261,14 +264,14 @@ export function HoldCountdown({
         </svg>
         <span
           className={cn(
-            'absolute font-mono text-xs font-extrabold tabular-nums',
+            'absolute font-mono text-caption font-extrabold tabular-nums',
             textColorClass,
           )}
         >
           {ringCenterLabel}
         </span>
       </div>
-      <span className={cn('mt-1.5 text-xs font-semibold', onDark ? 'text-silver' : 'text-text-2')}>
+      <span className={cn('mt-1.5 text-caption font-semibold', onDark ? 'text-silver' : 'text-text-2')}>
         Articles réservés pour vous
       </span>
     </div>

@@ -47,7 +47,7 @@ export function ContentArticle({ page, blocks, footer }: ContentArticleProps) {
         showDesktopToc && 'lg:grid lg:grid-cols-[minmax(0,680px)_minmax(0,240px)] lg:justify-center lg:gap-16',
       )}
     >
-      <article aria-labelledby="page-titre" className={cn('min-w-0 max-w-[680px]', !showDesktopToc && 'mx-auto')}>
+      <article aria-labelledby="page-titre" className={cn('min-w-0 max-w-170', !showDesktopToc && 'mx-auto')}>
         <header>
           <h1 id="page-titre" className="text-h1 break-words text-ink">
             {page.title}

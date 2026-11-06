@@ -8,7 +8,9 @@ import { useDocumentTitle } from '@/lib/utils/useDocumentTitle';
  * le catalogue et les écrans de réservation.
  */
 export function OfflinePage() {
-  useDocumentTitle('Hors connexion');
+  useDocumentTitle('Hors connexion', {
+    description: 'Cette page n’est pas encore enregistrée sur votre téléphone. Réessayez une fois connecté.',
+  });
 
   return (
     <div className="px-page pt-4 pb-16 lg:pt-16">

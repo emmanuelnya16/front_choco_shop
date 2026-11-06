@@ -29,7 +29,7 @@ export function isPaymentStepPath(pathname: string): boolean {
 /**
  * Parcours de réservation (`/reservation`, `/reservation/:ref/…`) et « Mes réservations »
  * (`/reservations`, `/reservations/:ref`). Correspondance exacte du premier segment : une page
- * d'aide comme `/pages/paiement-mobile-money` n'en fait pas partie.
+ * d'aide comme `/aide/paiement-mobile-money` n'en fait pas partie.
  */
 export function isReservationPath(pathname: string): boolean {
   return /^\/reservations?(\/|$)/.test(pathname);

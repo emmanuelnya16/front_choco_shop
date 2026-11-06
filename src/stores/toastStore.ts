@@ -10,8 +10,8 @@ export interface ToastMessage {
   onAction?: () => void;
   durationMs?: number;
   /**
-   * Texte secondaire aussi sur deux lignes au plus (toast riche d'une notification, M6 §7.4) ; le
-   * message tient toujours sur deux lignes au plus, le texte secondaire sinon sur une seule.
+   * Conservé pour compatibilité (toast riche d'une notification, M6 §7.4) : depuis M7, le message et
+   * le texte secondaire tiennent toujours sur deux lignes au plus.
    */
   wrap?: boolean;
   /** Icône affichée sans miniature : coche (par défaut) ou cloche (notification). */

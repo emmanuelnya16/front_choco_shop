@@ -5,7 +5,7 @@ import { useContentPage } from '@/features/content/api/useContentPage';
 import { ContentArticle } from '@/features/content/components/ContentArticle';
 import { ContentLoadError, ContentNotFound, ContentSkeleton } from '@/features/content/components/ContentStates';
 import { HelpContactBlock } from '@/features/content/components/HelpContactBlock';
-import { parseMarkdown } from '@/features/content/markdown/parse';
+import { inlineText, parseMarkdown, type MdBlock } from '@/features/content/markdown/parse';
 import {
   findContentEntry,
   HELP_CENTER_PATH,
@@ -17,6 +17,23 @@ import { isNetworkError } from '@/features/offline/networkErrors';
 import { OfflineScreen } from '@/features/offline/OfflineScreen';
 import { ApiError } from '@/lib/api/client';
 import { useDocumentTitle } from '@/lib/utils/useDocumentTitle';
+
+/** Longueur utile d'une description pour les moteurs de recherche. */
+const DESCRIPTION_MAX = 155;
+
+/**
+ * Description d'une page ajoutée depuis l'administration (inconnue de l'app) : début du premier
+ * paragraphe, coupé à un mot entier. Chaque page garde ainsi une description qui lui est propre.
+ */
+function describeBlocks(blocks: MdBlock[]): string | undefined {
+  const paragraph = blocks.find((block) => block.type === 'paragraph');
+  if (!paragraph || paragraph.type !== 'paragraph') return undefined;
+  const text = inlineText(paragraph.children).replace(/\s+/g, ' ').trim();
+  if (!text) return undefined;
+  if (text.length <= DESCRIPTION_MAX) return text;
+  const cut = text.slice(0, DESCRIPTION_MAX - 1);
+  return `${cut.slice(0, cut.lastIndexOf(' ')).replace(/[\s,;:]+$/, '')}…`;
+}
 
 function isNotFoundError(error: unknown): boolean {
   return error instanceof ApiError && error.status === 404;
@@ -39,7 +56,7 @@ function ContentPageView({ kind }: { kind: ContentKind }) {
 
   const fallbackTitle = entry?.title ?? (kind === 'help' ? 'Aide' : 'Informations');
   useDocumentTitle(notFound ? 'Page introuvable' : (data?.title ?? fallbackTitle), {
-    description: notFound ? undefined : entry?.description,
+    description: notFound ? undefined : (entry?.description ?? describeBlocks(blocks)),
     noindex: notFound ? true : undefined,
   });
 

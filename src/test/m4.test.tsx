@@ -114,7 +114,7 @@ describe('Module M4 — Paiement et Preuve', () => {
         ProofPreparationError,
       );
       await expect(prepareProof(pdfFile, { maxSizeMb: 10 })).rejects.toThrow(
-        "Ce format n'est pas pris en charge. Faites une capture d'écran classique.",
+        'Ce format n’est pas pris en charge. Faites une capture d’écran classique.',
       );
 
       // Fichier > 1 Mo avec limite fixée à 1 Mo
@@ -124,7 +124,7 @@ describe('Module M4 — Paiement et Preuve', () => {
       await expect(prepareProof(hugeFile, { maxSizeMb: 1 })).rejects.toThrow(
         ProofPreparationError,
       );
-      await expect(prepareProof(hugeFile, { maxSizeMb: 1 })).rejects.toThrow(/dépasse 1 Mo/);
+      await expect(prepareProof(hugeFile, { maxSizeMb: 1 })).rejects.toThrow(/dépasse 1\sMo/);
     });
 
     it('calcule un redimensionnement à 1600 px maximum sur le plus grand côté', () => {
@@ -242,11 +242,12 @@ describe('Module M4 — Paiement et Preuve', () => {
       });
 
       expect(message).toContain('Bonjour DR Choco 👋');
-      expect(message).toContain("Je viens d'envoyer ma preuve de paiement.");
-      expect(message).toContain('Réservation : RES-000124');
+      expect(message).toContain('Je viens d’envoyer ma preuve de paiement.');
+      // Espace insécable avant « : » (typographie française, M7)
+      expect(message).toContain('Réservation\u00A0: RES-000124');
       expect(message).toContain('autre');
       expect(message).toContain('(Orange Money)');
-      expect(message).toContain('Fiche : https://drchoco.cm/admin/reservations/RES-000124');
+      expect(message).toContain('Fiche\u00A0: https://drchoco.cm/admin/reservations/RES-000124');
       expect(message.length).toBeLessThan(1000);
 
       const url = buildWhatsAppPaymentUrl('+237690000000', {
@@ -256,7 +257,7 @@ describe('Module M4 — Paiement et Preuve', () => {
       });
       expect(url.startsWith('https://wa.me/237690000000?text=')).toBe(true);
       expect(url).toContain(encodeURIComponent('Bonjour DR Choco 👋'));
-      expect(decodeURIComponent(url.split('?text=')[1]!)).toContain('Réservation : RES-000124');
+      expect(decodeURIComponent(url.split('?text=')[1]!)).toContain('Réservation\u00A0: RES-000124');
     });
   });
 
@@ -335,6 +336,22 @@ describe('Module M4 — Paiement et Preuve', () => {
       });
     }, 15_000);
 
+    it('accepte la même capture renvoyée pour la même réservation après un rejet (DUPLICATE_PROOF : autre réservation seulement)', async () => {
+      const sameSha = 'b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3';
+      const send = () => {
+        const formData = new FormData();
+        formData.append('file', new Blob([new Uint8Array([5, 6, 7])], { type: 'image/jpeg' }), 'p.jpg');
+        formData.append('sha256', sameSha);
+        formData.append('operator', 'orange');
+        return api.upload<UploadProofResponse>(endpoints.reservations.proof('RES-000101'), formData);
+      };
+
+      expect((await send()).status).toBe('pending_validation');
+      await api.post(endpoints.mock.rejectReservation('RES-000101'), { reason: 'Montant incorrect' });
+      // Même empreinte, même réservation : acceptée
+      expect((await send()).status).toBe('pending_validation');
+    }, 15_000);
+
     it("permet d'annuler un envoi en cours via AbortSignal", async () => {
       const controller = new AbortController();
       controller.abort();
@@ -406,7 +423,7 @@ describe('Module M4 — Paiement et Preuve', () => {
       queryClient.setQueryData(['reservation', 'RES-000101'], validated);
 
       await waitFor(() => {
-        expect(screen.getByText("C'EST CONFIRMÉ !")).toBeInTheDocument();
+        expect(screen.getByText('C’EST CONFIRMÉ !')).toBeInTheDocument();
         expect(screen.getByText('Confirmée')).toBeInTheDocument();
       });
 
@@ -476,6 +493,7 @@ describe('Module M4 — Paiement et Preuve', () => {
                   <ReservationExpiredOverlay
                     open={true}
                     reservation={expiredReservation}
+                    whatsappNumber="+237699112233"
                     showAlreadyPaidHelp={true}
                   />
                 </LazyMotion>
@@ -495,9 +513,14 @@ describe('Module M4 — Paiement et Preuve', () => {
       expect(screen.getByText('Réservation expirée')).toBeInTheDocument();
       expect(
         screen.getByText(
-          'Vous avez déjà payé ? Contactez la boutique sur WhatsApp avec votre capture.',
+          'Vous avez déjà payé ? Contactez la boutique sur WhatsApp avec votre preuve de paiement.',
         ),
       ).toBeInTheDocument();
+      // Lien WhatsApp vers le numéro fourni (jamais de numéro fictif par défaut)
+      expect(screen.getByRole('link', { name: /Contacter la boutique sur WhatsApp/ })).toHaveAttribute(
+        'href',
+        expect.stringMatching(/^https:\/\/wa\.me\/237699112233\?text=/),
+      );
 
       const rebuildBtn = screen.getByRole('button', { name: /Refaire ma réservation/i });
       fireEvent.click(rebuildBtn);

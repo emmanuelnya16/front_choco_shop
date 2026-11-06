@@ -1,0 +1,122 @@
+# =============================================================================
+# DR Choco L'Incompris — configuration Apache de l'application (hébergement cPanel)
+# Copié tel quel dans dist/ par le build. Procédure : docs/MISE_EN_LIGNE.md
+# =============================================================================
+
+Options -Indexes -MultiViews
+DirectoryIndex index.html
+
+# -----------------------------------------------------------------------------
+# Types de fichiers
+# -----------------------------------------------------------------------------
+<IfModule mod_mime.c>
+  AddType application/manifest+json .webmanifest
+  AddType application/javascript .js .mjs
+  AddType font/woff2 .woff2
+  AddType image/webp .webp
+  AddType image/avif .avif
+  AddType image/svg+xml .svg
+  AddCharset utf-8 .html .css .js .mjs .json .webmanifest .svg .txt .xml
+</IfModule>
+
+# Fichiers cachés (.env, .git…) jamais servis, sauf .well-known (certificat SSL)
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteRule "(^|/)\.(?!well-known/)" - [R=404,L]
+</IfModule>
+
+# -----------------------------------------------------------------------------
+# Redirections et réécriture pour l'application
+# -----------------------------------------------------------------------------
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+
+  # 1. HTTP vers HTTPS (sauf validation du certificat AutoSSL)
+  RewriteCond %{HTTPS} !=on
+  RewriteCond %{HTTP:X-Forwarded-Proto} !=https
+  RewriteCond %{REQUEST_URI} !^/\.well-known/
+  RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [R=301,L]
+
+  # 2. www vers le domaine principal
+  # HYPOTHÈSE: adresse principale sans « www » ; pour l'inverse, voir docs/MISE_EN_LIGNE.md
+  RewriteCond %{HTTP_HOST} ^www\.(.+)$ [NC]
+  RewriteCond %{REQUEST_URI} !^/\.well-known/
+  RewriteRule ^ https://%1%{REQUEST_URI} [R=301,L]
+
+  # 3. L'API Symfony (dossier api/) garde ses propres règles ; .well-known (certificat) n'est
+  #    jamais confié à l'application
+  RewriteRule ^api(/|$) - [L]
+  RewriteRule ^\.well-known(/|$) - [L]
+
+  # 4. Fichiers et dossiers existants : servis tels quels
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+
+  # 5. Fichier de build absent (ancienne version) : vraie erreur 404, jamais la page de l'app,
+  #    sinon le navigateur lirait du HTML à la place d'un script
+  RewriteRule ^assets/ - [R=404,L]
+
+  # 6. Toute autre adresse (/produit/…, /reservations/…, /admin…) : l'application
+  RewriteRule ^ index.html [L]
+</IfModule>
+
+# -----------------------------------------------------------------------------
+# Cache du navigateur
+# -----------------------------------------------------------------------------
+<IfModule mod_headers.c>
+  # Fichiers avec empreinte (nom qui change à chaque version) : un an
+  <If "%{REQUEST_URI} =~ m#^/assets/.+-[A-Za-z0-9_-]{8,}\.(js|css|woff2|webp|png|svg)$#">
+    Header set Cache-Control "public, max-age=31536000, immutable"
+  </If>
+
+  # Images du catalogue et de la marque : 30 jours
+  <If "%{REQUEST_URI} =~ m#^/(images|brand|splash|screenshots|shortcuts)/#">
+    Header set Cache-Control "public, max-age=2592000"
+  </If>
+
+  # Icônes de l'application : 7 jours
+  <FilesMatch "^(favicon\.ico|pwa-.+\.png|maskable-icon-.+\.png|apple-touch-icon.*\.png|badge-.+\.png)$">
+    Header set Cache-Control "public, max-age=604800"
+  </FilesMatch>
+
+  # Page de l'app, service worker et manifeste : toujours revérifiés, sinon les mises à jour
+  # n'arrivent jamais
+  <FilesMatch "^(index\.html|sw\.js|manifest\.webmanifest|robots\.txt|sitemap\.xml)$">
+    Header set Cache-Control "no-cache"
+  </FilesMatch>
+</IfModule>
+
+# -----------------------------------------------------------------------------
+# Compression (Brotli si l'hébergeur l'a, sinon gzip)
+# -----------------------------------------------------------------------------
+<IfModule mod_filter.c>
+  <IfModule mod_brotli.c>
+    AddOutputFilterByType BROTLI_COMPRESS text/html text/plain text/css text/xml application/javascript application/json application/manifest+json application/xml image/svg+xml
+  </IfModule>
+  <IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/plain text/css text/xml application/javascript application/json application/manifest+json application/xml image/svg+xml
+  </IfModule>
+</IfModule>
+<IfModule mod_headers.c>
+  Header append Vary Accept-Encoding "expr=%{CONTENT_TYPE} =~ m#^(text/|application/(javascript|json|manifest\+json|xml)|image/svg)#"
+</IfModule>
+
+# -----------------------------------------------------------------------------
+# En-têtes de sécurité
+# -----------------------------------------------------------------------------
+<IfModule mod_headers.c>
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+  Header always set X-Frame-Options "SAMEORIGIN"
+  Header always set Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+
+  # Politique de sécurité du contenu, d'abord en observation (Report-Only) : les blocages éventuels
+  # s'affichent dans la console sans rien casser. Après une semaine sans alerte, remplacer
+  # « Content-Security-Policy-Report-Only » par « Content-Security-Policy » (docs/MISE_EN_LIGNE.md).
+  Header always set Content-Security-Policy-Report-Only "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://res.cloudinary.com; font-src 'self'; connect-src 'self' https://res.cloudinary.com; manifest-src 'self'; worker-src 'self'; media-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'"
+
+  # HTTPS strict : à activer seulement quand le HTTPS fonctionne sur le domaine ET ses sous-domaines
+  # (docs/MISE_EN_LIGNE.md, étape 4). Retirer le « # » de la ligne suivante.
+  # Header always set Strict-Transport-Security "max-age=31536000" "expr=%{HTTPS} == 'on'"
+</IfModule>

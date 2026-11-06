@@ -132,7 +132,7 @@ describe('M6 · modeapp · 1. Bandeau de mise à jour', () => {
   it('peut être masqué jusqu’au prochain lancement', async () => {
     usePwaStore.setState({ updateReady: true });
     renderBannerAt('/profil');
-    fireEvent.click(await screen.findByRole('button', { name: "Masquer jusqu'au prochain lancement" }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Masquer jusqu’au prochain lancement' }));
     await waitFor(() => expect(screen.queryByText(BANNER_TEXT)).not.toBeInTheDocument());
   });
 

@@ -1,5 +1,6 @@
 import { animate, useMotionValue } from 'motion/react';
 import { useEffect, useState } from 'react';
+import { duration, ease } from '@/motion/tokens';
 import { useReducedMotionPref } from '@/motion/useReducedMotionPref';
 
 export interface AnimatedCounterProps {
@@ -25,8 +26,8 @@ export function AnimatedCounter({ value, className }: AnimatedCounterProps) {
     }
 
     const controls = animate(motionValue, value, {
-      duration: 0.25,
-      ease: [0.22, 1, 0.36, 1],
+      duration: duration.quick,
+      ease: ease.out,
       onUpdate: (latest) => {
         setDisplayValue(Math.round(latest));
       },

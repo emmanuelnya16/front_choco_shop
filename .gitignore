@@ -6,3 +6,9 @@ dist-ssr
 stats.html
 .DS_Store
 *.tsbuildinfo
+
+# Parcours de bout en bout Playwright (M7)
+test-results/
+playwright-report/
+blob-report/
+e2e/reports/

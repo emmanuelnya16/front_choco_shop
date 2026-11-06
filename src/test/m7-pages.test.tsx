@@ -221,6 +221,29 @@ describe('M7 · Pages · page légale', SLOW, () => {
     await waitFor(() => expect(document.title).toBe('Page introuvable · DR Choco'));
   });
 
+  it('adresse inconnue de l’app : vraie page « Page introuvable », sans écran provisoire ni lien /_dev', async () => {
+    const { router } = renderApp('/adresse-qui-n-existe-pas');
+    const heading = await screen.findByRole('heading', { level: 1, name: 'Page introuvable' }, LOAD);
+    expect(heading).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Revenir à l’accueil' })).toHaveAttribute('href', '/');
+    expect(screen.getByRole('link', { name: 'Voir le catalogue' })).toHaveAttribute('href', '/explorer');
+    // Le pied de page a aussi son lien « Centre d’aide » : on vise celui de la page
+    expect(within(screen.getByRole('main')).getByRole('link', { name: /Besoin d’aide/ })).toHaveAttribute('href', '/aide');
+    // Plus rien de l'écran provisoire M0
+    expect(screen.queryByText(/SOCLE M0|Écran provisoire|Paramètres d.URL/i)).not.toBeInTheDocument();
+    expect(document.querySelector('a[href^="/_dev"]')).toBeNull();
+    await waitFor(() => expect(document.title).toBe('Page introuvable · DR Choco'));
+    expect(document.querySelector('meta[name="robots"]')?.getAttribute('content')).toContain('noindex');
+
+    // La recherche mène au catalogue filtré
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Rechercher un article' }), {
+      target: { value: 'babouche' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Rechercher' }));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/explorer'));
+    expect(router.state.location.search).toBe('?q=babouche');
+  });
+
   it('refuse un identifiant invalide sans appeler l’API', async () => {
     const requests: string[] = [];
     server.events.on('request:start', ({ request }) => requests.push(new URL(request.url).pathname));
@@ -365,6 +388,13 @@ describe('M7 · Pages · pages d’aide et centre d’aide', SLOW, () => {
   it('pied de page : liens vers les 4 pages légales et le centre d’aide', async () => {
     renderApp('/aide');
     const footer = await screen.findByRole('contentinfo', {}, LOAD);
+    // Deux versions dans le DOM, une seule affichée selon la largeur (jsdom ne lit pas le CSS)
+    const full = footer.querySelector<HTMLElement>('[data-footer="full"]')!;
+    const compact = footer.querySelector<HTMLElement>('[data-footer="compact"]')!;
+    expect(full).toHaveClass('hidden', 'lg:block');
+    expect(compact).toHaveClass('lg:hidden');
+
+    // Ordinateur : pied de page complet
     const expected: Array<[string, string]> = [
       ['Centre d’aide', '/aide'],
       ['Comment réserver', '/aide/comment-reserver'],
@@ -377,8 +407,27 @@ describe('M7 · Pages · pages d’aide et centre d’aide', SLOW, () => {
       ['Mentions légales', '/pages/mentions-legales'],
     ];
     for (const [name, href] of expected) {
-      expect(within(footer).getByRole('link', { name })).toHaveAttribute('href', href);
+      expect(within(full).getByRole('link', { name })).toHaveAttribute('href', href);
     }
+
+    // Téléphone : bande réduite, l'aide et les pages légales restent accessibles depuis chaque page
+    const compactNav = within(compact).getByRole('navigation', { name: 'Aide et informations légales' });
+    const compactExpected: Array<[string, string]> = [
+      ['Aide', '/aide'],
+      ['Conditions générales', '/pages/conditions-generales'],
+      ['Confidentialité', '/pages/confidentialite'],
+      ['Mentions légales', '/pages/mentions-legales'],
+    ];
+    expect(within(compactNav).getAllByRole('link')).toHaveLength(compactExpected.length);
+    for (const [name, href] of compactExpected) {
+      expect(within(compactNav).getByRole('link', { name })).toHaveAttribute('href', href);
+    }
+    // Libellé court à l'écran (une seule ligne à 360 px), nom complet pour les lecteurs d'écran
+    expect(within(compactNav).getByRole('link', { name: 'Conditions générales' })).toHaveTextContent(/^Conditions$/);
+    expect(within(compact).getByText(/^© \d{4} DR Choco L’Incompris$/)).toBeInTheDocument();
+    // Ni logo, ni bouton WhatsApp, ni pastilles de paiement dans la bande
+    expect(within(compact).queryByText(/WhatsApp|Orange Money|MTN/)).not.toBeInTheDocument();
+
     // Chaque lien d'aide ou légal du pied de page mène à une page servie par l'API
     const contentLinks = within(footer)
       .getAllByRole('link')

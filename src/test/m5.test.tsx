@@ -10,7 +10,9 @@ import { formValuesToAddressPayload } from '@/features/profile/schema/profileSch
 import { restoreReservationItemsToCart } from '@/features/cart/restoreReservationItems';
 import { rebookToastMessage } from '@/features/tracking/api/useRebook';
 import { getCardAction } from '@/features/tracking/cardAction';
+import { formatDayMonth, formatHour } from '@/features/tracking/format';
 import { packagePhotoRatio, useSignedUrlRefresh } from '@/features/tracking/packagePhotos';
+import { resolveShopWhatsapp } from '@/features/tracking/shopWhatsapp';
 import { createAppQueryClient } from '@/lib/api/queryClient';
 import { qk } from '@/lib/api/queryKeys';
 import { env } from '@/lib/env';
@@ -356,9 +358,10 @@ describe('Module M5 — 5. Mes réservations (cartes et page)', () => {
       kind: 'text',
       text: 'Vérification en cours',
     });
+    expect(getCardAction({ ...base, status: 'confirmed' })).toEqual({ kind: 'text', text: 'Paiement validé' });
     expect(getCardAction({ ...base, status: 'preparing' })).toEqual({
       kind: 'text',
-      text: 'Paiement validé · préparation en cours',
+      text: 'Préparation en cours',
     });
     expect(
       getCardAction({ ...base, status: 'ready_for_pickup', packagePhotoThumb: '/mock/colis-1.svg' }),
@@ -471,7 +474,7 @@ describe('Module M5 — 6. Détail d’une réservation', () => {
     renderRoute('/reservations/RES-000105');
     fireEvent.click(await screen.findByRole('button', { name: 'Annuler la réservation' }));
 
-    const dialog = await screen.findByRole('dialog', { name: 'Annuler RES-000105 ?' });
+    const dialog = await screen.findByRole('dialog', { name: 'Annuler RES-000105\u00A0?' });
     expect(within(dialog).getByText(/Vous avez déjà payé/)).toBeInTheDocument();
     fireEvent.click(within(dialog).getByRole('button', { name: 'Erreur de taille' }));
     fireEvent.click(within(dialog).getByRole('button', { name: 'Oui, annuler' }));
@@ -491,7 +494,7 @@ describe('Module M5 — 6. Détail d’une réservation', () => {
     );
     renderRoute('/reservations/RES-000101');
     fireEvent.click(await screen.findByRole('button', { name: 'Annuler la réservation' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Annuler RES-000101 ?' });
+    const dialog = await screen.findByRole('dialog', { name: 'Annuler RES-000101\u00A0?' });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Oui, annuler' }));
 
     expect(await within(dialog).findByText(CANCEL_NOT_ALLOWED_MESSAGE)).toBeInTheDocument();
@@ -574,8 +577,8 @@ describe('Module M5 — 7. Photo du colis prêt', () => {
     emulateReducedMotion(); // le dévoilement se termine immédiatement (affichage direct)
     renderRoute('/reservations/RES-000102');
 
-    expect(await screen.findByRole('heading', { name: /Votre colis est prêt.*photos du colis/, level: 2 })).toBeInTheDocument();
-    expect(screen.getByText('Vérifiez votre colis à la réception : il doit correspondre à cette photo.')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Photos de votre colis', level: 2 })).toBeInTheDocument();
+    expect(screen.getByText('Vérifiez votre colis au retrait : il doit correspondre à cette photo.')).toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'Photo de votre colis emballé, 1 sur 2' })).toBeInTheDocument();
     await waitFor(() => expect(useSeenStore.getState().byRef['RES-000102']?.photosRevealed).toBe(true));
     expect(document.querySelector('[data-reveal-badge]')).not.toBeNull();
@@ -585,10 +588,10 @@ describe('Module M5 — 7. Photo du colis prêt', () => {
     useSeenStore.getState().markPhotosRevealed('RES-000102', 'ready_for_pickup', new Date().toISOString());
     renderRoute('/reservations/RES-000102');
 
-    await screen.findByRole('heading', { name: /Votre colis est prêt.*photos du colis/, level: 2 });
+    await screen.findByRole('heading', { name: 'Photos de votre colis', level: 2 });
     expect(document.querySelector('[data-reveal-badge]')).toBeNull();
 
-    fireEvent.click(screen.getByRole('button', { name: /Agrandir : photo de votre colis emballé, 1 sur 2/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Agrandir la photo de votre colis emballé, 1 sur 2/ }));
     const viewer = await screen.findByRole('dialog', { name: 'Photos de votre colis' });
     expect(within(viewer).getByRole('button', { name: /Enregistrer la photo/ })).toBeInTheDocument();
   });
@@ -644,7 +647,7 @@ describe('Module M5 — 8. Profil, adresses et informations', () => {
       const maison = await cardFor('Maison');
       fireEvent.click(within(maison).getByRole('button', { name: /Actions pour l’adresse Maison/ }));
       fireEvent.click(await screen.findByRole('button', { name: 'Supprimer' }));
-      const confirm = await screen.findByRole('dialog', { name: /Supprimer « Maison »/ });
+      const confirm = await screen.findByRole('dialog', { name: /Supprimer\s«\sMaison\s»/ });
       fireEvent.click(within(confirm).getByRole('button', { name: 'Supprimer' }));
     };
 
@@ -690,7 +693,7 @@ describe('Module M5 — 8. Profil, adresses et informations', () => {
     });
     renderRoute('/profil');
     fireEvent.click(await screen.findByRole('button', { name: /Se déconnecter/ }));
-    const dialog = await screen.findByRole('dialog', { name: 'Se déconnecter ?' });
+    const dialog = await screen.findByRole('dialog', { name: 'Se déconnecter\u00A0?' });
     expect(within(dialog).getByText('Votre panier sera conservé sur ce téléphone.')).toBeInTheDocument();
     fireEvent.click(within(dialog).getByRole('button', { name: 'Me déconnecter' }));
 
@@ -706,6 +709,41 @@ describe('Module M5 — 8. Profil, adresses et informations', () => {
     expect(within(sheet).getByText(/paiement est validé, quand votre colis est prêt/)).toBeInTheDocument();
     // jsdom ne fournit pas l'API Notification
     expect(within(sheet).getByRole('status')).toHaveTextContent('Non disponibles');
+  });
+
+  it('aide et pages légales du profil : centre d’aide, pages d’aide et mentions légales', async () => {
+    renderRoute('/profil');
+    const aide = await screen.findByRole('region', { name: 'Aide' });
+    const legal = screen.getByRole('region', { name: 'Légal' });
+    const expected: Array<[HTMLElement, string, string]> = [
+      [aide, 'Centre d’aide', '/aide'],
+      [aide, 'Comment réserver', '/aide/comment-reserver'],
+      [aide, 'Livraison et retrait', '/aide/livraison-retrait'],
+      [legal, 'Conditions générales', '/pages/conditions-generales'],
+      [legal, 'Politique d’annulation et de retour', '/pages/annulation-retours'],
+      [legal, 'Confidentialité', '/pages/confidentialite'],
+      [legal, 'Mentions légales', '/pages/mentions-legales'],
+    ];
+    for (const [group, name, href] of expected) {
+      expect(within(group).getByRole('link', { name })).toHaveAttribute('href', href);
+    }
+    expect(within(aide).getByRole('link', { name: /WhatsApp/ })).toHaveAttribute(
+      'href',
+      expect.stringMatching(/^https:\/\/wa\.me\//),
+    );
+  });
+
+  it('numéro WhatsApp de la boutique : réglages, sinon configuration, jamais de faux numéro', () => {
+    expect(resolveShopWhatsapp('+237 690 00 00 00', '')).toBe('+237 690 00 00 00');
+    expect(resolveShopWhatsapp('', '+237699112233')).toBe('+237699112233');
+    expect(resolveShopWhatsapp(undefined, '')).toBeNull();
+    expect(resolveShopWhatsapp('  ', '12')).toBeNull();
+  });
+
+  it('dates et heures du suivi : espaces insécables et « 1ᵉʳ »', () => {
+    const date = new Date(2026, 10, 1, 9, 5);
+    expect(formatDayMonth(date)).toBe('1ᵉʳ\u00A0nov.');
+    expect(formatHour(date)).toBe('9\u00A0h\u00A005');
   });
 });
 
@@ -790,7 +828,7 @@ describe('Module M5 — 11. Correctifs issus de la revue de code', () => {
     const bureau = (await screen.findByRole('heading', { name: 'Bureau', level: 2 })).closest('article') as HTMLElement;
     fireEvent.click(within(bureau).getByRole('button', { name: /Actions pour l’adresse Bureau/ }));
     fireEvent.click(await screen.findByRole('button', { name: 'Supprimer' }));
-    fireEvent.click(within(await screen.findByRole('dialog', { name: /Supprimer « Bureau »/ })).getByRole('button', { name: 'Supprimer' }));
+    fireEvent.click(within(await screen.findByRole('dialog', { name: /Supprimer\s«\sBureau\s»/ })).getByRole('button', { name: 'Supprimer' }));
     expect(await screen.findByRole('button', { name: 'Annuler' })).toBeInTheDocument();
 
     fireEvent.click(screen.getAllByRole('link', { name: /Profil/ })[0]!);
@@ -838,7 +876,7 @@ describe('Module M5 — 11. Correctifs issus de la revue de code', () => {
   it('annuler soi-même n’affiche qu’un message, sans « Nouvelle étape »', async () => {
     renderRoute('/reservations/RES-000101');
     fireEvent.click(await screen.findByRole('button', { name: 'Annuler la réservation' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Annuler RES-000101 ?' });
+    const dialog = await screen.findByRole('dialog', { name: 'Annuler RES-000101\u00A0?' });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Oui, annuler' }));
 
     expect(await screen.findByRole('heading', { name: /Réservation annulée/ })).toBeInTheDocument();

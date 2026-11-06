@@ -33,6 +33,7 @@ import {
   useSignedUrlRefresh,
 } from '@/features/tracking/packagePhotos';
 import { useSeenStore } from '@/features/tracking/seenStore';
+import { resolveShopWhatsapp } from '@/features/tracking/shopWhatsapp';
 import {
   buildTimelineSteps,
   isLocalDelivery,
@@ -48,8 +49,6 @@ import { useAuthStore } from '@/stores/authStore';
 import { useToastStore } from '@/stores/toastStore';
 import { useUiStore } from '@/stores/uiStore';
 import { hasPackagePhotos, type PublicSettings, type Reservation } from '@/types/domain';
-
-const FALLBACK_WHATSAPP = '+237690000000';
 
 export function ReservationDetailPage() {
   const { ref = '' } = useParams<{ ref: string }>();
@@ -110,7 +109,10 @@ function DetailLoading({ reservationRef }: { reservationRef: string }) {
   return (
     <PageFrame>
       <BackLink />
-      <div className="mt-3 flex flex-wrap items-start justify-between gap-3" aria-busy="true">
+      <div
+        className="mt-3 flex flex-col items-start gap-2 sm:flex-row sm:justify-between sm:gap-3"
+        aria-busy="true"
+      >
         <div>
           <h1 className="font-mono text-h2 text-ink">{reservationRef}</h1>
           {partial ? (
@@ -137,7 +139,7 @@ function DetailLoading({ reservationRef }: { reservationRef: string }) {
           {partial && (
             <div className="rounded-[var(--radius-md)] border border-silver/70 p-5">
               <p className="text-label text-text-2">Total</p>
-              <Price amount={partial.amount.total} className="mt-1 block text-[18px] text-ink" />
+              <Price amount={partial.amount.total} className="mt-1 block text-h3 text-ink" />
             </div>
           )}
           <Skeleton className="h-40 w-full" />
@@ -189,16 +191,16 @@ function DetailContent({ reservationRef }: { reservationRef: string }) {
             <AlertCircle className="h-7 w-7 text-red" aria-hidden="true" />
           )}
           <h1 className="mt-3 text-h2 text-ink">
-            {notFound ? 'Réservation introuvable' : 'Chargement impossible'}
+            {notFound ? 'Réservation introuvable' : 'Impossible d’afficher cette réservation'}
           </h1>
           <p className="mt-2 max-w-sm text-small text-text-2">
             {notFound
               ? `Aucune réservation ${reservationRef} n’est associée à votre compte.`
-              : 'Vérifiez votre connexion puis réessayez.'}
+              : 'Un problème est survenu de notre côté. Réessayez dans quelques instants.'}
           </p>
           {notFound ? (
             <Button variant="dark" size="md" href="/reservations" className="mt-5">
-              Mes réservations
+              Voir mes réservations
             </Button>
           ) : (
             <Button variant="dark" size="md" className="mt-5" onClick={() => void query.refetch()}>
@@ -268,7 +270,7 @@ function DetailView({
   // Changement fait par le client lui-même (annulation) : pas de « Nouvelle étape », il a déjà son message
   const [selfChangeStatus, setSelfChangeStatus] = useState<Reservation['status'] | null>(null);
   const changedSinceLastVisit = Boolean(seenAtOpen && seenAtOpen.status !== reservation.status);
-  const newStepMessage = `Nouvelle étape : ${stepLabel(trackedStatus)}`;
+  const newStepMessage = `Nouvelle étape\u00A0: ${stepLabel(trackedStatus)}`;
   // Annonce vocale déduite de l'état (§9.2 M5) : changement depuis la dernière visite ou en direct
   const announcement =
     liveChanged || changedSinceLastVisit
@@ -337,7 +339,7 @@ function DetailView({
     return () => window.cancelAnimationFrame(id);
   }, [location.hash, showPackage]);
   const [cancelOpen, setCancelOpen] = useState(false);
-  const whatsappNumber = settings?.whatsappNumber ?? FALLBACK_WHATSAPP;
+  const whatsappNumber = resolveShopWhatsapp(settings?.whatsappNumber);
 
   const copyRef = async () => {
     try {
@@ -345,20 +347,20 @@ function DetailView({
       haptic('light');
       showToast({ message: `Référence ${ref} copiée` });
     } catch {
-      showToast({ message: `Référence : ${ref}` });
+      showToast({ message: `Référence\u00A0: ${ref}` });
     }
   };
 
   const openProof = () => {
     if (!reservation.proof) return;
     setViewer({
-      label: 'Capture de paiement envoyée',
+      label: 'Preuve de paiement envoyée',
       index: 0,
       images: [
         {
           url: reservation.proof.thumbnailUrl,
           fallbackUrl: reservation.proof.thumbnailUrl,
-          alt: 'Capture de paiement envoyée à la boutique',
+          alt: 'Preuve de paiement envoyée à la boutique',
           ratio: '3/4',
           fit: 'contain',
         },
@@ -370,15 +372,16 @@ function DetailView({
     <PageFrame>
       <BackLink />
 
-      <header className="mt-3 flex flex-wrap items-start justify-between gap-3">
+      {/* Pastille de statut toujours au même endroit : sous la date sur mobile, à droite dès 640 px */}
+      <header className="mt-3 flex flex-col items-start gap-2 sm:flex-row sm:justify-between sm:gap-3">
         <div className="min-w-0">
           <h1>
             <button
               type="button"
               onClick={() => void copyRef()}
-              aria-label={`Référence ${ref}, appuyer pour copier`}
+              aria-label={`Référence ${ref}, appuyez pour copier`}
               style={activeTransitionRef === ref ? { viewTransitionName: `res-${ref}` } : undefined}
-              className="inline-flex min-h-[44px] items-center gap-2 font-mono text-h2 text-ink"
+              className="inline-flex min-h-11 items-center gap-2 font-mono text-h2 text-ink"
             >
               {ref}
               <Copy className="h-4 w-4 text-text-2" aria-hidden="true" />
@@ -402,9 +405,9 @@ function DetailView({
         >
           <WifiOff className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
           <span>
-            Hors connexion : dernier état connu de votre réservation.
+            Hors connexion&nbsp;: dernier état connu de votre réservation.
             {lastUpdateLabel && (
-              <span className="mt-0.5 block text-xs text-text-2">{lastUpdateLabel}.</span>
+              <span className="mt-0.5 block text-caption text-text-2">{lastUpdateLabel}.</span>
             )}
           </span>
         </div>
@@ -418,6 +421,8 @@ function DetailView({
             <PackagePhotos
               photos={photos}
               packageReadyAt={reservation.packageReadyAt}
+              status={reservation.status}
+              receptionMode={reservation.receptionMode}
               alreadyRevealed={photosRevealed}
               onRevealed={() => markPhotosRevealed(ref, reservation.status, reservation.updatedAt)}
               onOpenViewer={openPackagePhoto}
@@ -440,7 +445,7 @@ function DetailView({
           </section>
         </div>
 
-        <div className="min-w-0 space-y-4 lg:sticky lg:top-[136px]">
+        <div className="min-w-0 space-y-4 lg:sticky lg:top-[calc(var(--desktop-shell-top)+4rem)]">
           <ItemsSection reservation={reservation} />
           <ReceptionSection reservation={reservation} settings={settings} />
           <PaymentSection reservation={reservation} onOpenProof={openProof} />

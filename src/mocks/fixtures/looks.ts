@@ -1,6 +1,6 @@
 import type { LookbookItem } from '@/types/domain';
 
-export const mockLooks: LookbookItem[] = [
+const INITIAL_LOOKS: LookbookItem[] = [
   {
     id: 'look-1',
     title: 'Total black barbelé',
@@ -34,3 +34,16 @@ export const mockLooks: LookbookItem[] = [
     productSlugs: ['hoodie-zip-armure', 'babouche-croco-nocturne'],
   },
 ];
+
+export function cloneLooks(source: LookbookItem[] = INITIAL_LOOKS): LookbookItem[] {
+  return source.map((look) => ({
+    ...look,
+    productSlugs: [...look.productSlugs],
+  }));
+}
+
+export const mockLooks: LookbookItem[] = cloneLooks();
+
+export function resetMockLooks(): void {
+  mockLooks.splice(0, mockLooks.length, ...cloneLooks());
+}

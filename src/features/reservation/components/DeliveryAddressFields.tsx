@@ -2,7 +2,7 @@ import { AlertCircle, Check, Loader2 } from 'lucide-react';
 import { useFormContext, useWatch } from 'react-hook-form';
 import { useAgencies } from '@/features/reservation/api/useReservationQueries';
 import { CityPickerField } from '@/features/reservation/components/CityPickerField';
-import { isCityLocal } from '@/features/reservation/schema/reservationSchema';
+import { isCityLocal } from '@/features/reservation/schema/reservationRules';
 import { cn } from '@/lib/utils/cn';
 import { haptic } from '@/lib/utils/haptics';
 import { formatCmPhoneInput } from '@/lib/utils/phone';
@@ -77,7 +77,7 @@ export function DeliveryAddressFields({
         {errors.city && (
           <p
             role="alert"
-            className="mt-1.5 flex items-center gap-1.5 text-xs font-semibold text-danger"
+            className="mt-1.5 flex items-center gap-1.5 text-caption font-semibold text-danger"
           >
             <AlertCircle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
             <span>{errors.city.message}</span>
@@ -97,12 +97,12 @@ export function DeliveryAddressFields({
               type="text"
               enterKeyHint="next"
               disabled={disabled}
-              placeholder="Ex. : Bonamoussadi, Akwa, Makepe…"
+              placeholder="Ex.&nbsp;: Bonamoussadi, Akwa, Makepe…"
               aria-invalid={Boolean(errors.district)}
               aria-describedby={errors.district ? `${idPrefix}-err-district` : undefined}
               {...register('district')}
               className={cn(
-                'mt-1.5 h-12 w-full rounded-[var(--radius-md)] border bg-white px-3.5 text-[16px] text-ink placeholder:text-text-2 focus:border-ink focus:outline-none',
+                'mt-1.5 h-12 w-full rounded-[var(--radius-md)] border bg-white px-3.5 text-body text-ink placeholder:text-text-2 focus:border-ink focus:outline-none',
                 errors.district ? 'border-danger' : 'border-silver',
               )}
             />
@@ -110,7 +110,7 @@ export function DeliveryAddressFields({
               <p
                 id={`${idPrefix}-err-district`}
                 role="alert"
-                className="mt-1.5 flex items-center gap-1.5 text-xs font-semibold text-danger"
+                className="mt-1.5 flex items-center gap-1.5 text-caption font-semibold text-danger"
               >
                 <AlertCircle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                 <span>{errors.district.message}</span>
@@ -127,23 +127,23 @@ export function DeliveryAddressFields({
               type="text"
               enterKeyHint="next"
               disabled={disabled}
-              placeholder="Ex. : Après la pharmacie du carrefour, portail noir"
+              placeholder="Ex.&nbsp;: Après la pharmacie du carrefour, portail noir"
               aria-invalid={Boolean(errors.landmark)}
               aria-describedby={`${idPrefix}-help-landmark ${idPrefix}-err-landmark`}
               {...register('landmark')}
               className={cn(
-                'mt-1.5 h-12 w-full rounded-[var(--radius-md)] border bg-white px-3.5 text-[16px] text-ink placeholder:text-text-2 focus:border-ink focus:outline-none',
+                'mt-1.5 h-12 w-full rounded-[var(--radius-md)] border bg-white px-3.5 text-body text-ink placeholder:text-text-2 focus:border-ink focus:outline-none',
                 errors.landmark ? 'border-danger' : 'border-silver',
               )}
             />
-            <p id={`${idPrefix}-help-landmark`} className="mt-1.5 text-xs text-text-2">
+            <p id={`${idPrefix}-help-landmark`} className="mt-1.5 text-caption text-text-2">
               Au Cameroun, les livreurs se repèrent surtout grâce aux repères connus. Soyez précis.
             </p>
             {errors.landmark && (
               <p
                 id={`${idPrefix}-err-landmark`}
                 role="alert"
-                className="mt-1.5 flex items-center gap-1.5 text-xs font-semibold text-danger"
+                className="mt-1.5 flex items-center gap-1.5 text-caption font-semibold text-danger"
               >
                 <AlertCircle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                 <span>{errors.landmark.message}</span>
@@ -159,7 +159,7 @@ export function DeliveryAddressFields({
               AGENCE DE TRANSPORT À {currentCity.toUpperCase()} *
             </span>
             {isLoadingAgencies ? (
-              <div className="mt-2 flex items-center gap-2 text-xs text-text-2">
+              <div className="mt-2 flex items-center gap-2 text-caption text-text-2">
                 <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
                 <span>Chargement des agences de {currentCity}…</span>
               </div>
@@ -185,7 +185,7 @@ export function DeliveryAddressFields({
                         });
                       }}
                       className={cn(
-                        'flex w-full items-start justify-between gap-3 rounded-[var(--radius-md)] border p-3.5 text-left transition-colors',
+                        'flex w-full items-start justify-between gap-3 rounded-[var(--radius-md)] border p-3.5 text-left transition-colors duration-fast',
                         isSelected
                           ? 'border-2 border-ink bg-surface'
                           : 'border-silver bg-white hover:border-ink',
@@ -193,8 +193,8 @@ export function DeliveryAddressFields({
                     >
                       <div>
                         <span className="block text-small font-bold text-ink">{agency.name}</span>
-                        <span className="mt-0.5 block text-xs text-text-2">{agency.address}</span>
-                        <span className="mt-1 block text-[11px] font-semibold text-text-2">
+                        <span className="mt-0.5 block text-caption text-text-2">{agency.address}</span>
+                        <span className="mt-1 block text-caption font-semibold text-text-2">
                           {agency.openingHours}
                         </span>
                       </div>
@@ -214,7 +214,7 @@ export function DeliveryAddressFields({
             {errors.agencyId && (
               <p
                 role="alert"
-                className="mt-1.5 flex items-center gap-1.5 text-xs font-semibold text-danger"
+                className="mt-1.5 flex items-center gap-1.5 text-caption font-semibold text-danger"
               >
                 <AlertCircle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                 <span>{errors.agencyId.message}</span>
@@ -237,7 +237,7 @@ export function DeliveryAddressFields({
                 aria-checked={recipientType === 'self'}
                 onClick={() => setValue('recipientType', 'self', { shouldValidate: true })}
                 className={cn(
-                  'min-h-[44px] rounded-[var(--radius-md)] border px-3 py-2 text-small font-bold transition-colors',
+                  'min-h-11 rounded-[var(--radius-md)] border px-3 py-2 text-small font-bold transition-colors duration-fast',
                   recipientType === 'self'
                     ? 'border-ink bg-ink text-white'
                     : 'border-silver bg-white text-ink hover:bg-surface',
@@ -251,7 +251,7 @@ export function DeliveryAddressFields({
                 aria-checked={recipientType === 'other'}
                 onClick={() => setValue('recipientType', 'other', { shouldValidate: true })}
                 className={cn(
-                  'min-h-[44px] rounded-[var(--radius-md)] border px-3 py-2 text-small font-bold transition-colors',
+                  'min-h-11 rounded-[var(--radius-md)] border px-3 py-2 text-small font-bold transition-colors duration-fast',
                   recipientType === 'other'
                     ? 'border-ink bg-ink text-white'
                     : 'border-silver bg-white text-ink hover:bg-surface',
@@ -271,16 +271,16 @@ export function DeliveryAddressFields({
                     id={`${idPrefix}-recipientName`}
                     type="text"
                     enterKeyHint="next"
-                    placeholder="Ex. : Paul Biyong"
+                    placeholder="Ex.&nbsp;: Paul Biyong"
                     aria-invalid={Boolean(errors.recipientName)}
                     {...register('recipientName')}
                     className={cn(
-                      'mt-1.5 h-11 w-full rounded-[var(--radius-md)] border bg-white px-3 text-[16px] text-ink focus:border-ink focus:outline-none',
+                      'mt-1.5 h-11 w-full rounded-[var(--radius-md)] border bg-white px-3 text-body text-ink focus:border-ink focus:outline-none',
                       errors.recipientName ? 'border-danger' : 'border-silver',
                     )}
                   />
                   {errors.recipientName && (
-                    <p role="alert" className="mt-1 text-xs font-semibold text-danger">
+                    <p role="alert" className="mt-1 text-caption font-semibold text-danger">
                       {errors.recipientName.message}
                     </p>
                   )}
@@ -303,12 +303,12 @@ export function DeliveryAddressFields({
                       },
                     })}
                     className={cn(
-                      'mt-1.5 h-11 w-full rounded-[var(--radius-md)] border bg-white px-3 font-mono text-[16px] text-ink focus:border-ink focus:outline-none',
+                      'mt-1.5 h-11 w-full rounded-[var(--radius-md)] border bg-white px-3 font-mono text-body text-ink focus:border-ink focus:outline-none',
                       errors.recipientPhone ? 'border-danger' : 'border-silver',
                     )}
                   />
                   {errors.recipientPhone && (
-                    <p role="alert" className="mt-1 text-xs font-semibold text-danger">
+                    <p role="alert" className="mt-1 text-caption font-semibold text-danger">
                       {errors.recipientPhone.message}
                     </p>
                   )}

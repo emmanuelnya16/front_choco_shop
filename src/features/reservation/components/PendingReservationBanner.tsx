@@ -22,9 +22,9 @@ function formatRemainingShort(ms: number): string {
   const hours = Math.floor(totalMins / 60);
   const mins = totalMins % 60;
   if (hours > 0) {
-    return `${hours} h ${String(mins).padStart(2, '0')}`;
+    return `${hours}\u00A0h\u00A0${String(mins).padStart(2, '0')}`;
   }
-  return `${mins} min`;
+  return `${mins}\u00A0min`;
 }
 
 /**
@@ -150,17 +150,19 @@ export function PendingReservationBanner() {
         exit={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 24 }}
         transition={spring.sheet}
         className={cn(
-          'z-30 text-white shadow-[var(--shadow-pop)]',
+          // Calque du bandeau : même niveau que l'en-tête (z-header), sous la barre basse et les feuilles
+          'z-header text-white shadow-[var(--shadow-pop)]',
           isRejected ? 'bg-danger' : 'bg-ink',
           // Mobile : collé au-dessus de la barre basse ou de la barre d'action de la page (panier rempli) ;
           // Ordinateur : sous la 1re rangée de l'en-tête (72 px une fois la 2e rangée repliée)
-          'fixed right-0 bottom-[var(--bottom-bar-h)] left-0 lg:sticky lg:top-[72px] lg:bottom-auto',
+          'fixed right-0 bottom-[var(--bottom-bar-h)] left-0 lg:sticky lg:top-18 lg:bottom-auto',
           hiddenOnMobile && 'max-lg:hidden',
         )}
       >
-        {/* 52 px de haut (--pending-banner-h) : bouton de 44 px + 2 × 4 px */}
-        <Container className="flex h-[52px] items-center justify-between gap-3 py-1">
-          <div className="flex min-w-0 items-center gap-2 text-xs sm:text-small">
+        {/* 52 px de haut (--pending-banner-h) : bouton de 44 px sur téléphone ; 40 px sur ordinateur,
+            pour que le bouton respire dans le bandeau */}
+        <Container className="flex h-13 items-center justify-between gap-3 py-1">
+          <div className="flex min-w-0 items-center gap-2 text-caption sm:text-small">
             {isRejected ? (
               <AlertCircle
                 className="h-4 w-4 shrink-0 text-white"
@@ -204,8 +206,8 @@ export function PendingReservationBanner() {
             <Button
               variant={isRejected ? 'dark' : 'primary'}
               size="sm"
-              // Cible tactile de 44 px
-              className="min-h-11"
+              // Cible tactile de 44 px sur téléphone, 40 px au pointeur (ordinateur)
+              className="min-h-11 lg:min-h-10"
               href={
                 isRejected
                   ? `/reservation/${activeReservation.ref}/preuve`
@@ -219,7 +221,7 @@ export function PendingReservationBanner() {
                 type="button"
                 onClick={() => dismissBanner(activeReservation.ref)}
                 aria-label="Masquer ce rappel pour la session"
-                className="inline-flex h-11 w-11 items-center justify-center rounded-[var(--radius-full)] text-silver transition-colors hover:bg-ink-2 hover:text-white"
+                className="inline-flex size-11 items-center justify-center rounded-[var(--radius-full)] text-silver transition-colors duration-fast hover:bg-ink-2 hover:text-white lg:size-10"
               >
                 <X className="h-4 w-4" aria-hidden="true" />
               </button>

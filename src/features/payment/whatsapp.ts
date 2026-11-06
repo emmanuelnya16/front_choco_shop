@@ -1,3 +1,4 @@
+import { env } from '@/lib/env';
 import { formatCmPhone } from '@/lib/utils/phone';
 import { formatPrice } from '@/lib/utils/price';
 import type { Reservation } from '@/types/domain';
@@ -11,29 +12,47 @@ export interface WhatsAppPaymentMessageOptions {
 const MAX_WHATSAPP_ITEMS = 4;
 const MAX_WHATSAPP_LENGTH = 1000;
 
+/** Chiffres d'un numéro WhatsApp utilisable (indicatif compris), ou null si le numéro est inconnu ou incomplet. */
+function toWhatsAppDigits(rawNumber?: string | null): string | null {
+  const digits = (rawNumber ?? '').replace(/\D/g, '');
+  return digits.length >= 8 ? digits : null;
+}
+
+/**
+ * Numéro WhatsApp de la boutique (M7) : réglages reçus de l'API, puis réglages mémorisés, puis
+ * VITE_SHOP_WHATSAPP. Aucun numéro fictif : `undefined` si aucun n'est connu (les boutons WhatsApp
+ * sont alors masqués).
+ */
+export function resolveShopWhatsapp(...candidates: Array<string | null | undefined>): string | undefined {
+  for (const candidate of [...candidates, env.shopWhatsapp]) {
+    if (candidate && toWhatsAppDigits(candidate)) return candidate.trim();
+  }
+  return undefined;
+}
+
+/** Lien wa.me : numéro fourni, sinon celui de la configuration ; sans numéro connu, WhatsApp propose de choisir le destinataire. */
+function waLink(whatsappNumber: string | null | undefined, text: string): string {
+  const digits = toWhatsAppDigits(whatsappNumber) ?? toWhatsAppDigits(env.shopWhatsapp);
+  return `https://wa.me/${digits ?? ''}?text=${encodeURIComponent(text)}`;
+}
+
 function formatReceptionLine(reservation: Reservation): string {
   if (reservation.receptionMode === 'pickup') {
-    return 'Retrait en boutique — Douala Akwa';
+    return 'Retrait en boutique';
   }
-  const city =
-    reservation.city ?? reservation.deliveryAddress?.city ?? 'Douala';
+  const city = reservation.city ?? reservation.deliveryAddress?.city;
   const agencyName =
     reservation.agency?.name ?? reservation.deliveryAddress?.agencyName;
-  if (agencyName) {
-    return `Livraison — ${city}, agence ${agencyName}`;
-  }
   const district =
     reservation.address?.district ??
     reservation.deliveryAddress?.district ??
     reservation.deliveryAddress?.quarter;
-  if (district) {
-    return `Livraison — ${city}, ${district}`;
-  }
-  return `Livraison — ${city}`;
+  const place = [city, agencyName ? `agence ${agencyName}` : district].filter(Boolean).join(', ');
+  return place ? `Livraison — ${place}` : 'Livraison';
 }
 
-function formatCustomerPhoneWithPrefix(rawPhone?: string): string {
-  if (!rawPhone) return '+237 690 00 00 01';
+function formatCustomerPhoneWithPrefix(rawPhone?: string): string | null {
+  if (!rawPhone) return null;
   const formatted = formatCmPhone(rawPhone);
   return formatted.startsWith('+237') ? formatted : `+237 ${formatted}`;
 }
@@ -92,16 +111,16 @@ export function buildWhatsAppPaymentMessage({
 
   const lines = [
     'Bonjour DR Choco 👋',
-    "Je viens d'envoyer ma preuve de paiement.",
+    "Je viens d’envoyer ma preuve de paiement.",
     '',
-    `Réservation : ${reservation.ref}`,
-    'Articles :',
+    `Réservation\u00A0: ${reservation.ref}`,
+    'Articles\u00A0:',
     ...itemLines,
-    `Total payé : ${formatPrice(totalAmount)} (${resolvedOperator})`,
-    `Réception : ${formatReceptionLine(reservation)}`,
-    `Mon numéro : ${phoneDisplay}`,
+    `Total payé\u00A0: ${formatPrice(totalAmount)} (${resolvedOperator})`,
+    `Réception\u00A0: ${formatReceptionLine(reservation)}`,
+    ...(phoneDisplay ? [`Mon numéro\u00A0: ${phoneDisplay}`] : []),
     '',
-    `Fiche : ${resolvedOrigin}/admin/reservations/${reservation.ref}`,
+    `Fiche\u00A0: ${resolvedOrigin}/admin/reservations/${reservation.ref}`,
   ];
 
   const message = lines.join('\n');
@@ -115,38 +134,34 @@ export function buildWhatsAppPaymentMessage({
  * Construit l'URL `https://wa.me/<numéro>?text=<message encodé>` (§6.3).
  */
 export function buildWhatsAppPaymentUrl(
-  whatsappNumber: string,
+  whatsappNumber: string | null | undefined,
   options: WhatsAppPaymentMessageOptions,
 ): string {
-  const digits = whatsappNumber.replace(/\D/g, '') || '237690000000';
-  const text = buildWhatsAppPaymentMessage(options);
-  return `https://wa.me/${digits}?text=${encodeURIComponent(text)}`;
+  return waLink(whatsappNumber, buildWhatsAppPaymentMessage(options));
 }
 
 /**
  * Construit l'URL WhatsApp pour le cas où la réservation a expiré (410) alors que le client a déjà payé (§7.3).
  */
 export function buildWhatsAppExpiredPaidUrl(
-  whatsappNumber: string,
+  whatsappNumber: string | null | undefined,
   ref: string,
   totalAmount: number,
 ): string {
-  const digits = whatsappNumber.replace(/\D/g, '') || '237690000000';
   const text = [
     'Bonjour DR Choco 👋',
-    `Ma réservation ${ref} a expiré mais j'ai déjà effectué le paiement de ${formatPrice(totalAmount)}.`,
-    'Voici ma capture de confirmation pour que vous puissiez vérifier mon règlement.',
+    `Ma réservation ${ref} a expiré mais j’ai déjà effectué le paiement de ${formatPrice(totalAmount)}.`,
+    'Voici la capture d’écran de mon paiement pour que vous puissiez le vérifier.',
   ].join('\n');
-  return `https://wa.me/${digits}?text=${encodeURIComponent(text)}`;
+  return waLink(whatsappNumber, text);
 }
 
 /**
  * Lien WhatsApp « question sur ma réservation » (aide du détail et du profil, §5.1 M5).
  */
-export function buildWhatsAppQuestionUrl(whatsappNumber: string, ref?: string): string {
-  const digits = whatsappNumber.replace(/\D/g, '') || '237690000000';
+export function buildWhatsAppQuestionUrl(whatsappNumber: string | null | undefined, ref?: string): string {
   const text = ref
     ? `Bonjour DR Choco, j’ai une question sur ma réservation ${ref}.`
     : 'Bonjour DR Choco, j’ai une question.';
-  return `https://wa.me/${digits}?text=${encodeURIComponent(text)}`;
+  return waLink(whatsappNumber, text);
 }

@@ -8,6 +8,11 @@ import { createRoot } from 'react-dom/client';
 // beforeinstallprompt, qui part tôt, est gardé (§5.1). Module minuscule : le service complet est
 // chargé après le premier affichage.
 import '@/pwa/installEarly';
+// Avant App (donc avant createBrowserRouter) : l'historique des feuilles et menus doit intercepter
+// la touche retour et mettre en attente les navigations lancées pendant la fermeture d'une feuille,
+// avant que React Router n'écoute popstate (M6 §8). Chargé seulement avec les feuilles, il arrivait
+// trop tard : « Réserver » puis connexion restait sur le panier (défaut D1, M7).
+import '@/lib/hooks/overlayHistory';
 import { App } from '@/app/App';
 import { ErrorBoundary } from '@/components/errors/ErrorBoundary';
 import { installGlobalErrorHandlers } from '@/components/errors/globalErrorHandlers';

@@ -29,7 +29,7 @@ export function ReservationProgressBar({
     >
       <div
         className={cn(
-          'h-full w-full origin-left rounded-[var(--radius-full)] transition-transform duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]',
+          'h-full w-full origin-left rounded-[var(--radius-full)] transition-transform duration-reveal ease-brand-out',
           FILL_CLASSES[progress.tone],
         )}
         style={{ transform: `scaleX(${ratio})` }}

@@ -1,9 +1,9 @@
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/Button';
 import { ProductCard, ProductCardSkeleton } from '@/components/ui/ProductCard';
 import { SectionHeader } from '@/components/ui/SectionHeader';
 import { useProducts } from '@/features/catalog/api/useCatalogQueries';
-import { gsap, useGSAP } from '@/lib/gsap';
+import { duration, gsapEase, staggerSlow } from '@/motion/tokens';
 import { useReducedMotionPref } from '@/motion/useReducedMotionPref';
 
 /**
@@ -15,6 +15,7 @@ import { useReducedMotionPref } from '@/motion/useReducedMotionPref';
  */
 export function EmptyCartState() {
   const scopeRef = useRef<HTMLDivElement>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
   const reducedMotion = useReducedMotionPref();
 
   const { data: popularData, isLoading } = useProducts({
@@ -24,22 +25,39 @@ export function EmptyCartState() {
     pageSize: 4,
   });
 
-  useGSAP(
-    () => {
-      if (reducedMotion) return;
-      gsap.fromTo(
-        '.empty-bag-stroke',
-        { drawSVG: '0%' },
-        {
-          drawSVG: '100%',
-          duration: 1,
-          stagger: 0.12,
-          ease: 'power2.out',
-        },
-      );
-    },
-    { scope: scopeRef, dependencies: [reducedMotion] },
-  );
+  // Tracé du sac (DrawSVG) : GSAP chargé à la demande, il ne pèse pas sur la page Panier (M7).
+  // Le dessin reste masqué jusqu'au départ du tracé ; sans GSAP (hors connexion), il s'affiche tel quel.
+  useEffect(() => {
+    const svg = svgRef.current;
+    if (!svg) return undefined;
+    if (reducedMotion) {
+      svg.style.opacity = '1';
+      return undefined;
+    }
+    let cancelled = false;
+    let revert: (() => void) | undefined;
+    import('@/lib/gsap')
+      .then(({ gsap }) => {
+        if (cancelled || !scopeRef.current) return;
+        const ctx = gsap.context(() => {
+          gsap.set(svg, { opacity: 1 });
+          gsap.fromTo(
+            '.empty-bag-stroke',
+            { drawSVG: '0%' },
+            { drawSVG: '100%', duration: duration.story, stagger: staggerSlow, ease: gsapEase.soft },
+          );
+        }, scopeRef);
+        revert = () => ctx.revert();
+      })
+      .catch(() => {
+        svg.style.opacity = '1';
+      });
+    return () => {
+      cancelled = true;
+      revert?.();
+      svg.style.opacity = '1';
+    };
+  }, [reducedMotion]);
 
   const popularProducts = popularData?.items?.slice(0, 4) ?? [];
 
@@ -47,9 +65,11 @@ export function EmptyCartState() {
     <div ref={scopeRef} className="space-y-14 py-6 lg:py-10">
       <div className="mx-auto flex max-w-md flex-col items-center rounded-[var(--radius-md)] border border-silver/70 bg-surface/50 px-6 py-12 text-center">
         <svg
+          ref={svgRef}
           viewBox="0 0 96 96"
           fill="none"
           className="h-24 w-24"
+          style={{ opacity: reducedMotion ? 1 : 0 }}
           aria-hidden="true"
         >
           {/* Ombre et plis intérieurs en silver */}

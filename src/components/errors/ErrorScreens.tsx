@@ -33,7 +33,7 @@ function ErrorIllustration() {
 
 // Même rendu que <Button variant="outline" size="lg"> : un vrai lien, utilisable sans routeur
 const HOME_LINK_CLASSES =
-  'inline-flex min-h-[52px] shrink-0 items-center justify-center gap-2.5 rounded-[var(--radius-md)] border-[1.5px] border-ink bg-transparent px-6 py-3 text-[15px] font-semibold whitespace-nowrap text-ink transition-colors select-none [@media(hover:hover)]:hover:bg-surface';
+  'inline-flex min-h-13 shrink-0 items-center justify-center gap-2.5 rounded-[var(--radius-md)] border-[1.5px] border-ink bg-transparent px-6 py-3 text-body font-semibold whitespace-nowrap text-ink transition-colors duration-fast select-none [@media(hover:hover)]:hover:bg-surface';
 
 export interface GeneralErrorScreenProps {
   /** Plein écran (coquille, routeur) ou dans la page, sous l'en-tête. */
@@ -48,7 +48,7 @@ export interface GeneralErrorScreenProps {
 
 /**
  * Écran d'erreur générale (M7 §5.1) : titre, phrase rassurante, « Recharger » et
- * « Revenir à l'accueil ». Aucun détail technique n'est montré au client.
+ * « Revenir à l’accueil ». Aucun détail technique n'est montré au client (jamais error.message).
  */
 export function GeneralErrorScreen({
   fullScreen = false,
@@ -115,12 +115,12 @@ export function GeneralErrorScreen({
           initial={reducedMotion ? false : { opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: duration.base, ease: ease.out }}
-          className="flex w-full max-w-[640px] flex-col items-center"
+          className="flex w-full max-w-160 flex-col items-center"
         >
           {content}
         </m.div>
       ) : (
-        <div className="flex w-full max-w-[640px] flex-col items-center">{content}</div>
+        <div className="flex w-full max-w-160 flex-col items-center">{content}</div>
       )}
     </Wrapper>
   );
@@ -140,7 +140,7 @@ export function SectionErrorNotice({ onRetry }: { onRetry: () => void }) {
         </p>
         <Button
           variant="ghost"
-          size="sm"
+          size="md"
           iconLeft={<RefreshCw className="h-4 w-4" aria-hidden="true" />}
           onClick={onRetry}
         >

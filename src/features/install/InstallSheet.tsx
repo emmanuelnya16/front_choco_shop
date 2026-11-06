@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Sheet } from '@/components/ui/Sheet';
 import { useReducedMotionPref } from '@/motion/useReducedMotionPref';
-import { duration, ease, spring } from '@/motion/tokens';
+import { delay, duration, ease, spring, staggerSlow, staggerStep } from '@/motion/tokens';
 import { AppIconTile } from './AppIconTile';
 
 const BENEFITS: { icon: LucideIcon; label: string }[] = [
@@ -22,7 +22,7 @@ const PREVIEWS = [
 
 const benefitsList: Variants = {
   hidden: {},
-  visible: { transition: { delayChildren: 0.18, staggerChildren: 0.08 } },
+  visible: { transition: { delayChildren: delay.short + staggerStep, staggerChildren: staggerSlow } },
 };
 
 const benefitItem: Variants = {
@@ -35,12 +35,12 @@ function ScreenshotPreview({ src, label }: { src: string; label: string }) {
   const [failed, setFailed] = useState(false);
 
   return (
-    <figure className="w-[108px] shrink-0 snap-start">
+    <figure className="w-27 shrink-0 snap-start">
       <div className="aspect-[9/16] overflow-hidden rounded-[var(--radius-md)] border border-silver/70 bg-surface">
         {failed ? (
           <div aria-hidden="true" className="flex h-full flex-col">
             <div className="flex h-7 items-center bg-ink px-2">
-              <span className="text-[9px] font-black tracking-wide text-white">DR CHOCO</span>
+              <span className="text-caption font-black tracking-wide text-white">DR CHOCO</span>
             </div>
             <div className="flex flex-1 flex-col gap-1.5 p-2">
               <div className="h-12 rounded-[var(--radius-sm)] bg-silver/60" />
@@ -56,7 +56,7 @@ function ScreenshotPreview({ src, label }: { src: string; label: string }) {
         ) : (
           <img
             src={src}
-            alt={`Aperçu : ${label}`}
+            alt={`Aperçu\u00A0: ${label}`}
             loading="lazy"
             decoding="async"
             onError={() => setFailed(true)}
@@ -64,7 +64,7 @@ function ScreenshotPreview({ src, label }: { src: string; label: string }) {
           />
         )}
       </div>
-      <figcaption className="mt-1.5 text-center text-xs text-text-2">{label}</figcaption>
+      <figcaption className="mt-1.5 text-center text-caption text-text-2">{label}</figcaption>
     </figure>
   );
 }
@@ -87,7 +87,7 @@ export function InstallSheet({ open, installing = false, onInstall, onLater }: I
           <m.div
             initial={reducedMotion ? false : { opacity: 0, scale: 0.6 }}
             animate={{ opacity: 1, scale: 1 }}
-            transition={{ ...spring.bounce, delay: 0.08 }}
+            transition={{ ...spring.bounce, delay: staggerStep }}
           >
             <AppIconTile />
           </m.div>
@@ -108,7 +108,7 @@ export function InstallSheet({ open, installing = false, onInstall, onLater }: I
           {BENEFITS.map(({ icon: Icon, label }) => (
             <m.li key={label} variants={benefitItem} className="flex items-center gap-3 text-small text-ink">
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-surface text-ink">
-                <Icon className="h-[18px] w-[18px]" aria-hidden="true" />
+                <Icon className="h-5 w-5" aria-hidden="true" />
               </span>
               <span>{label}</span>
             </m.li>
@@ -131,7 +131,7 @@ export function InstallSheet({ open, installing = false, onInstall, onLater }: I
         <button
           type="button"
           onClick={onLater}
-          className="mt-2 flex min-h-[44px] w-full items-center justify-center text-small font-semibold text-text-2 underline underline-offset-4 [@media(hover:hover)]:hover:text-ink"
+          className="mt-2 flex min-h-11 w-full items-center justify-center text-small font-semibold text-text-2 underline underline-offset-4 [@media(hover:hover)]:hover:text-ink"
         >
           Plus tard
         </button>

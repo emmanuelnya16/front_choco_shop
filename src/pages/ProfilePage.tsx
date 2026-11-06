@@ -7,6 +7,8 @@ import {
   ExternalLink,
   FileText,
   Heart,
+  Landmark,
+  LifeBuoy,
   LogOut,
   MapPin,
   MessageCircle,
@@ -23,7 +25,6 @@ import { Button } from '@/components/ui/Button';
 import { Logo } from '@/components/ui/Logo';
 import { Sheet } from '@/components/ui/Sheet';
 import { useLogout } from '@/features/auth/api/useAuthQueries';
-import { usePublicSettings } from '@/features/catalog/api/useCatalogQueries';
 import { InstallSheets } from '@/features/install/InstallSheets';
 import { useInstallController } from '@/features/install/useInstallController';
 import { buildWhatsAppQuestionUrl } from '@/features/payment/whatsapp';
@@ -35,6 +36,7 @@ import {
   type NotificationsDisplayState,
 } from '@/features/profile/notifications';
 import { useAddresses } from '@/features/reservation/api/useReservationQueries';
+import { useShopWhatsapp } from '@/features/tracking/shopWhatsapp';
 import { useReservationsAttention } from '@/features/tracking/useReservationsAttention';
 import { env } from '@/lib/env';
 import { cn } from '@/lib/utils/cn';
@@ -46,8 +48,6 @@ import { selectFavoritesCount, useFavoritesStore } from '@/stores/favoritesStore
 import { useToastStore } from '@/stores/toastStore';
 import { useUiStore } from '@/stores/uiStore';
 import type { User } from '@/types/domain';
-
-const FALLBACK_WHATSAPP = '+237690000000';
 
 export function ProfilePage() {
   useDocumentTitle('Mon profil');
@@ -85,7 +85,7 @@ function SettingsRow({ icon: Icon, label, value, to, href, onClick, iconClassNam
     </>
   );
   const className =
-    'flex min-h-[56px] w-full items-center gap-3.5 px-4 text-left transition-colors [@media(hover:hover)]:hover:bg-surface';
+    'flex min-h-14 w-full items-center gap-3.5 px-4 text-left transition-colors [@media(hover:hover)]:hover:bg-surface';
 
   if (to) {
     return (
@@ -121,18 +121,30 @@ function SettingsGroup({ id, title, children }: { id?: string; title: string; ch
   );
 }
 
-function HelpAndLegalRows({ whatsappNumber }: { whatsappNumber: string }) {
+/** Aide et pages légales (M7) : mêmes adresses que le pied de page ; WhatsApp masqué si le numéro est inconnu. */
+function HelpAndLegalRows() {
+  const whatsappNumber = useShopWhatsapp();
+
   return (
     <>
       <SettingsGroup id="aide" title="Aide">
         <li>
-          <SettingsRow icon={MessageCircle} label="Contacter la boutique sur WhatsApp" href={buildWhatsAppQuestionUrl(whatsappNumber)} />
+          <SettingsRow icon={LifeBuoy} label="Centre d’aide" to="/aide" />
+        </li>
+        {whatsappNumber && (
+          <li>
+            <SettingsRow
+              icon={MessageCircle}
+              label="Contacter la boutique sur WhatsApp"
+              href={buildWhatsAppQuestionUrl(whatsappNumber)}
+            />
+          </li>
+        )}
+        <li>
+          <SettingsRow icon={BookOpen} label="Comment réserver" to="/aide/comment-reserver" />
         </li>
         <li>
-          <SettingsRow icon={BookOpen} label="Comment réserver" to="/#comment-reserver" />
-        </li>
-        <li>
-          <SettingsRow icon={Truck} label="Livraison et retrait" to="/pages/livraison-et-retrait" />
+          <SettingsRow icon={Truck} label="Livraison et retrait" to="/aide/livraison-retrait" />
         </li>
       </SettingsGroup>
       <SettingsGroup title="Légal">
@@ -140,10 +152,13 @@ function HelpAndLegalRows({ whatsappNumber }: { whatsappNumber: string }) {
           <SettingsRow icon={FileText} label="Conditions générales" to="/pages/conditions-generales" />
         </li>
         <li>
-          <SettingsRow icon={RotateCcw} label="Politique d’annulation et de retour" to="/pages/politique-retour" />
+          <SettingsRow icon={RotateCcw} label="Politique d’annulation et de retour" to="/pages/annulation-retours" />
         </li>
         <li>
           <SettingsRow icon={Shield} label="Confidentialité" to="/pages/confidentialite" />
+        </li>
+        <li>
+          <SettingsRow icon={Landmark} label="Mentions légales" to="/pages/mentions-legales" />
         </li>
       </SettingsGroup>
     </>
@@ -154,7 +169,6 @@ function HelpAndLegalRows({ whatsappNumber }: { whatsappNumber: string }) {
 function ProfileGuest() {
   const openAuthSheet = useUiStore((s) => s.openAuthSheet);
   const favoritesCount = useFavoritesStore(selectFavoritesCount);
-  const { data: settings } = usePublicSettings();
 
   return (
     <div className="mx-auto w-full max-w-xl px-page pt-8 pb-12">
@@ -179,7 +193,7 @@ function ProfileGuest() {
             />
           </li>
         </SettingsGroup>
-        <HelpAndLegalRows whatsappNumber={settings?.whatsappNumber ?? FALLBACK_WHATSAPP} />
+        <HelpAndLegalRows />
       </m.div>
     </div>
   );
@@ -190,7 +204,6 @@ function ProfileConnected({ user }: { user: User }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const showToast = useToastStore((s) => s.show);
   const logout = useLogout();
-  const { data: settings } = usePublicSettings();
   const { data: addresses } = useAddresses();
   const favoritesCount = useFavoritesStore(selectFavoritesCount);
   const { needsAttention, activeCount } = useReservationsAttention();
@@ -242,7 +255,7 @@ function ProfileConnected({ user }: { user: User }) {
             <Link
               to="/profil/informations"
               viewTransition
-              className="inline-flex min-h-[44px] items-center px-2 text-small font-semibold text-white underline underline-offset-2"
+              className="inline-flex min-h-11 items-center px-2 text-small font-semibold text-white underline underline-offset-2"
             >
               Modifier
             </Link>
@@ -255,13 +268,17 @@ function ProfileConnected({ user }: { user: User }) {
             <Link
               to="/reservations"
               viewTransition
-              className="relative flex min-h-[104px] flex-col justify-between rounded-[var(--radius-md)] bg-surface p-4 transition-colors [@media(hover:hover)]:hover:bg-silver/40"
+              className="relative flex min-h-26 flex-col justify-between rounded-[var(--radius-md)] bg-surface p-4 transition-colors [@media(hover:hover)]:hover:bg-silver/40"
             >
               <ReceiptText className="h-5 w-5 text-ink" aria-hidden="true" />
               <span>
                 <span className="block text-h3 text-ink">Mes réservations</span>
                 <span className="text-small text-text-2">
-                  {activeCount === undefined ? '…' : `${activeCount} en cours`}
+                  {activeCount === undefined
+                    ? 'Suivi et historique'
+                    : activeCount === 0
+                      ? 'Aucune en cours'
+                      : `${activeCount}\u00A0en cours`}
                 </span>
               </span>
               {needsAttention && (
@@ -273,13 +290,15 @@ function ProfileConnected({ user }: { user: User }) {
             <Link
               to="/favoris"
               viewTransition
-              className="flex min-h-[104px] flex-col justify-between rounded-[var(--radius-md)] bg-surface p-4 transition-colors [@media(hover:hover)]:hover:bg-silver/40"
+              className="flex min-h-26 flex-col justify-between rounded-[var(--radius-md)] bg-surface p-4 transition-colors [@media(hover:hover)]:hover:bg-silver/40"
             >
               <Heart className="h-5 w-5 text-ink" aria-hidden="true" />
               <span>
                 <span className="block text-h3 text-ink">Mes favoris</span>
                 <span className="text-small text-text-2">
-                  {favoritesCount} article{favoritesCount > 1 ? 's' : ''}
+                  {favoritesCount === 0
+                    ? 'Aucun article'
+                    : `${favoritesCount}\u00A0article${favoritesCount > 1 ? 's' : ''}`}
                 </span>
               </span>
             </Link>
@@ -315,7 +334,7 @@ function ProfileConnected({ user }: { user: User }) {
             )}
           </SettingsGroup>
 
-          <HelpAndLegalRows whatsappNumber={settings?.whatsappNumber ?? FALLBACK_WHATSAPP} />
+          <HelpAndLegalRows />
 
           {/* Déconnexion */}
           <m.div variants={fadeUp}>
@@ -332,7 +351,7 @@ function ProfileConnected({ user }: { user: User }) {
           </m.div>
 
           <m.p variants={fadeUp} className="pb-2 text-center text-small text-text-2">
-            DR Choco L’Incompris · version {env.appVersion}
+            DR Choco L’Incompris · Version {env.appVersion}
           </m.p>
         </div>
       </m.div>
@@ -345,7 +364,7 @@ function ProfileConnected({ user }: { user: User }) {
         onStateChange={setNotificationsState}
       />
 
-      <Sheet open={logoutOpen} onClose={() => setLogoutOpen(false)} title="Se déconnecter ?">
+      <Sheet open={logoutOpen} onClose={() => setLogoutOpen(false)} title="Se déconnecter&nbsp;?">
         <p className="text-body text-text-2">Votre panier sera conservé sur ce téléphone.</p>
         <div className="mt-6 flex flex-col gap-3">
           <Button
@@ -357,7 +376,7 @@ function ProfileConnected({ user }: { user: User }) {
               // mutateAsync : la promesse se résout même si ce composant est démonté par la déconnexion
               await logout.mutateAsync().catch(() => undefined);
               setLogoutOpen(false);
-              showToast({ message: 'Vous êtes déconnecté. À bientôt !' });
+              showToast({ message: 'Vous êtes déconnecté. À bientôt\u00A0!' });
             }}
           >
             Me déconnecter

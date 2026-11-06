@@ -22,10 +22,16 @@ import { Button } from '@/components/ui/Button';
 import { Container, Price, Skeleton } from '@/components/ui/Primitives';
 import { ProductCard } from '@/components/ui/ProductCard';
 import {
+  useDeliveryCitiesInfo,
   useProduct,
   useProducts,
+  usePublicSettings,
 } from '@/features/catalog/api/useCatalogQueries';
 import { ProductGallery } from '@/features/catalog/product/ProductGallery';
+import {
+  productFallbackImage,
+  productPrimaryImage,
+} from '@/features/catalog/product/productImages';
 import { ProductLightbox } from '@/features/catalog/product/ProductLightbox';
 import { ProductSeo } from '@/features/catalog/product/ProductSeo';
 import { SizeGuideSheet } from '@/features/catalog/product/SizeGuideSheet';
@@ -33,10 +39,12 @@ import { isNetworkError } from '@/features/offline/networkErrors';
 import { OfflineScreen } from '@/features/offline/OfflineScreen';
 import { useBackNavigation } from '@/lib/hooks/useBackNavigation';
 import { useOnlineStatus } from '@/lib/hooks/useOnlineStatus';
+import { SITE_NAME, siteOrigin } from '@/lib/seo/seo';
+import { useSeo } from '@/lib/seo/useSeo';
 import { cn } from '@/lib/utils/cn';
 import { haptic } from '@/lib/utils/haptics';
 import { formatPrice } from '@/lib/utils/price';
-import { ease } from '@/motion/tokens';
+import { duration, ease } from '@/motion/tokens';
 import { useReducedMotionPref } from '@/motion/useReducedMotionPref';
 import { useCartStore } from '@/stores/cartStore';
 import { useFavoritesStore } from '@/stores/favoritesStore';
@@ -67,7 +75,34 @@ const PARTICLE_OFFSETS = [
   { x: -14, y: -8 },
 ] as const;
 
+/**
+ * Durée de blocage d'un article réservé quand les réglages de la boutique ne sont pas encore chargés.
+ * HYPOTHÈSE: 24 h, valeur de reservationHoldHours dans les réglages publics (§3.1).
+ */
+const DEFAULT_HOLD_HOURS = 24;
+
+/** Durée pendant laquelle « Ajouté » remplace « Ajouter » après un ajout au panier. */
+const JUST_ADDED_MS = 1200;
+
 type AccordionSectionId = 'description' | 'care' | 'delivery';
+
+/** Erreur « article introuvable » de l'API : code NOT_FOUND ou statut HTTP 404. */
+function isNotFoundError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const { code, status } = error as { code?: unknown; status?: unknown };
+  return code === 'NOT_FOUND' || status === 404;
+}
+
+/** Apostrophe typographique dans les textes reçus de l'API (adresses, délais). */
+function typographic(text: string): string {
+  return text.replace(/'/g, '’');
+}
+
+/** Titre de l'onglet et « noindex » des états sans article (introuvable, erreur, hors connexion). */
+function StatusSeo({ title }: { title: string }) {
+  useSeo({ title: `${title} — ${SITE_NAME}`, absoluteTitle: true, noindex: true });
+  return null;
+}
 
 /**
  * Page Fiche Produit (`/produit/:slug`, §7).
@@ -88,16 +123,12 @@ export function ProductPage() {
   }
 
   const isNotFound =
-    (isError &&
-      error &&
-      typeof error === 'object' &&
-      'code' in error &&
-      (error as { code?: string }).code === 'NOT_FOUND') ||
-    (!isLoading && !isError && !product);
+    (isError && isNotFoundError(error)) || (!isLoading && !isError && !product);
 
   if (isNotFound) {
     return (
       <Container className="py-12">
+        <StatusSeo title="Article introuvable" />
         <BackButton fallback="/explorer" className="mb-4 lg:hidden" />
         <div className="mx-auto max-w-xl rounded-[var(--radius-md)] border border-silver bg-surface p-8 text-center">
           <span className="text-label text-red">ARTICLE INTROUVABLE</span>
@@ -105,12 +136,14 @@ export function ProductPage() {
             Cet article n&rsquo;existe plus ou a été déplacé
           </h1>
           <p className="mt-2 text-small text-text-2">
-            Découvrez nos nouveautés et nos pièces disponibles immédiatement en
-            réservation 24 h.
+            Découvrez nos nouveautés et les pièces disponibles à la réservation.
           </p>
-          <div className="mt-6 flex justify-center">
+          <div className="mt-6 flex flex-wrap justify-center gap-3">
             <Button variant="primary" size="md" href="/explorer">
               Explorer le catalogue
+            </Button>
+            <Button variant="outline" size="md" href="/">
+              Retour à l&rsquo;accueil
             </Button>
           </div>
         </div>
@@ -136,11 +169,12 @@ export function ProductPage() {
     // Fiche jamais consultée et réseau absent : repli « hors connexion » (M6 §6.5)
     return (
       <Container className="pt-[calc(env(safe-area-inset-top)+var(--offline-banner-h,0px)+16px)] pb-14 lg:pt-14">
+        <StatusSeo title="Hors connexion" />
         {/* Pas d'en-tête sur la fiche mobile : retour explicite (indispensable en mode application) */}
         <button
           type="button"
           onClick={handleBack}
-          className="-ml-2 inline-flex min-h-[44px] items-center gap-2 px-2 text-small font-semibold text-ink lg:hidden"
+          className="-ml-2 inline-flex min-h-11 items-center gap-2 px-2 text-small font-semibold text-ink lg:hidden"
         >
           <ArrowLeft className="h-4 w-4" aria-hidden="true" />
           Retour
@@ -153,6 +187,7 @@ export function ProductPage() {
   if (!product) {
     return (
       <Container className="py-14">
+        <StatusSeo title="Article indisponible" />
         <BackButton fallback="/explorer" className="mb-4 lg:hidden" />
         <div className="mx-auto max-w-md rounded-[var(--radius-md)] border border-silver bg-surface p-6 text-center">
           <AlertCircle className="mx-auto h-10 w-10 text-danger" aria-hidden="true" />
@@ -206,6 +241,11 @@ function ProductDetailView({
   const bumpCartBounce = useUiStore((s) => s.bumpCartBounce);
   const showMobileCartPeek = useUiStore((s) => s.showMobileCartPeek);
   const setActiveTransitionSlug = useUiStore((s) => s.setActiveTransitionSlug);
+
+  // Réglages publics (adresse de retrait, durée de blocage), déjà en cache dans l'app
+  const { data: settings } = usePublicSettings();
+  const holdHours = settings?.reservationHoldHours ?? DEFAULT_HOLD_HOURS;
+  const shopCity = settings?.shop?.city ?? settings?.pickupAddress?.city;
 
   // Enregistre le slug actif pour le retour de transition vers la grille (§4.2)
   useEffect(() => {
@@ -308,6 +348,7 @@ function ProductDetailView({
 
   const categoryLabel =
     CATEGORY_LABELS[product.categorySlug] ?? product.categorySlug;
+  const hasSimilar = relatedProducts.length > 0;
 
   // Apparition de la barre haute compacte sur mobile après 60 % de la galerie (§7.1)
   useEffect(() => {
@@ -378,13 +419,11 @@ function ProductDetailView({
   };
 
   const handleShare = async () => {
-    const origin =
-      typeof window !== 'undefined' ? window.location.origin : 'https://drchoco.cm';
-    const shareUrl = `${origin}/produit/${product.slug}?couleur=${encodeURIComponent(
+    const shareUrl = `${siteOrigin()}/produit/${product.slug}?couleur=${encodeURIComponent(
       activeColor.code,
     )}`;
     const shareTitle = `${product.name} — ${formatPrice(product.price)}`;
-    const shareText = `${product.name} (${formatPrice(product.price)}) sur DR Choco L'Incompris`;
+    const shareText = `${product.name} (${formatPrice(product.price)}) sur ${SITE_NAME}`;
 
     if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
       try {
@@ -407,7 +446,7 @@ function ProductDetailView({
       try {
         await navigator.clipboard.writeText(shareUrl);
       } catch {
-        // Ignore clipboard permission errors in test environments
+        // Presse-papiers refusé (permissions, environnement de test) : le message reste affiché
       }
     }
 
@@ -435,13 +474,8 @@ function ProductDetailView({
     }
 
     const activeImg = galleryImages[activeImageIndex] ?? galleryImages[0];
-    const imageSrc =
-      activeImg?.url ??
-      product.images[0] ??
-      product.fallbackImages[0] ??
-      '/mock/product-tee.svg';
-    const fallbackSrc =
-      activeImg?.fallbackUrl ?? product.fallbackImages[0] ?? '/mock/product-tee.svg';
+    const imageSrc = activeImg?.url ?? productPrimaryImage(product);
+    const fallbackSrc = activeImg?.fallbackUrl ?? productFallbackImage(product);
 
     addToCart({
       productId: product.id,
@@ -485,7 +519,7 @@ function ProductDetailView({
 
     showMobileCartPeek();
     setJustAdded(true);
-    window.setTimeout(() => setJustAdded(false), 1200);
+    window.setTimeout(() => setJustAdded(false), JUST_ADDED_MS);
 
     if (typeof window !== 'undefined' && window.innerWidth >= 1024) {
       useUiStore.getState().openCartDrawer(true);
@@ -521,7 +555,7 @@ function ProductDetailView({
             initial={{ y: '-100%', opacity: 0 }}
             animate={{ y: '0%', opacity: 1 }}
             exit={{ y: '-100%', opacity: 0 }}
-            transition={{ duration: 0.22, ease: ease.out }}
+            transition={{ duration: duration.fast, ease: ease.out }}
             className="fixed top-[var(--offline-banner-h,0px)] right-0 left-0 z-header flex h-[calc(52px+env(safe-area-inset-top,0px))] items-center justify-between border-b border-silver/70 bg-white/95 px-3 pt-safe shadow-[var(--shadow-header)] backdrop-blur-md lg:hidden"
           >
             <button
@@ -534,8 +568,8 @@ function ProductDetailView({
             </button>
 
             <div className="min-w-0 flex-1 px-3 text-center">
-              <p className="truncate text-xs font-bold text-ink">{product.name}</p>
-              <Price amount={product.price} className="text-xs text-text-2" />
+              <p className="truncate text-caption font-bold text-ink">{product.name}</p>
+              <Price amount={product.price} className="text-caption text-text-2" />
             </div>
 
             <button
@@ -565,7 +599,7 @@ function ProductDetailView({
       <div
         inert={showCompactHeader}
         className={cn(
-          'pointer-events-none fixed top-[calc(0.75rem+var(--offline-banner-h,0px))] right-4 left-4 z-sticky flex items-center justify-between pt-safe transition-opacity duration-200 lg:hidden',
+          'pointer-events-none fixed top-[calc(0.75rem+var(--offline-banner-h,0px))] right-4 left-4 z-sticky flex items-center justify-between pt-safe transition-opacity duration-fast lg:hidden',
           // La barre compacte reprend Retour et Favori : les boutons ronds ne dépassent plus en dessous
           showCompactHeader && 'opacity-0',
         )}
@@ -612,7 +646,7 @@ function ProductDetailView({
                       opacity: 0,
                       scale: 0.4,
                     }}
-                    transition={{ duration: 0.4, ease: ease.out }}
+                    transition={{ duration: duration.base, ease: ease.out }}
                     className="absolute h-1.5 w-1.5 rounded-[var(--radius-full)] bg-red"
                   />
                 ))}
@@ -634,17 +668,17 @@ function ProductDetailView({
       {/* Fil d'Ariane sur ordinateur (§7.1) */}
       <Container className="hidden pt-6 pb-4 lg:block">
         <nav
-          aria-label="Fil d'Ariane"
-          className="flex items-center gap-1.5 text-xs text-text-2"
+          aria-label="Fil d’Ariane"
+          className="flex items-center gap-1.5 text-caption text-text-2"
         >
-          <Link to="/" viewTransition className="hover:text-ink">
+          <Link to="/" viewTransition className="py-1 hover:text-ink">
             Accueil
           </Link>
           <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
           <Link
             to={`/explorer/${product.categorySlug}`}
             viewTransition
-            className="hover:text-ink"
+            className="py-1 hover:text-ink"
           >
             {categoryLabel}
           </Link>
@@ -662,6 +696,7 @@ function ProductDetailView({
           <div className="lg:col-span-7">
             <ProductGallery
               slug={product.slug}
+              productName={product.name}
               images={galleryImages}
               activeIndex={activeImageIndex}
               onActiveIndexChange={setActiveImageIndex}
@@ -677,8 +712,9 @@ function ProductDetailView({
             />
           </div>
 
-          {/* Colonne droite (42 % -> 5 cols sur 12) : Feuille d'informations (remonte de -24px sur mobile, §7.1) */}
-          <div className="relative z-10 -mt-6 rounded-t-[var(--radius-sheet)] bg-white px-page pt-6 lg:col-span-5 lg:sticky lg:top-24 lg:mt-0 lg:rounded-none lg:px-0 lg:pt-0">
+          {/* Colonne droite (42 % -> 5 cols sur 12) : Feuille d'informations (remonte de -24px sur mobile, §7.1) ;
+              sur ordinateur, collée sous l'en-tête replié (et sous le bandeau rouge s'il est affiché) */}
+          <div className="relative z-10 -mt-6 rounded-t-[var(--radius-sheet)] bg-white px-page pt-6 lg:sticky lg:top-[calc(var(--desktop-shell-top)+24px)] lg:col-span-5 lg:mt-0 lg:rounded-none lg:px-0 lg:pt-0">
             {/* Poignée décorative mobile */}
             <div
               aria-hidden="true"
@@ -690,7 +726,7 @@ function ProductDetailView({
               <Link
                 to={`/explorer/${product.categorySlug}`}
                 viewTransition
-                className="-my-3 inline-flex min-h-[44px] items-center text-label text-text-2 hover:text-ink"
+                className="-my-3 inline-flex min-h-11 items-center text-label text-text-2 hover:text-ink"
               >
                 {categoryLabel}
               </Link>
@@ -709,13 +745,15 @@ function ProductDetailView({
             {/* Titre produit */}
             <h1 className="mt-1.5 text-h1 text-ink">{product.name}</h1>
 
-            {/* Prix + Mention de blocage 24 h */}
+            {/* Prix + Mention de blocage (masquée si l'article est épuisé : rien à réserver) */}
             <div className="mt-3 flex flex-wrap items-baseline justify-between gap-2 border-b border-silver/60 pb-4">
-              <Price amount={product.price} className="text-[24px] text-ink" />
-              <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-success">
-                <Clock className="h-3.5 w-3.5" aria-hidden="true" />
-                <span>Réservation gratuite · bloqué 24 h</span>
-              </span>
+              <Price amount={product.price} className="text-h2 text-ink" />
+              {!isSoldOut && (
+                <span className="inline-flex items-center gap-1.5 text-caption font-semibold text-success">
+                  <Clock className="h-3.5 w-3.5" aria-hidden="true" />
+                  <span>Réservation gratuite · article bloqué {holdHours}&nbsp;h</span>
+                </span>
+              )}
             </div>
 
             {/* =================================================================
@@ -724,7 +762,7 @@ function ProductDetailView({
             {product.colors.length > 0 && (
               <div className="mt-5">
                 <p className="text-label text-text-2">
-                  COULEUR : <span className="text-ink">{activeColor.name}</span>
+                  COULEUR&nbsp;: <span className="text-ink">{activeColor.name}</span>
                 </p>
 
                 <div
@@ -746,7 +784,7 @@ function ProductDetailView({
                         aria-checked={isSelected}
                         aria-label={
                           isColorSoldOut
-                            ? `${color.name} (Épuisée)`
+                            ? `${color.name}, épuisée`
                             : color.name
                         }
                         onClick={() => handleSelectColor(color.code)}
@@ -762,7 +800,7 @@ function ProductDetailView({
                           <span
                             aria-hidden="true"
                             className={cn(
-                              'pointer-events-none absolute inset-x-[-2px] top-1/2 h-[2px] -translate-y-1/2 -rotate-45',
+                              'pointer-events-none absolute -inset-x-0.5 top-1/2 h-[2px] -translate-y-1/2 -rotate-45',
                               // Barre rouge invisible sur la pastille rouge : barre noire pour celle-ci
                               color.code === 'rouge' ? 'bg-ink' : 'bg-red',
                             )}
@@ -788,7 +826,7 @@ function ProductDetailView({
                   <button
                     type="button"
                     onClick={() => setSizeGuideOpen(true)}
-                    className="-my-3 inline-flex min-h-[44px] items-center gap-1.5 text-xs font-bold text-ink underline underline-offset-2 hover:text-red"
+                    className="-my-3 inline-flex min-h-11 items-center gap-1.5 text-caption font-bold text-ink underline underline-offset-2 hover:text-red"
                   >
                     <Ruler className="h-3.5 w-3.5" aria-hidden="true" />
                     <span>Guide des tailles</span>
@@ -808,11 +846,12 @@ function ProductDetailView({
                       ? { x: [0, -6, 6, -4, 4, 0] }
                       : { x: 0 }
                   }
-                  transition={{ duration: 0.35 }}
+                  transition={{ duration: duration.base }}
                   role="radiogroup"
                   aria-label="Choisir une taille"
                   className={cn(
-                    'mt-2.5 grid grid-cols-5 gap-2 rounded-[var(--radius-md)] p-1 transition-colors sm:grid-cols-6',
+                    // Colonnes automatiques : les tailles occupent toute la rangée (5 tailles à 768 px aussi)
+                    'mt-2.5 grid grid-cols-[repeat(auto-fit,minmax(3.5rem,1fr))] gap-2 rounded-[var(--radius-md)] p-1 transition-colors',
                     sizeError && 'border border-red bg-red/5 p-2',
                   )}
                 >
@@ -832,13 +871,13 @@ function ProductDetailView({
                         onClick={() => handleSelectSize(size)}
                         aria-label={
                           outOfStock
-                            ? `Taille ${size} — Épuisée`
+                            ? `Taille ${size}, épuisée`
                             : `Taille ${size} (${stock} disponible${stock > 1 ? 's' : ''})`
                         }
                         className={cn(
                           'relative flex h-12 items-center justify-center overflow-hidden rounded-[var(--radius-md)] border text-small font-bold transition-colors',
                           outOfStock
-                            ? 'cursor-not-allowed border-silver bg-surface text-silver line-through opacity-60'
+                            ? 'cursor-not-allowed border-silver bg-surface text-text-2 line-through'
                             : isSelected
                               ? 'border-ink bg-ink text-white'
                               : 'border-silver bg-white text-ink hover:border-ink',
@@ -848,7 +887,7 @@ function ProductDetailView({
                         {outOfStock && (
                           <span
                             aria-hidden="true"
-                            className="pointer-events-none absolute inset-x-[-4px] top-1/2 h-[1px] -translate-y-1/2 -rotate-35 bg-silver"
+                            className="pointer-events-none absolute -inset-x-1 top-1/2 h-[1px] -translate-y-1/2 -rotate-35 bg-silver"
                           />
                         )}
                       </button>
@@ -858,25 +897,25 @@ function ProductDetailView({
               )}
 
               {/* Messages dynamiques : erreur aucune taille, désélection couleur, ou stock réel (§7.4 & §7.5) */}
-              <div aria-live="polite" className="mt-2 min-h-[20px]">
+              <div aria-live="polite" className="mt-2 min-h-5">
                 {sizeError ? (
-                  <p role="alert" className="text-xs font-bold text-danger">
+                  <p role="alert" className="text-caption font-bold text-danger">
                     Choisissez votre taille pour continuer
                   </p>
                 ) : sizeDeselectedNotice ? (
-                  <p className="text-xs font-semibold text-warning">
+                  <p className="text-caption font-semibold text-warning">
                     {sizeDeselectedNotice}
                   </p>
                 ) : selectedVariant && selectedVariant.stock > 0 ? (
                   selectedVariant.stock <= 2 ? (
-                    <p className="text-xs font-bold text-warning">
+                    <p className="text-caption font-bold text-warning">
                       Plus que {selectedVariant.stock} exemplaire
                       {selectedVariant.stock > 1 ? 's' : ''} en taille{' '}
-                      {selectedVariant.size} — bloqué 24 h dès votre réservation
+                      {selectedVariant.size} — bloqué {holdHours}&nbsp;h dès votre réservation
                     </p>
                   ) : (
-                    <p className="text-xs font-semibold text-success">
-                      En stock — bloqué 24 h dès votre réservation
+                    <p className="text-caption font-semibold text-success">
+                      En stock — bloqué {holdHours}&nbsp;h dès votre réservation
                     </p>
                   )
                 ) : null}
@@ -893,13 +932,23 @@ function ProductDetailView({
                   <p className="text-small font-bold text-ink">
                     Cet article est épuisé
                   </p>
-                  <button
-                    type="button"
-                    onClick={scrollToSimilar}
-                    className="mt-2 inline-flex items-center gap-1.5 text-xs font-bold text-red hover:underline"
-                  >
-                    <span>Voir des articles similaires ↓</span>
-                  </button>
+                  {hasSimilar ? (
+                    <button
+                      type="button"
+                      onClick={scrollToSimilar}
+                      className="mt-1 inline-flex min-h-11 items-center gap-1.5 text-caption font-bold text-red hover:underline"
+                    >
+                      <span>Voir des articles similaires ↓</span>
+                    </button>
+                  ) : (
+                    <Link
+                      to={`/explorer/${product.categorySlug}`}
+                      viewTransition
+                      className="mt-1 inline-flex min-h-11 items-center gap-1.5 text-caption font-bold text-red hover:underline"
+                    >
+                      Voir les autres articles&nbsp;: {categoryLabel}
+                    </Link>
+                  )}
                 </div>
               ) : (
                 <div className="hidden flex-col gap-3 lg:flex">
@@ -931,12 +980,12 @@ function ProductDetailView({
                   </div>
 
                   {/* Actions secondaires sur ordinateur : Favoris & Partager */}
-                  <div className="flex items-center justify-between pt-1">
+                  <div className="flex items-center justify-between">
                     <button
                       type="button"
                       onClick={handleToggleFavorite}
                       aria-pressed={isFavorite}
-                      className="inline-flex items-center gap-2 py-1.5 text-xs font-bold text-ink hover:text-red"
+                      className="inline-flex min-h-11 items-center gap-2 text-caption font-bold text-ink hover:text-red"
                     >
                       <Heart
                         className={cn(
@@ -955,7 +1004,7 @@ function ProductDetailView({
                     <button
                       type="button"
                       onClick={() => void handleShare()}
-                      className="inline-flex items-center gap-1.5 py-1.5 text-xs font-bold text-text-2 hover:text-ink"
+                      className="inline-flex min-h-11 items-center gap-1.5 text-caption font-bold text-text-2 hover:text-ink"
                     >
                       <Share2 className="h-4 w-4" aria-hidden="true" />
                       <span>Partager l&rsquo;article</span>
@@ -965,8 +1014,8 @@ function ProductDetailView({
               )}
             </div>
 
-            {/* Bandeau de réassurance rapide */}
-            <div className="mt-4 grid grid-cols-2 gap-3 rounded-[var(--radius-md)] bg-surface p-3.5 text-xs text-ink lg:mt-6">
+            {/* Bandeau de réassurance rapide (adresse et frais exacts dans « Livraison et retrait en boutique ») */}
+            <div className="mt-4 grid grid-cols-2 gap-3 rounded-[var(--radius-md)] bg-surface p-3.5 text-caption text-ink lg:mt-6">
               <div className="flex items-start gap-2.5">
                 <ShieldCheck
                   className="mt-0.5 h-4 w-4 shrink-0 text-red"
@@ -980,8 +1029,8 @@ function ProductDetailView({
                   aria-hidden="true"
                 />
                 <span>
-                  Retrait gratuit Akwa Douala ou livraison{' '}
-                  <span className="whitespace-nowrap">24–48 h</span>
+                  Retrait gratuit en boutique{shopCity ? ` à ${shopCity}` : ''} ou livraison au
+                  Cameroun
                 </span>
               </div>
             </div>
@@ -991,6 +1040,7 @@ function ProductDetailView({
              * ================================================================= */}
             <div className="mt-6 divide-y divide-silver/70 border-t border-b border-silver/70">
               <AccordionItem
+                id="description"
                 title="Description"
                 isOpen={openAccordion === 'description'}
                 onToggle={() =>
@@ -1005,6 +1055,7 @@ function ProductDetailView({
               </AccordionItem>
 
               <AccordionItem
+                id="care"
                 title="Composition et entretien"
                 isOpen={openAccordion === 'care'}
                 onToggle={() =>
@@ -1014,7 +1065,7 @@ function ProductDetailView({
                 <div className="space-y-2 text-small text-text-2">
                   <p>
                     <strong className="font-semibold text-ink">
-                      Matière :
+                      Matière&nbsp;:
                     </strong>{' '}
                     {product.composition}
                   </p>
@@ -1022,7 +1073,7 @@ function ProductDetailView({
                     product.careInstructions.length > 0 && (
                       <div>
                         <strong className="font-semibold text-ink">
-                          Conseils d&rsquo;entretien :
+                          Conseils d&rsquo;entretien&nbsp;:
                         </strong>
                         <ul className="mt-1 list-inside list-disc space-y-1">
                           {product.careInstructions.map((item, idx) => (
@@ -1035,6 +1086,7 @@ function ProductDetailView({
               </AccordionItem>
 
               <AccordionItem
+                id="delivery"
                 title="Livraison et retrait en boutique"
                 isOpen={openAccordion === 'delivery'}
                 onToggle={() =>
@@ -1043,28 +1095,7 @@ function ProductDetailView({
                   )
                 }
               >
-                <ul className="space-y-2 text-small text-text-2">
-                  <li>
-                    <strong className="font-semibold text-ink">
-                      Retrait en boutique (Gratuit) :
-                    </strong>{' '}
-                    Showroom DR Choco Akwa, Douala — votre pièce est mise de côté
-                    pendant 24 h dès votre réservation.
-                  </li>
-                  <li>
-                    <strong className="font-semibold text-ink">
-                      Livraison Douala (1 500 FCFA) :
-                    </strong>{' '}
-                    Coursier rapide sous 24 h après validation de votre preuve de
-                    paiement.
-                  </li>
-                  <li>
-                    <strong className="font-semibold text-ink">
-                      Livraison Yaoundé & autres villes (2 500 FCFA) :
-                    </strong>{' '}
-                    Expédition sécurisée sous 24 à 48 h.
-                  </li>
-                </ul>
+                <DeliveryDetails active={openAccordion === 'delivery'} holdHours={holdHours} />
               </AccordionItem>
             </div>
           </div>
@@ -1073,7 +1104,7 @@ function ProductDetailView({
         {/* =====================================================================
          * SECTION « ARTICLES SIMILAIRES » (§7.10)
          * ===================================================================== */}
-        {relatedProducts.length > 0 && (
+        {hasSimilar && (
           <section
             id="articles-similaires"
             aria-labelledby="similar-products-heading"
@@ -1087,8 +1118,8 @@ function ProductDetailView({
               <Link
                 to={`/explorer/${product.categorySlug}`}
                 viewTransition
-                aria-label={`Voir tout : ${categoryLabel}`}
-                className="inline-flex min-h-[44px] shrink-0 items-center text-xs font-bold whitespace-nowrap text-ink underline-offset-2 hover:underline"
+                aria-label={`Voir tout\u00a0: ${categoryLabel}`}
+                className="inline-flex min-h-11 shrink-0 items-center text-caption font-bold whitespace-nowrap text-ink underline-offset-2 hover:underline"
               >
                 Voir tout<span className="hidden sm:inline">&nbsp;({categoryLabel})</span>
               </Link>
@@ -1099,7 +1130,7 @@ function ProductDetailView({
               {relatedProducts.slice(0, 4).map((related) => (
                 <div
                   key={related.id}
-                  className="w-[66vw] max-w-[260px] shrink-0 snap-start lg:w-auto lg:max-w-none"
+                  className="w-[66vw] max-w-65 shrink-0 snap-start lg:w-auto lg:max-w-none"
                 >
                   <ProductCard product={related} />
                 </div>
@@ -1115,14 +1146,25 @@ function ProductDetailView({
       <div className="fixed right-0 bottom-0 left-0 z-nav border-t border-silver/70 bg-white pb-safe shadow-[var(--shadow-nav)] lg:hidden">
         <Container className="flex h-[var(--action-bar-h)] items-center gap-3">
           {isSoldOut ? (
-            <Button
-              variant="outline"
-              size="md"
-              fullWidth
-              onClick={scrollToSimilar}
-            >
-              Cet article est épuisé · Voir similaires ↓
-            </Button>
+            hasSimilar ? (
+              <Button
+                variant="outline"
+                size="md"
+                fullWidth
+                onClick={scrollToSimilar}
+              >
+                Cet article est épuisé · Voir similaires ↓
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                size="md"
+                fullWidth
+                href={`/explorer/${product.categorySlug}`}
+              >
+                Article épuisé · Voir la catégorie
+              </Button>
+            )
           ) : (
             <>
               <div data-cart-target="product-bar" className="w-[40%]">
@@ -1177,43 +1219,128 @@ function ProductDetailView({
   );
 }
 
+/**
+ * Contenu de l'accordéon « Livraison et retrait en boutique » (§7.7) : adresse de retrait et frais
+ * lus dans les réglages publics (GET /settings/public) et la liste des villes (GET /delivery/cities),
+ * chargée à l'ouverture. Sans ces données (chargement impossible, hors connexion) : formulation
+ * neutre, sans aucun montant écrit en dur.
+ */
+function DeliveryDetails({ active, holdHours }: { active: boolean; holdHours: number }) {
+  const { data: settings } = usePublicSettings();
+  const { data: cities, isLoading } = useDeliveryCitiesInfo(active);
+
+  const pickup = settings?.pickupAddress;
+  const pickupPlace = pickup
+    ? typographic([pickup.quarter, pickup.city].filter(Boolean).join(', '))
+    : settings?.shop
+      ? typographic([settings.shop.address, settings.shop.city].filter(Boolean).join(', '))
+      : null;
+
+  const localCities = (cities ?? []).filter((c) => c.isLocal);
+  const otherFees = (cities ?? []).filter((c) => !c.isLocal).map((c) => c.fee);
+  const minOtherFee = otherFees.length > 0 ? Math.min(...otherFees) : null;
+  const maxOtherFee = otherFees.length > 0 ? Math.max(...otherFees) : null;
+
+  return (
+    <ul className="space-y-2 text-small text-text-2">
+      <li>
+        <strong className="font-semibold text-ink">Retrait en boutique (gratuit)&nbsp;:</strong>{' '}
+        {pickupPlace ? `${pickupPlace}. ` : ''}Votre pièce est mise de côté pendant {holdHours}&nbsp;h
+        dès votre réservation.
+      </li>
+
+      {isLoading && active ? (
+        <li aria-hidden="true" className="space-y-2 pt-1">
+          <Skeleton className="h-4 w-4/5" />
+          <Skeleton className="h-4 w-3/5" />
+        </li>
+      ) : cities && cities.length > 0 ? (
+        <>
+          {localCities.map((city) => (
+            <li key={city.id}>
+              <strong className="font-semibold text-ink">
+                Livraison à {city.name}&nbsp;:
+              </strong>{' '}
+              {formatPrice(city.fee)}, {typographic(city.estimatedDelay).toLowerCase()}, après
+              validation de votre preuve de paiement.
+            </li>
+          ))}
+          {minOtherFee !== null && maxOtherFee !== null && (
+            <li>
+              <strong className="font-semibold text-ink">Autres villes du Cameroun&nbsp;:</strong>{' '}
+              {minOtherFee === maxOtherFee
+                ? formatPrice(minOtherFee)
+                : `de ${formatPrice(minOtherFee)} à ${formatPrice(maxOtherFee)} selon la ville`}
+              , expédition par agence de transport. Tarif et délai exacts à l&rsquo;étape de livraison.
+            </li>
+          )}
+          {settings?.deliveryFeePayment && (
+            <li>
+              {settings.deliveryFeePayment === 'on_delivery'
+                ? 'Les frais de livraison se règlent à la réception du colis.'
+                : 'Les frais de livraison se règlent avec votre réservation, par Mobile Money.'}
+            </li>
+          )}
+        </>
+      ) : (
+        <li>
+          <strong className="font-semibold text-ink">Livraison&nbsp;:</strong> frais calculés à
+          l&rsquo;étape de livraison, selon votre ville.
+        </li>
+      )}
+    </ul>
+  );
+}
+
 function AccordionItem({
+  id,
   title,
   isOpen,
   onToggle,
   children,
 }: {
+  id: string;
   title: string;
   isOpen: boolean;
   onToggle: () => void;
   children: React.ReactNode;
 }) {
+  const panelId = `fiche-accordeon-${id}`;
   return (
     <div>
       <button
         type="button"
         aria-expanded={isOpen}
+        aria-controls={panelId}
         onClick={onToggle}
-        className="flex min-h-[52px] w-full items-center justify-between py-3.5 text-left text-small font-bold text-ink"
+        className="flex min-h-13 w-full items-center justify-between py-3.5 text-left text-small font-bold text-ink"
       >
         <span>{title}</span>
         <Plus
           className={cn(
-            'h-4 w-4 shrink-0 text-ink transition-transform duration-280 ease-[cubic-bezier(0.22,1,0.36,1)]',
+            'h-4 w-4 shrink-0 text-ink transition-transform duration-quick ease-brand-out',
             isOpen && 'rotate-45 text-red',
           )}
           aria-hidden="true"
         />
       </button>
 
+      {/* Ouverture sans animation de hauteur (M7 §4.4 : transform et opacité seulement) : le contenu
+          apparaît en fondu. Fermé, il sort de l'ordre de tabulation et des lecteurs d'écran (inert). */}
       <div
-        className={cn(
-          'grid transition-[grid-template-rows] duration-280 ease-[cubic-bezier(0.22,1,0.36,1)]',
-          isOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]',
-        )}
+        id={panelId}
+        inert={!isOpen}
+        className={cn('grid', isOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]')}
       >
         <div className="overflow-hidden">
-          <div className="pb-4">{children}</div>
+          <div
+            className={cn(
+              'pb-4 transition-opacity duration-quick ease-brand-out',
+              isOpen ? 'opacity-100' : 'opacity-0',
+            )}
+          >
+            {children}
+          </div>
         </div>
       </div>
     </div>

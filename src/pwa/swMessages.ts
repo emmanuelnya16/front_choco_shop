@@ -42,6 +42,8 @@ export function handleServiceWorkerMessage(data: unknown, ctx: SwMessageContext)
     if (typeof data.url === 'string' && isSafeAppPath(data.url)) ctx.navigate(data.url);
     return true;
   }
+  // État du réseau : traité dès le démarrage par le store réseau (src/pwa/networkStore.ts)
+  if (data.type === SW_MESSAGES.networkStatus) return true;
 
   const payload = parsePushPayload(data.payload);
   if (!payload) return true;

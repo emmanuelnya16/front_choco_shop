@@ -9,13 +9,13 @@ import { OfflineScreen } from './OfflineScreen';
 export function OfflineRouteFallback() {
   return (
     <main id="contenu" className="min-h-dvh bg-white px-page pt-[calc(env(safe-area-inset-top)+16px)] pb-16 lg:pt-12">
-      <div className="mx-auto w-full max-w-[640px]">
+      <div className="mx-auto w-full max-w-160">
         <Link
           to="/"
-          className="-ml-2 inline-flex min-h-[44px] items-center gap-2 px-2 text-small font-semibold text-ink"
+          className="-ml-2 inline-flex min-h-11 items-center gap-2 px-2 text-small font-semibold text-ink"
         >
           <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-          Revenir à l&apos;accueil
+          Revenir à l&rsquo;accueil
         </Link>
       </div>
       <OfflineScreen className="mt-6" />

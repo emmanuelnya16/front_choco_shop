@@ -6,15 +6,12 @@ import { useProducts } from '@/features/catalog/api/useCatalogQueries';
 import {
   getSizesForCategory,
   PRICE_RANGE_LABELS,
+  CATALOG_SORT_OPTIONS,
   SORT_OPTION_LABELS,
   type CatalogFiltersState,
 } from '@/features/catalog/filters/useCatalogFilters';
 import { cn } from '@/lib/utils/cn';
-import type {
-  CatalogSortOption,
-  PriceRangeKey,
-  ProductFacets,
-} from '@/types/api';
+import type { PriceRangeKey, ProductFacets } from '@/types/api';
 
 export type ActiveFilterSheet = 'size' | 'price' | 'sort' | 'all' | null;
 
@@ -23,13 +20,6 @@ const PRICE_RANGE_KEYS: PriceRangeKey[] = [
   '15000-30000',
   '30000-50000',
   '50000+',
-];
-
-const SORT_OPTIONS: CatalogSortOption[] = [
-  'popular',
-  'newest',
-  'price-asc',
-  'price-desc',
 ];
 
 export interface FilterSheetsProps {
@@ -163,7 +153,7 @@ function FilterSheetBody({
   if (mode === 'sort') {
     return (
       <div role="radiogroup" aria-label="Trier les articles" className="space-y-1.5">
-        {SORT_OPTIONS.map((option) => {
+        {CATALOG_SORT_OPTIONS.map((option) => {
           const isSelected = filters.sort === option;
           return (
             <button
@@ -176,7 +166,7 @@ function FilterSheetBody({
                 onClose();
               }}
               className={cn(
-                'flex min-h-[48px] w-full items-center justify-between rounded-[var(--radius-md)] px-4 py-3 text-left text-body transition-colors',
+                'flex min-h-12 w-full items-center justify-between rounded-[var(--radius-md)] px-4 py-3 text-left text-body transition-colors',
                 isSelected
                   ? 'bg-ink font-bold text-white'
                   : 'bg-surface text-ink hover:bg-silver/40',
@@ -203,7 +193,7 @@ function FilterSheetBody({
           <div className="flex items-center justify-between rounded-[var(--radius-md)] border border-silver bg-surface px-4 py-3.5">
             <div>
               <p className="text-small font-bold text-ink">En stock uniquement</p>
-              <p className="text-xs text-text-2">
+              <p className="text-caption text-text-2">
                 Masquer les articles momentanément épuisés
               </p>
             </div>
@@ -249,7 +239,7 @@ function FilterSheetBody({
                         className={cn(
                           'flex h-12 flex-col items-center justify-center rounded-[var(--radius-md)] border text-small font-bold transition-colors',
                           isDisabled
-                            ? 'cursor-not-allowed border-silver bg-surface text-silver line-through opacity-60'
+                            ? 'cursor-not-allowed border-silver bg-surface text-text-2 line-through'
                             : isSelected
                               ? 'border-ink bg-ink text-white'
                               : 'border-silver bg-white text-ink hover:border-ink',
@@ -281,7 +271,7 @@ function FilterSheetBody({
                         className={cn(
                           'flex h-12 flex-col items-center justify-center rounded-[var(--radius-md)] border text-small font-bold transition-colors',
                           isDisabled
-                            ? 'cursor-not-allowed border-silver bg-surface text-silver line-through opacity-60'
+                            ? 'cursor-not-allowed border-silver bg-surface text-text-2 line-through'
                             : isSelected
                               ? 'border-ink bg-ink text-white'
                               : 'border-silver bg-white text-ink hover:border-ink',
@@ -315,7 +305,7 @@ function FilterSheetBody({
                       setStagedPrice((prev) => (prev === priceKey ? undefined : priceKey))
                     }
                     className={cn(
-                      'flex min-h-[48px] w-full items-center justify-between rounded-[var(--radius-md)] border px-4 py-2.5 text-left text-small font-semibold transition-colors',
+                      'flex min-h-12 w-full items-center justify-between rounded-[var(--radius-md)] border px-4 py-2.5 text-left text-small font-semibold transition-colors',
                       isSelected
                         ? 'border-ink bg-ink text-white'
                         : 'border-silver bg-white text-ink hover:bg-surface',
@@ -325,7 +315,7 @@ function FilterSheetBody({
                     {typeof count === 'number' && (
                       <span
                         className={cn(
-                          'text-xs tabular-nums',
+                          'text-caption tabular-nums',
                           isSelected ? 'text-silver' : 'text-text-2',
                         )}
                       >

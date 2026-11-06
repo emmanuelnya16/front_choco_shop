@@ -8,7 +8,7 @@ import { SmartImage } from '@/components/ui/SmartImage';
 import { cn } from '@/lib/utils/cn';
 import { haptic } from '@/lib/utils/haptics';
 import { formatPrice } from '@/lib/utils/price';
-import { ease, spring } from '@/motion/tokens';
+import { duration, ease, spring } from '@/motion/tokens';
 import { useReducedMotionPref } from '@/motion/useReducedMotionPref';
 import type { CartValidationItemResult } from '@/types/api';
 import type { CartItem } from '@/types/domain';
@@ -88,7 +88,7 @@ export function CartItemRow({
       exit={
         reducedMotion
           ? { opacity: 0 }
-          : { opacity: 0, x: -320, transition: { duration: 0.22, ease: ease.out } }
+          : { opacity: 0, x: -320, transition: { duration: duration.fast, ease: ease.out } }
       }
       transition={spring.snappy}
       className="relative overflow-hidden rounded-[var(--radius-md)]"
@@ -112,7 +112,7 @@ export function CartItemRow({
         dragElastic={{ left: 0.25, right: 0 }}
         onDragEnd={!compact ? handleDragEnd : undefined}
         className={cn(
-          'relative rounded-[var(--radius-md)] border bg-white p-3.5 transition-colors sm:p-4',
+          'relative rounded-[var(--radius-md)] border bg-white p-3.5 transition-colors duration-fast sm:p-4',
           isReduced
             ? 'border-2 border-warning'
             : isUnavailable
@@ -127,7 +127,7 @@ export function CartItemRow({
             viewTransition
             className={cn(
               'block shrink-0 overflow-hidden rounded-[var(--radius-md)] bg-surface',
-              compact ? 'h-[85px] w-[68px]' : 'h-[100px] w-[80px]',
+              compact ? 'h-21 w-17' : 'h-25 w-20',
               isUnavailable && 'opacity-50',
             )}
           >
@@ -162,7 +162,7 @@ export function CartItemRow({
                 <button
                   type="button"
                   onClick={() => onRemove(item)}
-                  className="inline-flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-[var(--radius-md)] bg-red px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-ink"
+                  className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-[var(--radius-md)] bg-red px-3 py-1.5 text-caption font-bold text-white transition-colors duration-fast hover:bg-ink"
                 >
                   <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                   <span>Retirer</span>
@@ -172,7 +172,7 @@ export function CartItemRow({
                   type="button"
                   onClick={() => onRemove(item)}
                   aria-label={`Retirer ${item.name} du panier`}
-                  className="-mt-1 -mr-1 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--radius-full)] text-text-2 transition-colors hover:bg-surface hover:text-red"
+                  className="-mt-1 -mr-1 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--radius-full)] text-text-2 transition-colors duration-fast hover:bg-surface hover:text-red"
                 >
                   <Trash2 className="h-4 w-4" aria-hidden="true" />
                 </button>
@@ -191,13 +191,13 @@ export function CartItemRow({
                 className="text-body font-bold text-ink"
               />
               {isPriceChanged && validation?.previousPrice && (
-                <span className="text-xs text-text-2 line-through tabular-nums">
+                <span className="text-caption text-text-2 line-through tabular-nums">
                   {formatPrice(validation.previousPrice)}
                 </span>
               )}
               {item.quantity > 1 && !isUnavailable && (
-                <span className="text-xs font-semibold text-text-2 tabular-nums">
-                  · Total : {formatPrice(item.unitPrice * item.quantity)}
+                <span className="text-caption font-semibold text-text-2 tabular-nums">
+                  Total&nbsp;: <span className="whitespace-nowrap">{formatPrice(item.unitPrice * item.quantity)}</span>
                 </span>
               )}
             </div>
@@ -206,7 +206,7 @@ export function CartItemRow({
             {isUnavailable && (
               <p
                 role="alert"
-                className="mt-2 inline-flex items-center gap-1.5 text-xs font-bold text-danger"
+                className="mt-2 inline-flex items-center gap-1.5 text-caption font-bold text-danger"
               >
                 <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                 <span>Épuisé entre-temps</span>
@@ -216,12 +216,12 @@ export function CartItemRow({
             {isReduced && !isUnavailable && (
               <p
                 role="status"
-                className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-warning"
+                className="mt-2 inline-flex items-center gap-1.5 text-caption font-semibold text-warning"
               >
                 <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                 <span>
                   Il ne reste que {item.maxQuantity} pièce
-                  {item.maxQuantity > 1 ? 's' : ''} : quantité ajustée.
+                  {item.maxQuantity > 1 ? 's' : ''}&nbsp;: quantité ajustée.
                 </span>
               </p>
             )}
@@ -229,7 +229,7 @@ export function CartItemRow({
             {isPriceChanged && !isUnavailable && (
               <p
                 role="status"
-                className="mt-1.5 text-xs font-semibold text-warning"
+                className="mt-1.5 text-caption font-semibold text-warning"
               >
                 Le prix a changé.
               </p>
@@ -247,7 +247,7 @@ export function CartItemRow({
                         ? `Retirer ${item.name}`
                         : `Diminuer la quantité de ${item.name}`
                     }
-                    className="inline-flex h-11 w-11 items-center justify-center text-ink transition-colors hover:bg-surface"
+                    className="inline-flex h-11 w-11 items-center justify-center text-ink transition-colors duration-fast hover:bg-surface"
                   >
                     <span className="flex h-9 w-9 items-center justify-center rounded-[var(--radius-sm)]">
                       {item.quantity <= 1 ? (
@@ -261,11 +261,11 @@ export function CartItemRow({
                     </span>
                   </button>
 
-                  {/* Chiffre qui défile verticalement en 0,2 s (§4.1) */}
+                  {/* Chiffre qui défile verticalement (§4.1, durée duration.fast) */}
                   <div
                     aria-live="polite"
                     aria-atomic="true"
-                    className="relative flex h-9 min-w-[36px] items-center justify-center overflow-hidden px-2 text-small font-extrabold tabular-nums text-ink"
+                    className="relative flex h-9 min-w-9 items-center justify-center overflow-hidden px-2 text-small font-extrabold tabular-nums text-ink"
                   >
                     <AnimatePresence mode="popLayout" initial={false}>
                       <m.span
@@ -287,7 +287,7 @@ export function CartItemRow({
                                 opacity: 0,
                               }
                         }
-                        transition={{ duration: 0.2, ease: ease.out }}
+                        transition={{ duration: duration.fast, ease: ease.out }}
                         className="inline-block"
                       >
                         {item.quantity}
@@ -301,7 +301,7 @@ export function CartItemRow({
                     onClick={handleIncrement}
                     aria-label={`Augmenter la quantité de ${item.name}`}
                     className={cn(
-                      'inline-flex h-11 w-11 items-center justify-center transition-colors',
+                      'inline-flex h-11 w-11 items-center justify-center transition-colors duration-fast',
                       isAtMaxStock
                         ? 'cursor-not-allowed text-silver'
                         : 'text-ink hover:bg-surface',
@@ -314,7 +314,7 @@ export function CartItemRow({
                 </div>
 
                 {isAtMaxStock && (
-                  <span className="text-xs font-semibold text-text-2">
+                  <span className="text-caption font-semibold text-text-2">
                     Maximum disponible
                   </span>
                 )}

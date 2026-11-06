@@ -4,6 +4,7 @@ import { useState, type ReactNode } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Sheet } from '@/components/ui/Sheet';
 import { cn } from '@/lib/utils/cn';
+import { duration, ease } from '@/motion/tokens';
 import { useReducedMotionPref } from '@/motion/useReducedMotionPref';
 import { getIosInstallContext, type IosInstallContext } from '@/pwa/installService';
 import { AppIconTile } from './AppIconTile';
@@ -80,18 +81,18 @@ function ShareArrow({ direction, label }: { direction: 'up' | 'down'; label: str
 
   return (
     <div className={cn('flex flex-col items-center gap-1 text-text-2', direction === 'down' ? 'mt-4' : 'mb-4')}>
-      {direction === 'down' && <span className="text-xs">{label}</span>}
+      {direction === 'down' && <span className="text-caption">{label}</span>}
       <m.span
         aria-hidden="true"
         className="flex h-8 w-8 items-center justify-center rounded-[var(--radius-full)] bg-surface text-ink"
         // Pas d'initial={false} : il figerait la boucle sur sa dernière image au montage
         initial={{ y: 0 }}
         animate={reducedMotion ? { y: 0 } : { y: [0, travel, 0] }}
-        transition={reducedMotion ? { duration: 0 } : { duration: 1.4, ease: 'easeInOut', repeat: Infinity }}
+        transition={reducedMotion ? { duration: 0 } : { duration: duration.ambient, ease: ease.inOut, repeat: Infinity }}
       >
         <Icon className="h-4 w-4" />
       </m.span>
-      {direction === 'up' && <span className="text-xs">{label}</span>}
+      {direction === 'up' && <span className="text-caption">{label}</span>}
     </div>
   );
 }
@@ -122,7 +123,7 @@ export function IosInstallSheet({ open, onDone, onClose }: IosInstallSheetProps)
         <div className="flex items-center gap-3.5">
           <AppIconTile className="h-12 w-12 rounded-xl" />
           <p className="text-small text-text-2">
-            Ajoutez DR Choco à votre écran d’accueil : il s’ouvrira comme une application, en plein écran.
+            Ajoutez DR Choco à votre écran d’accueil&nbsp;: il s’ouvrira comme une application, en plein écran.
           </p>
         </div>
 
@@ -133,7 +134,7 @@ export function IosInstallSheet({ open, onDone, onClose }: IosInstallSheetProps)
               <>
                 Appuyez sur <strong className="font-bold">Partager</strong>
                 <span className="ml-2 inline-flex h-7 w-7 translate-y-1.5 items-center justify-center rounded-[var(--radius-sm)] border border-silver bg-white text-ink">
-                  <IosShareIcon className="h-[18px] w-[18px]" />
+                  <IosShareIcon className="h-5 w-5" />
                 </span>
               </>
             }

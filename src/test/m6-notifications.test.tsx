@@ -418,6 +418,24 @@ describe('M6 · Notifications · 2. Abonnement', () => {
     expect(subscribeBodies[1]!.oldEndpoint).toBe(endpoint);
     expect(subscribeBodies[0]).not.toHaveProperty('oldEndpoint');
   });
+
+  it('démarrage : clé VAPID du serveur changée → ancien abonnement remplacé et signalé au serveur', async () => {
+    const endpoint = 'https://fcm.googleapis.com/fcm/send/ancienne-cle';
+    const fake = installFakePush({ permission: 'granted', existingEndpoint: endpoint });
+    storeEndpoint(endpoint);
+    // Abonnement créé avec une autre clé publique que celle de l'app
+    const previous = fake.state.subscription!;
+    Object.defineProperty(previous, 'options', {
+      value: { applicationServerKey: new Uint8Array(65).fill(7).buffer, userVisibleOnly: true },
+    });
+
+    await syncPushSubscription('startup');
+    expect(previous.unsubscribe).toHaveBeenCalledTimes(1);
+    expect(subscribeBodies).toHaveLength(1);
+    expect((subscribeBodies[0]!.subscription as { endpoint: string }).endpoint).not.toBe(endpoint);
+    expect(subscribeBodies[0]!.oldEndpoint).toBe(endpoint);
+    expect(usePushStore.getState().status).toBe('subscribed');
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -474,10 +492,11 @@ describe('M6 · Notifications · 3. Profil et déconnexion', () => {
     renderRoute('/profil');
 
     fireEvent.click(await screen.findByRole('button', { name: /Se déconnecter/ }, { timeout: 6000 }));
-    const dialog = await screen.findByRole('dialog', { name: 'Se déconnecter ?' });
+    // Espace insécable avant « ? » et « ! » (M7) : \s la reconnaît aussi
+    const dialog = await screen.findByRole('dialog', { name: /^Se déconnecter\s\?$/ });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Me déconnecter' }));
 
-    expect(await screen.findByText('Vous êtes déconnecté. À bientôt !', {}, { timeout: 6000 })).toBeInTheDocument();
+    expect(await screen.findByText(/^Vous êtes déconnecté\. À bientôt\s!$/, {}, { timeout: 6000 })).toBeInTheDocument();
     expect(unsubscribeBodies).toEqual([{ endpoint }]);
     expect(badge.clearAppBadge).toHaveBeenCalled();
     // Données personnelles enregistrées pour le hors connexion : vidées par le service worker

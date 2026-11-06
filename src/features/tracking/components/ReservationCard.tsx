@@ -22,7 +22,7 @@ import { ReservationStatusBadge } from './ReservationStatusBadge';
  * Bouton d'action d'une carte : 44 px de haut au toucher (sous 1024 px), 36 px (taille sm) sur ordinateur.
  * Un appui à côté du bouton ouvrirait le détail (lien étendu à toute la carte).
  */
-const ACTION_TARGET = 'max-lg:min-h-[44px]';
+const ACTION_TARGET = 'max-lg:min-h-11';
 
 export interface ReservationCardProps {
   item: ReservationListItem;
@@ -73,7 +73,7 @@ export function ReservationCard({ item, className }: ReservationCardProps) {
                 ? { viewTransitionName: `res-${item.ref}` }
                 : undefined
             }
-            className="block font-mono text-[16px] font-bold tracking-tight text-ink after:absolute after:inset-0 after:rounded-[var(--radius-md)] after:content-[''] focus-visible:outline-none focus-visible:after:outline-2 focus-visible:after:outline-offset-2 focus-visible:after:outline-red"
+            className="block font-mono text-body font-bold tracking-tight text-ink after:absolute after:inset-0 after:rounded-[var(--radius-md)] after:content-[''] focus-visible:outline-none focus-visible:after:outline-2 focus-visible:after:outline-offset-2 focus-visible:after:outline-red"
           >
             {item.ref}
           </Link>
@@ -97,7 +97,7 @@ export function ReservationCard({ item, className }: ReservationCardProps) {
               src={item.packagePhotoThumb!}
               alt="Photo de votre colis emballé"
               ratio="1/1"
-              className="h-[60px] w-[60px] shrink-0 rounded-[var(--radius-sm)]"
+              className="h-15 w-15 shrink-0 rounded-[var(--radius-sm)]"
             />
             <span className="inline-flex items-center gap-1.5 text-small font-semibold text-ink">
               <Camera className="h-4 w-4 text-red" aria-hidden="true" />
@@ -112,13 +112,13 @@ export function ReservationCard({ item, className }: ReservationCardProps) {
                   src={preview.image}
                   alt={preview.name}
                   ratio="4/5"
-                  className="h-[60px] w-12 rounded-[var(--radius-sm)]"
+                  className="h-15 w-12 rounded-[var(--radius-sm)]"
                 />
               </li>
             ))}
           </ul>
         )}
-        <Price amount={item.amount.total} className="text-[16px] text-ink" />
+        <Price amount={item.amount.total} className="text-body text-ink" />
       </div>
 
       <ReservationProgressBar progress={progress} className="mt-3.5" />
@@ -127,10 +127,11 @@ export function ReservationCard({ item, className }: ReservationCardProps) {
         <ReservationStatusBadge status={item.status} />
       </div>
 
-      {/* Rangée d'action en bas de carte (mt-auto) et de hauteur fixe, avec ou sans bouton (box-content :
+      {/* z-[1] local : la rangée passe au-dessus du lien étendu à toute la carte (after:inset-0).
+          Rangée d'action en bas de carte (mt-auto) et de hauteur fixe, avec ou sans bouton (box-content :
           min-h = hauteur du bouton, hors filet et pt-3) : cartes et filets alignés sur une même rangée. */}
       <div
-        className="relative z-[1] mt-auto box-content flex min-h-[44px] items-center justify-between gap-3 border-t border-silver/70 pt-3 lg:min-h-[36px]"
+        className="relative z-[1] mt-auto box-content flex min-h-11 items-center justify-between gap-3 border-t border-silver/70 pt-3 lg:min-h-9"
         onPointerDown={(event) => {
           // Le bouton d'action ne déclenche pas l'effet d'appui de la carte
           if ((event.target as HTMLElement).closest('a,button')) event.stopPropagation();
@@ -191,9 +192,9 @@ export function ReservationCardSkeleton() {
       <Skeleton className="mt-1.5 h-4 w-40" />
       <div className="mt-3 flex items-end justify-between">
         <div className="flex gap-1.5">
-          <Skeleton className="h-[60px] w-12 rounded-[var(--radius-sm)]" />
-          <Skeleton className="h-[60px] w-12 rounded-[var(--radius-sm)]" />
-          <Skeleton className="h-[60px] w-12 rounded-[var(--radius-sm)]" />
+          <Skeleton className="h-15 w-12 rounded-[var(--radius-sm)]" />
+          <Skeleton className="h-15 w-12 rounded-[var(--radius-sm)]" />
+          <Skeleton className="h-15 w-12 rounded-[var(--radius-sm)]" />
         </div>
         <Skeleton className="h-5 w-24" />
       </div>

@@ -135,7 +135,7 @@ export function Sheet({ open, onClose, title, children, className }: SheetProps)
             onDragEnd={handleDragEnd}
             className={cn(
               // touch-pan-x : le glissement vertical revient à la feuille (comme le faisait l'écouteur de Motion)
-              'relative z-10 flex max-h-[92dvh] w-full max-w-lg touch-pan-x flex-col rounded-t-[var(--radius-sheet)] bg-white p-5 pb-[calc(20px+env(safe-area-inset-bottom,0px))] shadow-[var(--shadow-sheet)] lg:max-w-[440px] lg:rounded-[var(--radius-md)] lg:p-6',
+              'relative z-10 flex max-h-[92dvh] w-full max-w-lg touch-pan-x flex-col rounded-t-[var(--radius-sheet)] bg-white p-5 pb-[calc(20px+env(safe-area-inset-bottom,0px))] shadow-[var(--shadow-sheet)] lg:max-w-110 lg:rounded-[var(--radius-md)] lg:p-6',
               className,
             )}
           >
@@ -146,12 +146,13 @@ export function Sheet({ open, onClose, title, children, className }: SheetProps)
             />
 
             <div className="flex shrink-0 items-center justify-between gap-4 border-b border-silver pb-3.5 select-none">
-              <h2 className="text-h3 font-bold text-ink">{title}</h2>
+              <h2 className="min-w-0 text-h3 font-bold text-ink">{title}</h2>
+              {/* shrink-0 : un titre sur deux lignes n'écrase jamais le bouton (44 × 44 px) */}
               <button
                 type="button"
                 onClick={onClose}
                 aria-label="Fermer la fenêtre"
-                className="inline-flex h-11 w-11 items-center justify-center rounded-[var(--radius-full)] text-ink hover:bg-surface"
+                className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--radius-full)] text-ink transition-colors duration-fast hover:bg-surface"
               >
                 <X className="h-5 w-5" aria-hidden="true" />
               </button>

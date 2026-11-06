@@ -17,8 +17,9 @@ import {
   resolveNotificationUrl,
   samplePushPayload,
 } from '@/pwa/pushPayload';
-import { useNetworkStore } from '@/pwa/networkStore';
-import { OFFLINE_FALLBACK_HEADER } from '@/pwa/swProtocol';
+import { handleNetworkStatusMessage, useNetworkStore, useSyncStore } from '@/pwa/networkStore';
+import { markCachedResponse, networkStatusPlugin } from '@/pwa/swNetworkStatus';
+import { FROM_CACHE_HEADER, OFFLINE_FALLBACK_HEADER, SW_MESSAGES } from '@/pwa/swProtocol';
 import { urlBase64ToUint8Array } from '@/pwa/vapid';
 import { useAuthStore } from '@/stores/authStore';
 import type { User } from '@/types/domain';
@@ -369,6 +370,84 @@ describe('M6 · 5. Téléphone « en ligne » sans vraie connexion', () => {
     expect(useNetworkStore.getState().online).toBe(true);
     await expect(api.get('/reservations/summary')).resolves.toEqual({ needsAction: 1 });
     expect(useNetworkStore.getState().online).toBe(false);
+  });
+
+  it('copie du catalogue (StaleWhileRevalidate) : ni succès ni échec, aucune date de synchronisation', async () => {
+    // Un échec déjà compté n'est pas effacé par une réponse lue dans le cache (défaut D2, M7)
+    useNetworkStore.setState({ browserOnline: true, consecutiveFailures: 1, online: true, offlineSince: null });
+    const fromCache = () =>
+      new Response(JSON.stringify({ ref: 'RES-000101' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json', [FROM_CACHE_HEADER]: '1' },
+      });
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(fromCache()).mockResolvedValueOnce(fromCache());
+    useSyncStore.getState().clear();
+
+    await expect(api.get('/reservations/RES-000101')).resolves.toEqual({ ref: 'RES-000101' });
+    expect(useNetworkStore.getState()).toMatchObject({ online: true, consecutiveFailures: 1 });
+    expect(useSyncStore.getState().syncedAt).toEqual({});
+
+    // Hors connexion : une copie ne fait pas revenir en ligne
+    useNetworkStore.setState({ consecutiveFailures: 2, online: false, offlineSince: 1 });
+    await api.get('/reservations/RES-000101');
+    expect(useNetworkStore.getState().online).toBe(false);
+  });
+
+  it('message NETWORK_STATUS du service worker : 2 mises à jour en échec → hors connexion, une réussite → en ligne', () => {
+    useNetworkStore.setState({ browserOnline: true, consecutiveFailures: 0, online: true, offlineSince: null });
+    const failed = { type: SW_MESSAGES.networkStatus, reachable: false };
+    expect(handleNetworkStatusMessage(failed)).toBe(true);
+    expect(useNetworkStore.getState().online).toBe(true);
+    handleNetworkStatusMessage(failed);
+    expect(useNetworkStore.getState().online).toBe(false);
+
+    expect(handleNetworkStatusMessage({ type: SW_MESSAGES.networkStatus, reachable: true })).toBe(true);
+    expect(useNetworkStore.getState()).toMatchObject({ online: true, consecutiveFailures: 0 });
+
+    // Messages étrangers ou incomplets : ignorés
+    expect(handleNetworkStatusMessage({ type: SW_MESSAGES.networkStatus })).toBe(false);
+    expect(handleNetworkStatusMessage({ type: SW_MESSAGES.navigate, url: '/' })).toBe(false);
+    expect(handleNetworkStatusMessage(null)).toBe(false);
+  });
+
+  it('service worker : copies marquées, échec signalé seulement si une copie a été servie', async () => {
+    const cached = new Response('{"ok":true}', { status: 200, headers: { 'Content-Type': 'application/json' } });
+    const marked = await markCachedResponse(cached.clone(), { offlineFallback: false });
+    expect(marked.headers.get(FROM_CACHE_HEADER)).toBe('1');
+    expect(marked.headers.get(OFFLINE_FALLBACK_HEADER)).toBeNull();
+    expect(marked.headers.get('Content-Type')).toBe('application/json');
+    await expect(marked.json()).resolves.toEqual({ ok: true });
+    const fallback = await markCachedResponse(cached.clone(), { offlineFallback: true });
+    expect(fallback.headers.get(OFFLINE_FALLBACK_HEADER)).toBe('1');
+    expect(fallback.headers.get(FROM_CACHE_HEADER)).toBe('1');
+    // API sur une autre origine : en-têtes déclarés lisibles par la page, liste existante conservée
+    expect(marked.headers.get('Access-Control-Expose-Headers')).toBe(FROM_CACHE_HEADER);
+    const crossOrigin = new Response('{}', { headers: { 'Access-Control-Expose-Headers': 'ETag, x-drc-from-cache' } });
+    const exposed = await markCachedResponse(crossOrigin, { offlineFallback: true });
+    expect(exposed.headers.get('Access-Control-Expose-Headers')).toBe(`ETag, x-drc-from-cache, ${OFFLINE_FALLBACK_HEADER}`);
+
+    const notify = vi.fn();
+    let hasCopy = true;
+    const plugin = networkStatusPlugin({ hasCachedCopy: async () => hasCopy, notify });
+    const request = new Request('https://api.drchoco.cm/api/products/hoodie');
+    const event = { clientId: 'onglet-1' } as unknown as Event;
+    type FailParam = Parameters<NonNullable<typeof plugin.fetchDidFail>>[0];
+    type SuccessParam = Parameters<NonNullable<typeof plugin.fetchDidSucceed>>[0];
+
+    await plugin.fetchDidFail?.({ request, originalRequest: request, error: new Error('x'), event, state: {} } as FailParam);
+    expect(notify).toHaveBeenLastCalledWith(false, 'onglet-1');
+
+    // Sans copie, la requête de l'app échoue elle-même : pas de double comptage
+    notify.mockClear();
+    hasCopy = false;
+    await plugin.fetchDidFail?.({ request, originalRequest: request, error: new Error('x'), event, state: {} } as FailParam);
+    expect(notify).not.toHaveBeenCalled();
+
+    const response = new Response('{}', { status: 503 });
+    await expect(
+      plugin.fetchDidSucceed?.({ request, response, event, state: {} } as SuccessParam),
+    ).resolves.toBe(response);
+    expect(notify).toHaveBeenLastCalledWith(true, 'onglet-1');
   });
 
   it('une vraie réponse du serveur remet en ligne', async () => {

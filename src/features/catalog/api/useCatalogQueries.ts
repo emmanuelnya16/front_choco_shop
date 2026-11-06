@@ -11,6 +11,7 @@ import { endpoints } from '@/lib/api/endpoints';
 import { qk } from '@/lib/api/queryKeys';
 import type {
   CategoriesResponse,
+  CitiesResponse,
   LookDetailResponse,
   LooksResponse,
   ProductDetailResponse,
@@ -22,6 +23,7 @@ import type {
 import type { Product } from '@/types/domain';
 
 const FIVE_MINUTES_MS = 5 * 60 * 1000;
+const ONE_HOUR_MS = 60 * 60 * 1000;
 
 export function useCategories() {
   return useQuery({
@@ -244,6 +246,20 @@ export function usePublicSettings() {
   return useQuery({
     queryKey: qk.settings(),
     queryFn: () => api.get<PublicSettingsResponse>(endpoints.settings.public),
+  });
+}
+
+/**
+ * Villes de livraison et leurs frais (GET /delivery/cities), pour les informations de livraison de la
+ * fiche produit. Chargées seulement quand elles sont affichées (`enabled`) ; même cache que le
+ * formulaire de réservation (useDeliveryCities), qui les retrouve donc sans nouvelle requête.
+ */
+export function useDeliveryCitiesInfo(enabled: boolean) {
+  return useQuery({
+    queryKey: qk.cities(),
+    queryFn: () => api.get<CitiesResponse>(endpoints.delivery.cities),
+    staleTime: ONE_HOUR_MS,
+    enabled,
   });
 }
 

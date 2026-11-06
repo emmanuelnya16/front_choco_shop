@@ -143,7 +143,7 @@ export function SmartImage({
             onLoad={handleLoad}
             onError={handleError}
             className={cn(
-              'h-full w-full object-cover transition-opacity duration-400',
+              'h-full w-full object-cover transition-opacity duration-slow',
               isLoaded ? 'opacity-100' : 'opacity-0',
               tone === 'mood' && 'mood-image',
               tone === 'mood' && colorRevealOnGroupHover && 'mood-image-color-reveal',

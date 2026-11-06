@@ -1,4 +1,5 @@
 import { useCallback, useSyncExternalStore } from 'react';
+import { PRICE_RANGE_LABELS } from '@/features/catalog/filters/useCatalogFilters';
 import { safeStorage } from '@/lib/utils/storage';
 
 const RECENT_SEARCHES_KEY = 'drc_recent_searches_v1';
@@ -11,11 +12,13 @@ export const POPULAR_SEARCH_CHIPS: {
 }[] = [
   { label: 'Babouches cuir', query: 'babouche cuir' },
   { label: 'T-shirt oversize', query: 'oversize' },
-  { label: 'Ensemble noir', query: 'ensemble' },
+  // Recherches qui mènent à des articles du catalogue (aucune sous-catégorie « ensembles » dans /categories)
+  { label: 'Hoodies', query: 'hoodie' },
   { label: 'Pointure 42', query: '42', targetUrl: '/explorer?size=42' },
   { label: 'Taille XL', query: 'XL', targetUrl: '/explorer?size=XL' },
+  // Même libellé que le filtre appliqué (« Moins de 15 000 FCFA ») : le raccourci mène à ce filtre
   {
-    label: 'Moins de 20 000 FCFA',
+    label: PRICE_RANGE_LABELS['0-15000'],
     query: '15000',
     targetUrl: '/explorer?price=0-15000',
   },

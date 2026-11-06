@@ -20,6 +20,7 @@ import {
   useVerifyOtp,
 } from '@/features/auth/api/useAuthQueries';
 import { ApiError } from '@/lib/api/client';
+import { env } from '@/lib/env';
 import { useOnlineStatus } from '@/lib/hooks/useOnlineStatus';
 import { cn } from '@/lib/utils/cn';
 import { haptic } from '@/lib/utils/haptics';
@@ -31,7 +32,7 @@ import {
   isValidCmPhone,
   normalizeCmPhone,
 } from '@/lib/utils/phone';
-import { ease } from '@/motion/tokens';
+import { duration, ease, staggerSlow, staggerStep } from '@/motion/tokens';
 import { useReducedMotionPref } from '@/motion/useReducedMotionPref';
 import { useUiStore } from '@/stores/uiStore';
 
@@ -113,7 +114,34 @@ function AuthSheetContent({
   const [lastName, setLastName] = useState('');
   const [nameError, setNameError] = useState<string | null>(null);
 
-  const otpInputRef = useRef<HTMLInputElement>(null);
+  const otpInputRef = useRef<HTMLInputElement | null>(null);
+  const resentTimerRef = useRef<number | null>(null);
+
+  // Curseur dans le champ du code dès que l'étape est réellement affichée (D3) : AnimatePresence
+  // (mode « wait ») ne monte le champ qu'après la sortie de l'étape précédente, d'où un ref de rappel
+  // plutôt qu'un délai fixe.
+  const setOtpInputRef = useCallback((node: HTMLInputElement | null) => {
+    otpInputRef.current = node;
+    if (node && !node.disabled) node.focus({ preventScroll: true });
+  }, []);
+
+  // Retour à l'étape du numéro (« Modifier ») : curseur dans le champ du numéro
+  const phoneInputRef = useRef<HTMLInputElement | null>(null);
+  const returningToPhoneRef = useRef(false);
+  const setPhoneInputRef = useCallback((node: HTMLInputElement | null) => {
+    phoneInputRef.current = node;
+    if (node && returningToPhoneRef.current) {
+      returningToPhoneRef.current = false;
+      node.focus({ preventScroll: true });
+    }
+  }, []);
+
+  useEffect(
+    () => () => {
+      if (resentTimerRef.current !== null) window.clearTimeout(resentTimerRef.current);
+    },
+    [],
+  );
   const verifyingCodeRef = useRef<string | null>(null);
 
   const detectedOperator = detectCmOperator(phoneInput);
@@ -131,16 +159,6 @@ function AuthSheetContent({
 
     return () => window.clearInterval(timer);
   }, [step, resendSeconds, lockedSeconds]);
-
-  // Focus sur le champ OTP à l'entrée de l'étape 2
-  useEffect(() => {
-    if (step === 'otp') {
-      const id = window.setTimeout(() => {
-        otpInputRef.current?.focus();
-      }, 60);
-      return () => window.clearTimeout(id);
-    }
-  }, [step]);
 
   const submitOtpCode = useCallback(
     async (codeToVerify: string, targetPhone: string) => {
@@ -164,7 +182,8 @@ function AuthSheetContent({
         setIsSuccessCascade(true);
         haptic('success');
 
-        const delayMs = reducedMotion ? 80 : 420;
+        // Laisse voir la cascade verte (6 cases décalées de staggerStep, durée duration.fast)
+        const delayMs = (reducedMotion ? duration.tap : staggerStep * 5 + duration.fast) * 1000;
         window.setTimeout(() => {
           if (session.isNewUser) {
             setStepDirection(1);
@@ -192,7 +211,7 @@ function AuthSheetContent({
                 : 600;
             setLockedSeconds(retryAfter);
             setOtpError(
-              `Trop de tentatives. Réessayez dans ${Math.max(1, Math.ceil(retryAfter / 60))} min.`,
+              `Trop de tentatives. Réessayez dans ${Math.max(1, Math.ceil(retryAfter / 60))}\u00A0min.`,
             );
             setOtpCode('');
             return;
@@ -210,9 +229,9 @@ function AuthSheetContent({
               : err.message || 'Code incorrect.',
           );
           setOtpCode('');
-          window.setTimeout(() => {
-            otpInputRef.current?.focus();
-          }, 30);
+          requestAnimationFrame(() => {
+            otpInputRef.current?.focus({ preventScroll: true });
+          });
           return;
         }
 
@@ -320,14 +339,14 @@ function AuthSheetContent({
             : 600;
         setLockedSeconds(retryAfter);
         setPhoneError(
-          `Trop de tentatives. Réessayez dans ${Math.max(1, Math.ceil(retryAfter / 60))} min.`,
+          `Trop de tentatives. Réessayez dans ${Math.max(1, Math.ceil(retryAfter / 60))}\u00A0min.`,
         );
         return;
       }
       setPhoneError(
         err instanceof Error
           ? err.message
-          : "Impossible d'envoyer le SMS pour le moment.",
+          : "Impossible d’envoyer le SMS pour le moment.",
       );
     }
   };
@@ -369,8 +388,10 @@ function AuthSheetContent({
       const res = await requestOtp.mutateAsync({ phone: normalizedPhone });
       setResendSeconds(res.resendIn ?? 60);
       setResentBannerVisible(true);
-      window.setTimeout(() => setResentBannerVisible(false), 3000);
-      otpInputRef.current?.focus();
+      // Message « Nouveau code envoyé » affiché 3 s (retour d'information, pas une animation)
+      if (resentTimerRef.current !== null) window.clearTimeout(resentTimerRef.current);
+      resentTimerRef.current = window.setTimeout(() => setResentBannerVisible(false), 3000);
+      otpInputRef.current?.focus({ preventScroll: true });
     } catch (err) {
       haptic('error');
       if (err instanceof ApiError && err.status === 429) {
@@ -380,10 +401,10 @@ function AuthSheetContent({
             : 600;
         setLockedSeconds(retryAfter);
         setOtpError(
-          `Trop de tentatives. Réessayez dans ${Math.max(1, Math.ceil(retryAfter / 60))} min.`,
+          `Trop de tentatives. Réessayez dans ${Math.max(1, Math.ceil(retryAfter / 60))}\u00A0min.`,
         );
       } else {
-        setOtpError("Impossible de renvoyer le code pour l'instant.");
+        setOtpError("Impossible de renvoyer le code pour l’instant.");
       }
     }
   };
@@ -429,15 +450,15 @@ function AuthSheetContent({
             initial="initial"
             animate="animate"
             exit="exit"
-            transition={{ duration: 0.28, ease: ease.out }}
+            transition={{ duration: duration.quick, ease: ease.out }}
             onSubmit={handlePhoneSubmit}
             noValidate
             className="space-y-5"
           >
             <div>
-              <h2 className="text-h2 text-ink">Réservez en 1 minute</h2>
+              <h2 className="text-h2 text-ink">Réservez en 1&nbsp;minute</h2>
               <p className="mt-1.5 text-small text-text-2">
-                Entrez votre numéro : nous vous envoyons un code par SMS. Pas de
+                Entrez votre numéro&nbsp;: nous vous envoyons un code par SMS. Pas de
                 mot de passe.
               </p>
             </div>
@@ -452,7 +473,7 @@ function AuthSheetContent({
 
               <div
                 className={cn(
-                  'mt-2 flex h-13 items-center rounded-[var(--radius-md)] border bg-white px-3.5 transition-colors focus-within:border-ink',
+                  'mt-2 flex h-13 items-center rounded-[var(--radius-md)] border bg-white px-3.5 transition-colors duration-fast focus-within:border-ink',
                   phoneTouched && phoneError ? 'border-danger' : 'border-silver',
                 )}
               >
@@ -464,6 +485,7 @@ function AuthSheetContent({
                 </span>
 
                 <input
+                  ref={setPhoneInputRef}
                   id="auth-phone-input"
                   type="tel"
                   inputMode="numeric"
@@ -478,14 +500,14 @@ function AuthSheetContent({
                   aria-describedby={
                     phoneTouched && phoneError ? errorId : undefined
                   }
-                  className="h-full min-w-0 flex-1 bg-transparent px-3 font-mono text-[16px] font-bold tracking-wide text-ink placeholder:font-sans placeholder:font-normal placeholder:text-text-2 focus:outline-none"
+                  className="h-full min-w-0 flex-1 bg-transparent px-3 font-mono text-body font-bold tracking-wide text-ink placeholder:font-sans placeholder:font-normal placeholder:text-text-2 focus:outline-none"
                 />
 
                 {/* Repère d'opérateur dès 3 chiffres (§5.2) */}
                 {operatorLabel && (
                   <span
                     data-testid="operator-badge"
-                    className="shrink-0 rounded-[var(--radius-sm)] bg-surface px-2.5 py-1 text-xs font-bold text-ink"
+                    className="shrink-0 rounded-[var(--radius-sm)] bg-surface px-2.5 py-1 text-caption font-bold text-ink"
                   >
                     {operatorLabel}
                   </span>
@@ -496,7 +518,7 @@ function AuthSheetContent({
                 <p
                   id={errorId}
                   role="alert"
-                  className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-danger"
+                  className="mt-2 flex items-center gap-1.5 text-caption font-semibold text-danger"
                 >
                   <AlertCircle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                   <span>{phoneError}</span>
@@ -506,7 +528,7 @@ function AuthSheetContent({
               {!isOnline && (
                 <p
                   role="alert"
-                  className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-warning"
+                  className="mt-2 flex items-center gap-1.5 text-caption font-semibold text-warning"
                 >
                   <AlertCircle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                   <span>
@@ -527,10 +549,10 @@ function AuthSheetContent({
               Recevoir mon code
             </Button>
 
-            <p className="text-center text-xs leading-relaxed text-text-2">
+            <p className="text-center text-caption leading-relaxed text-text-2">
               En continuant, vous acceptez nos{' '}
               <Link
-                to="/pages/cgv"
+                to="/pages/conditions-generales"
                 onClick={onCancel}
                 className="font-semibold text-ink underline"
               >
@@ -557,7 +579,7 @@ function AuthSheetContent({
             initial="initial"
             animate="animate"
             exit="exit"
-            transition={{ duration: 0.28, ease: ease.out }}
+            transition={{ duration: duration.quick, ease: ease.out }}
             className="space-y-5"
           >
             <div>
@@ -567,10 +589,11 @@ function AuthSheetContent({
                 <button
                   type="button"
                   onClick={() => {
+                    returningToPhoneRef.current = true;
                     setStepDirection(-1);
                     setStep('phone');
                   }}
-                  className="font-bold text-ink underline hover:text-red"
+                  className="inline-flex min-h-11 items-center font-bold text-ink underline transition-colors duration-fast hover:text-red"
                 >
                   Modifier
                 </button>
@@ -580,7 +603,7 @@ function AuthSheetContent({
             {/* 6 cases visuelles alimentées par un seul champ caché (§5.3 & §9.2) */}
             <div className="relative">
               <input
-                ref={otpInputRef}
+                ref={setOtpInputRef}
                 data-testid="otp-hidden-input"
                 type="text"
                 inputMode="numeric"
@@ -604,7 +627,7 @@ function AuthSheetContent({
                     ? { x: [0, -8, 8, -6, 6, 0] }
                     : { x: 0 }
                 }
-                transition={{ duration: 0.4, ease: ease.out }}
+                transition={{ duration: duration.slow, ease: ease.out }}
                 aria-hidden="true"
                 className="grid grid-cols-6 gap-2 sm:gap-3"
               >
@@ -630,17 +653,18 @@ function AuthSheetContent({
                       }
                       transition={
                         isSuccessCascade
-                          ? { delay: idx * 0.05, duration: 0.22 }
+                          ? { delay: idx * staggerStep, duration: duration.fast }
                           : verifyOtp.isPending
                             ? {
                                 repeat: Number.POSITIVE_INFINITY,
-                                duration: 0.7,
-                                delay: idx * 0.08,
+                                duration: duration.reveal,
+                                delay: idx * staggerSlow,
                               }
                             : undefined
                       }
                       className={cn(
-                        'relative flex h-[56px] w-full max-w-[52px] items-center justify-center justify-self-center rounded-[var(--radius-md)] border font-mono text-[24px] font-bold transition-colors',
+                        // Chiffres de 24 px : choix graphique des cases du code (taille fixe, cases de 56 px)
+                        'relative flex h-14 w-full max-w-13 items-center justify-center justify-self-center rounded-[var(--radius-md)] border font-mono text-[24px] font-bold transition-colors duration-fast',
                         isSuccessCascade
                           ? 'border-success bg-success text-white'
                           : lockedSeconds > 0
@@ -655,7 +679,7 @@ function AuthSheetContent({
                       )}
                     >
                       {isSuccessCascade && idx === 2 ? (
-                        <Check className="h-6 w-6 text-white" />
+                        <Check className="h-6 w-6 text-white" aria-hidden="true" />
                       ) : (
                         <span>{char}</span>
                       )}
@@ -670,9 +694,9 @@ function AuthSheetContent({
             </div>
 
             {/* État de vérification / messages d'erreur / essais restants annoncés en aria-live */}
-            <div aria-live="polite" aria-atomic="true" className="min-h-[24px]">
+            <div aria-live="polite" aria-atomic="true" className="min-h-6">
               {verifyOtp.isPending && (
-                <p className="flex items-center justify-center gap-2 text-xs font-semibold text-text-2">
+                <p className="flex items-center justify-center gap-2 text-caption font-semibold text-text-2">
                   <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
                   <span>Vérification du code…</span>
                 </p>
@@ -682,19 +706,19 @@ function AuthSheetContent({
                 <p
                   id={errorId}
                   role="alert"
-                  className="flex items-center justify-center gap-1.5 text-center text-xs font-bold text-danger"
+                  className="flex items-center justify-center gap-1.5 text-center text-caption font-bold text-danger"
                 >
                   <AlertCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
                   <span>
                     {lockedSeconds > 0
-                      ? `Trop de tentatives. Réessayez dans ${Math.max(1, Math.ceil(lockedSeconds / 60))} min.`
+                      ? `Trop de tentatives. Réessayez dans ${Math.max(1, Math.ceil(lockedSeconds / 60))}\u00A0min.`
                       : otpError}
                   </span>
                 </p>
               )}
 
               {resentBannerVisible && !otpError && (
-                <p className="text-center text-xs font-bold text-success">
+                <p className="text-center text-caption font-bold text-success">
                   Nouveau code envoyé
                 </p>
               )}
@@ -712,7 +736,7 @@ function AuthSheetContent({
                 Recevoir un nouveau code
               </Button>
             ) : (
-              <div className="flex items-center justify-between border-t border-silver/60 pt-3 text-xs text-text-2">
+              <div className="flex min-h-14 items-center justify-between border-t border-silver/60 pt-3 text-caption text-text-2">
                 {resendSeconds > 0 ? (
                   <span>
                     Renvoyer le code dans {formatSecondsTimer(resendSeconds)}
@@ -722,16 +746,19 @@ function AuthSheetContent({
                     type="button"
                     disabled={requestOtp.isPending || lockedSeconds > 0}
                     onClick={handleResendCode}
-                    className="inline-flex min-h-[44px] items-center gap-1.5 font-bold text-ink underline hover:text-red disabled:opacity-50"
+                    className="inline-flex min-h-11 items-center gap-1.5 font-bold text-ink underline transition-colors duration-fast hover:text-red disabled:opacity-50"
                   >
                     <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
                     <span>Renvoyer le code</span>
                   </button>
                 )}
 
-                <span className="font-mono text-[11px] text-text-2">
-                  Démo : 123456
-                </span>
+                {/* Code de démonstration : uniquement avec les données simulées (jamais en production) */}
+                {env.apiMock && (
+                  <span className="font-mono text-caption text-text-2">
+                    Démo&nbsp;: 123456
+                  </span>
+                )}
               </div>
             )}
           </m.div>
@@ -745,13 +772,13 @@ function AuthSheetContent({
             initial="initial"
             animate="animate"
             exit="exit"
-            transition={{ duration: 0.28, ease: ease.out }}
+            transition={{ duration: duration.quick, ease: ease.out }}
             onSubmit={handleNameSubmit}
             noValidate
             className="space-y-5"
           >
             <div>
-              <h2 className="text-h2 text-ink">Comment vous appelez-vous ?</h2>
+              <h2 className="text-h2 text-ink">Comment vous appelez-vous&nbsp;?</h2>
               <p className="mt-1.5 text-small text-text-2">
                 Ces informations préremplissent vos réservations et l&rsquo;étiquette
                 de votre colis.
@@ -771,13 +798,13 @@ function AuthSheetContent({
                   type="text"
                   autoComplete="given-name"
                   enterKeyHint="next"
-                  placeholder="Ex. : Junior"
+                  placeholder="Ex.&nbsp;: Junior"
                   value={firstName}
                   onChange={(e) => {
                     setFirstName(e.target.value);
                     if (nameError) setNameError(null);
                   }}
-                  className="mt-1.5 h-12 w-full rounded-[var(--radius-md)] border border-silver bg-white px-3.5 text-[16px] text-ink placeholder:text-text-2 focus:border-ink focus:outline-none"
+                  className="mt-1.5 h-12 w-full rounded-[var(--radius-md)] border border-silver bg-white px-3.5 text-body text-ink placeholder:text-text-2 focus:border-ink focus:outline-none"
                 />
               </div>
 
@@ -793,17 +820,17 @@ function AuthSheetContent({
                   type="text"
                   autoComplete="family-name"
                   enterKeyHint="done"
-                  placeholder="Ex. : Mbarga"
+                  placeholder="Ex.&nbsp;: Mbarga"
                   value={lastName}
                   onChange={(e) => setLastName(e.target.value)}
-                  className="mt-1.5 h-12 w-full rounded-[var(--radius-md)] border border-silver bg-white px-3.5 text-[16px] text-ink placeholder:text-text-2 focus:border-ink focus:outline-none"
+                  className="mt-1.5 h-12 w-full rounded-[var(--radius-md)] border border-silver bg-white px-3.5 text-body text-ink placeholder:text-text-2 focus:border-ink focus:outline-none"
                 />
               </div>
 
               {nameError && (
                 <p
                   role="alert"
-                  className="flex items-center gap-1.5 text-xs font-semibold text-danger"
+                  className="flex items-center gap-1.5 text-caption font-semibold text-danger"
                 >
                   <AlertCircle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                   <span>{nameError}</span>
@@ -825,7 +852,7 @@ function AuthSheetContent({
               <button
                 type="button"
                 onClick={onComplete}
-                className="flex min-h-[44px] w-full items-center justify-center text-small font-semibold text-text-2 underline hover:text-ink"
+                className="flex min-h-11 w-full items-center justify-center text-small font-semibold text-text-2 underline transition-colors duration-fast hover:text-ink"
               >
                 Plus tard
               </button>

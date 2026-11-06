@@ -34,7 +34,7 @@ export function CategoryTile({
         to={`/explorer/${slug}`}
         className="relative block h-full w-full overflow-hidden rounded-[var(--radius-md)]"
       >
-        <div className="h-full w-full transition-transform duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] [@media(hover:hover)]:group-hover/tile:scale-106">
+        <div className="h-full w-full transition-transform duration-reveal ease-brand-out [@media(hover:hover)]:group-hover/tile:scale-106">
           <SmartImage
             src={coverImage}
             fallback={fallbackImage}
@@ -45,15 +45,15 @@ export function CategoryTile({
           />
         </div>
 
-        {/* Voile ink à 55 % qui passe à 40 % au survol */}
+        {/* Voile ink à 55 % qui passe à 40 % au survol (opacité du calque : 0,73 × 55 % ≈ 40 %) */}
         <div
           aria-hidden="true"
-          className="absolute inset-0 bg-[var(--color-scrim-55)] transition-colors duration-500 [@media(hover:hover)]:group-hover/tile:bg-[var(--color-scrim-40)]"
+          className="absolute inset-0 bg-[var(--color-scrim-55)] transition-opacity duration-slow ease-brand-out [@media(hover:hover)]:group-hover/tile:opacity-73"
         />
 
         {/* Contenu centré */}
         <div className="absolute inset-0 flex flex-col items-center justify-center p-4 text-center">
-          <span className="text-h3 font-semibold text-white transition-transform duration-300 [@media(hover:hover)]:group-hover/tile:-translate-y-1">
+          <span className="text-h3 font-semibold text-white transition-transform duration-base ease-brand-out [@media(hover:hover)]:group-hover/tile:-translate-y-1">
             {name}
           </span>
           <span className="mt-1 text-label text-silver">

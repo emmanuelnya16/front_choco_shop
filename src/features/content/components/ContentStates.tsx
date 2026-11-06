@@ -6,7 +6,7 @@ import { HELP_CENTER_PATH } from '../registry';
 /** Gabarit de la page pendant le chargement : titre, date, paragraphes (pas de saut de mise en page). */
 export function ContentSkeleton() {
   return (
-    <div role="status" aria-label="Chargement de la page" className="max-w-[680px]">
+    <div role="status" aria-label="Chargement de la page" className="max-w-170">
       <Skeleton className="h-9 w-4/5" />
       <Skeleton className="mt-3 h-4 w-48" />
       <div className="mt-8 space-y-3">
@@ -27,7 +27,7 @@ export function ContentSkeleton() {
 /** Adresse inconnue (404 PAGE_NOT_FOUND) : renvoi vers le centre d'aide. */
 export function ContentNotFound() {
   return (
-    <section aria-labelledby="page-introuvable-titre" className="mx-auto flex max-w-[680px] flex-col items-start py-6">
+    <section aria-labelledby="page-introuvable-titre" className="mx-auto flex max-w-170 flex-col items-start py-6">
       <span className="flex h-14 w-14 items-center justify-center rounded-[var(--radius-full)] bg-surface text-ink">
         <FileQuestion className="h-7 w-7" aria-hidden="true" />
       </span>
@@ -52,7 +52,7 @@ export function ContentNotFound() {
 /** Erreur du serveur : la page n'a pas pu être chargée. */
 export function ContentLoadError({ onRetry, retrying }: { onRetry: () => void; retrying: boolean }) {
   return (
-    <section role="alert" className="mx-auto flex max-w-[680px] flex-col items-start py-6">
+    <section role="alert" className="mx-auto flex max-w-170 flex-col items-start py-6">
       <h1 className="text-h1 text-ink">Page indisponible</h1>
       <p className="mt-3 text-body text-text-2">
         Cette page n’a pas pu être chargée. Réessayez dans un instant.

@@ -13,7 +13,7 @@ import { isBottomNavHidden } from '@/components/layout/bottomNavVisibility';
 import { AttentionDot } from '@/features/tracking/components/AttentionDot';
 import { useReservationsAttention } from '@/features/tracking/useReservationsAttention';
 import { cn } from '@/lib/utils/cn';
-import { ease, spring } from '@/motion/tokens';
+import { duration, ease, spring } from '@/motion/tokens';
 import { useReducedMotionPref } from '@/motion/useReducedMotionPref';
 import { selectCartCount, useCartStore } from '@/stores/cartStore';
 import { useUiStore } from '@/stores/uiStore';
@@ -69,7 +69,7 @@ export function BottomNav() {
   }
 
   const isTabActive = (tab: (typeof NAV_TABS)[number]) => {
-    if (tab.exact) return location.pathname === location.pathname && location.pathname === tab.to;
+    if (tab.exact) return location.pathname === tab.to;
     if (tab.matchExact?.includes(location.pathname)) return true;
     if (tab.matchPrefixes) {
       return tab.matchPrefixes.some((prefix) => location.pathname.startsWith(prefix));
@@ -80,7 +80,8 @@ export function BottomNav() {
   return (
     <nav
       aria-label="Navigation principale mobile"
-      className="bottom-nav fixed right-0 bottom-0 left-0 z-40 border-t border-silver/50 bg-[var(--color-nav-glass)] pb-safe shadow-[var(--shadow-nav)] backdrop-blur-md lg:hidden"
+      // Verre à 96 % : les libellés gardent un contraste suffisant même posés sur le pied de page sombre
+      className="bottom-nav fixed right-0 bottom-0 left-0 z-nav border-t border-silver/50 bg-white/96 pb-safe shadow-[var(--shadow-nav)] backdrop-blur-md lg:hidden"
     >
       <ul className="grid h-[var(--bottom-nav-h)] grid-cols-5 items-stretch">
         {NAV_TABS.map((tab) => {
@@ -95,7 +96,8 @@ export function BottomNav() {
                 aria-current={active ? 'page' : undefined}
                 data-cart-target={tab.showCartBadge ? 'mobile' : undefined}
                 className={cn(
-                  'relative flex w-full flex-col items-center justify-center gap-1 pt-1 transition-colors',
+                  'relative flex w-full min-w-0 flex-col items-center justify-center gap-1 pt-1 transition-colors duration-fast',
+                  // Onglet actif : icône et repère rouges, libellé ink (le rouge en 12 px manque de contraste)
                   active ? 'text-red' : 'text-text-2 hover:text-ink',
                 )}
               >
@@ -103,7 +105,7 @@ export function BottomNav() {
                   <m.span
                     layoutId="bottom-nav-indicator"
                     transition={spring.snappy}
-                    className="absolute top-0 h-[3px] w-5 rounded-b-[var(--radius-sm)] bg-red"
+                    className="absolute top-0 h-[3px] w-6 rounded-b-[var(--radius-sm)] bg-red"
                   />
                 )}
 
@@ -124,10 +126,10 @@ export function BottomNav() {
                       : { scale: 1 }
                   }
                   whileTap={reducedMotion ? undefined : { scale: 0.9 }}
-                  transition={{ duration: 0.35, ease: ease.out }}
+                  transition={{ duration: duration.base, ease: ease.out }}
                   className="relative flex h-6 w-6 items-center justify-center"
                 >
-                  <Icon className="h-[22px] w-[22px]" aria-hidden="true" />
+                  <Icon className="h-6 w-6" aria-hidden="true" />
 
                   {tab.id === 'reservations' && (
                     <AttentionDot show={needsAttention} className="-top-0.5 -right-1" />
@@ -142,7 +144,7 @@ export function BottomNav() {
                           animate={{ scale: 1, opacity: 1 }}
                           exit={{ scale: 0.4, opacity: 0 }}
                           transition={spring.bounce}
-                          className="absolute -top-1.5 -right-2.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red px-1 font-mono text-[11px] font-bold leading-none text-white"
+                          className="absolute -top-2 -right-3 flex h-5 min-w-5 items-center justify-center rounded-full bg-red px-1 text-caption leading-none font-bold tabular-nums text-white"
                         >
                           {cartCount > 99 ? '99+' : cartCount}
                         </m.span>
@@ -151,7 +153,14 @@ export function BottomNav() {
                   )}
                 </m.span>
 
-                <span className="text-[11px] font-semibold leading-none">
+                {/* 12 px (text-caption). Exception mesurée : sous 380 px, un onglet fait 72 px et
+                    « Réservations » en 12 px demi-gras en demande 76 : 11 px pour ne jamais le couper */}
+                <span
+                  className={cn(
+                    'max-w-full truncate px-0.5 text-caption leading-none font-semibold max-[379px]:text-[11px]',
+                    active && 'text-ink',
+                  )}
+                >
                   {tab.label}
                   {tab.id === 'reservations' && needsAttention && (
                     <span className="sr-only"> : une réservation demande votre attention</span>

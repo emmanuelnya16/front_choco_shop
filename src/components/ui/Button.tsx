@@ -49,14 +49,16 @@ const APP_SCHEME_PATTERN = /^(tel|mailto|sms):/i;
 const WEB_URL_PATTERN = /^(https?:)?\/\//i;
 
 const SIZE_CLASSES: Record<ButtonSize, string> = {
-  sm: 'min-h-[36px] px-4 py-1.5 text-[13px] gap-1.5',
-  md: 'min-h-[44px] px-5 py-2.5 text-[14px] gap-2',
-  lg: 'min-h-[52px] px-6 py-3 text-[15px] gap-2.5',
+  // 36 px visibles, mais une zone d'appui de 44 px (pseudo-élément qui déborde de 4 px en haut et en bas)
+  sm: 'min-h-9 px-4 py-1.5 text-small gap-1.5 after:absolute after:inset-x-0 after:-inset-y-1',
+  md: 'min-h-11 px-5 py-2.5 text-small gap-2',
+  lg: 'min-h-13 px-6 py-3 text-body gap-2.5',
 };
 
 /**
  * Bouton du kit visuel M1 (§5.2) :
- * - 6 variantes, 3 tailles, non capitalisé, poids 600, rayon 8 px.
+ * - 7 variantes, 3 tailles (36, 44 et 52 px ; zone d'appui de 44 px au moins), non capitalisé,
+ *   poids 600, rayon 8 px.
  * - Utilise `m.button` avec le preset `pressable` (scale 0.97 en 120 ms).
  */
 export function Button({
@@ -77,7 +79,8 @@ export function Button({
   const isDisabled = disabled || loading;
 
   const baseClassName = cn(
-    'relative inline-flex shrink-0 items-center justify-center rounded-[var(--radius-md)] font-semibold whitespace-nowrap transition-all select-none',
+    // Transitions ciblées (couleurs et luminosité au survol), jamais « transition-all »
+    'relative inline-flex shrink-0 items-center justify-center rounded-[var(--radius-md)] font-semibold whitespace-nowrap transition-[background-color,border-color,color,filter] duration-fast select-none',
     'disabled:pointer-events-none disabled:opacity-45',
     VARIANT_CLASSES[variant],
     SIZE_CLASSES[size],

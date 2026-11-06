@@ -11,7 +11,8 @@ import type { RouteHandlerCallbackOptions, WorkboxPlugin } from 'workbox-core/ty
 import { validateEnv } from './lib/env';
 import { CACHE_LIMITS, CACHE_NAMES, classifyRequest, isCacheableResponse, type CacheStrategy } from './pwa/cacheRules';
 import { BADGE_PUSH_TYPES, buildNotification, parsePushPayload, resolveNotificationUrl } from './pwa/pushPayload';
-import { OFFLINE_FALLBACK_HEADER, SW_MESSAGES, type SwReply, type SwToAppMessage } from './pwa/swProtocol';
+import { markCachedResponsePlugin, networkStatusPlugin } from './pwa/swNetworkStatus';
+import { SW_MESSAGES, type SwReply, type SwToAppMessage } from './pwa/swProtocol';
 import { urlBase64ToUint8Array } from './pwa/vapid';
 
 declare const self: ServiceWorkerGlobalScope & {
@@ -37,19 +38,31 @@ function cacheableOnly(strategy: Exclude<CacheStrategy, 'network-only'>): Workbo
   };
 }
 
-/** NetworkFirst : la copie enregistrée n'est utilisée qu'en cas d'échec du réseau, on le signale à l'app. */
-const markOfflineFallback: WorkboxPlugin = {
-  cachedResponseWillBeUsed: async ({ cachedResponse }) => {
-    if (!cachedResponse) return cachedResponse;
-    const headers = new Headers(cachedResponse.headers);
-    headers.set(OFFLINE_FALLBACK_HEADER, '1');
-    return new Response(await cachedResponse.blob(), {
-      status: cachedResponse.status,
-      statusText: cachedResponse.statusText,
-      headers,
-    });
-  },
-};
+/**
+ * Réponses de l'API lues dans le cache (M6 §6.1, M7) : marquées pour que l'app ne les prenne pas
+ * pour des réponses du serveur. NetworkFirst ne s'en sert qu'après un échec du réseau (copie de
+ * secours, comptée comme un échec) ; StaleWhileRevalidate les sert tout de suite (neutres).
+ */
+const markOfflineFallback = markCachedResponsePlugin({ offlineFallback: true });
+const markFromCache = markCachedResponsePlugin({ offlineFallback: false });
+
+/** Prévient la page concernée (ou toutes les fenêtres) : le serveur répond-il ? */
+async function notifyNetworkStatus(reachable: boolean, clientId: string | undefined): Promise<void> {
+  const message: SwToAppMessage = { type: SW_MESSAGES.networkStatus, reachable };
+  const client = clientId ? await self.clients.get(clientId) : undefined;
+  if (client) {
+    client.postMessage(message);
+    return;
+  }
+  await postToWindows(message);
+}
+
+/** Catalogue : la mise à jour en arrière-plan dit à l'app si le serveur répond (défaut D2, M7). */
+const catalogNetworkStatus = networkStatusPlugin({
+  hasCachedCopy: async (request) =>
+    Boolean(await caches.match(request, { cacheName: CACHE_NAMES.catalog, ignoreVary: true })),
+  notify: notifyNetworkStatus,
+});
 
 const strategies = {
   pages: new NetworkFirst({
@@ -59,19 +72,25 @@ const strategies = {
   }),
   catalog: new StaleWhileRevalidate({
     cacheName: CACHE_NAMES.catalog,
-    plugins: [cacheableOnly('catalog'), new ExpirationPlugin({ ...CACHE_LIMITS.catalog, purgeOnQuotaError: true })],
+    plugins: [
+      cacheableOnly('catalog'),
+      new ExpirationPlugin({ ...CACHE_LIMITS.catalog, purgeOnQuotaError: true }),
+      markFromCache,
+      catalogNetworkStatus,
+    ],
   }),
   user: new NetworkFirst({
     cacheName: CACHE_NAMES.user,
     networkTimeoutSeconds: CACHE_LIMITS.user.networkTimeoutSeconds,
     plugins: [
       cacheableOnly('user'),
-      markOfflineFallback,
       new ExpirationPlugin({
         maxEntries: CACHE_LIMITS.user.maxEntries,
         maxAgeSeconds: CACHE_LIMITS.user.maxAgeSeconds,
         purgeOnQuotaError: true,
       }),
+      // Après l'expiration : une copie périmée n'est jamais servie, même marquée
+      markOfflineFallback,
     ],
   }),
   images: new CacheFirst({

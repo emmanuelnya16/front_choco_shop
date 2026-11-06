@@ -8,7 +8,7 @@ import { Price } from '@/components/ui/Primitives';
 import { SmartImage } from '@/components/ui/SmartImage';
 import { cn } from '@/lib/utils/cn';
 import { fadeUp } from '@/motion/presets';
-import { ease } from '@/motion/tokens';
+import { duration, ease, staggerStep } from '@/motion/tokens';
 import { useReducedMotionPref } from '@/motion/useReducedMotionPref';
 import { useRecentlyViewedStore } from '@/stores/recentlyViewedStore';
 import { CloudOffIllustration } from './CloudOffIllustration';
@@ -58,12 +58,12 @@ export function OfflineScreen({ headingLevel = 'h1', onRetry, className }: Offli
   return (
     <section
       aria-labelledby="hors-connexion-titre"
-      className={cn('mx-auto flex w-full max-w-[640px] flex-col items-center text-center', className)}
+      className={cn('mx-auto flex w-full max-w-160 flex-col items-center text-center', className)}
     >
       <m.div
         initial={reducedMotion ? false : { opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.45, ease: ease.out }}
+        transition={{ duration: duration.slow, ease: ease.out }}
         className="text-silver"
       >
         <CloudOffIllustration />
@@ -123,7 +123,7 @@ function RecentlyViewedOffline() {
             variants={fadeUp}
             initial={reducedMotion ? false : 'hidden'}
             animate="visible"
-            transition={{ delay: reducedMotion ? 0 : index * 0.05 }}
+            transition={{ delay: reducedMotion ? 0 : index * staggerStep }}
           >
             <Link
               to={`/produit/${item.slug}`}

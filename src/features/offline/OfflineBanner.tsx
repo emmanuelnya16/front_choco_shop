@@ -16,8 +16,11 @@ const RECOVERED_VISIBLE_MS = 2200;
 /** Hors connexion détecté par les requêtes alors que le navigateur se dit en ligne : vérification régulière. */
 // HYPOTHÈSE: une vérification toutes les 30 s suffit (le client peut aussi appuyer sur « Réessayer »).
 const AUTO_RETRY_MS = 30_000;
-/** Hauteur de la bande (h-8), exposée aux écrans qui ont des éléments fixes en haut (fiche produit). */
-const BANNER_HEIGHT = '32px';
+/**
+ * Hauteur de la bande (h-11 : le bouton « Réessayer » garde une cible de 44 px), exposée aux écrans
+ * qui ont des éléments fixes en haut (fiche produit).
+ */
+const BANNER_HEIGHT = '44px';
 
 function readHeaderHeight(): number {
   if (typeof window === 'undefined') return 56;
@@ -27,8 +30,9 @@ function readHeaderHeight(): number {
 
 /**
  * Bandeau global hors connexion (M6 §6.2), monté une fois dans RootLayout :
- * - hors connexion : fine bande ink sous l'en-tête (en haut sur la fiche produit), icône WifiOff,
- *   « Hors connexion · contenu de votre dernière visite » et lien « Réessayer » ;
+ * - hors connexion : bande ink sous l'en-tête (en haut sur la fiche produit), icône WifiOff,
+ *   « Hors connexion · contenu de votre dernière visite » et bouton « Réessayer » (44 px). C'est le
+ *   seul bandeau de coupure de l'app : les écrans ne répètent pas le message ;
  * - retour du réseau : la bande passe brièvement en vert « Connexion rétablie », puis disparaît
  *   (les données sont relancées par useNetworkRecovery).
  */
@@ -120,9 +124,9 @@ export function OfflineBanner() {
             <m.div
               key="offline-banner"
               role="status"
-              initial={reducedMotion ? { opacity: 0 } : { opacity: 0, y: -40 }}
+              initial={reducedMotion ? { opacity: 0 } : { opacity: 0, y: -44 }}
               animate={{ opacity: 1, y: followHeader ? -headerHeight : 0 }}
-              exit={reducedMotion ? { opacity: 0 } : { opacity: 0, y: -40 }}
+              exit={reducedMotion ? { opacity: 0 } : { opacity: 0, y: -44 }}
               transition={{ duration: duration.fast, ease: ease.out }}
               className={cn(
                 'text-white',
@@ -130,7 +134,7 @@ export function OfflineBanner() {
                 !hasMobileHeader && 'pt-safe lg:pt-0',
               )}
             >
-              <div className="mx-auto flex h-8 max-w-content items-center justify-center gap-1.5 px-3 text-[11px] font-semibold sm:gap-2 sm:px-page sm:text-xs">
+              <div className="mx-auto flex h-11 max-w-content items-center justify-center gap-2 px-page text-caption font-semibold">
                 {online ? (
                   <>
                     <Wifi className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
@@ -139,12 +143,15 @@ export function OfflineBanner() {
                 ) : (
                   <>
                     <WifiOff className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                    <span className="truncate">Hors connexion · contenu de votre dernière visite</span>
+                    {/* Deux lignes au plus sur un petit écran, jamais coupé */}
+                    <span className="line-clamp-2 min-w-0 leading-tight">
+                      Hors connexion · contenu de votre dernière visite
+                    </span>
                     <button
                       type="button"
                       onClick={() => void handleRetry()}
                       disabled={checking}
-                      className="-my-2 inline-flex min-h-[32px] shrink-0 items-center px-1 text-white underline underline-offset-2 disabled:opacity-60"
+                      className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center px-1 font-semibold text-white underline underline-offset-2 disabled:opacity-60"
                     >
                       {checking ? 'Vérification…' : 'Réessayer'}
                     </button>
@@ -157,7 +164,7 @@ export function OfflineBanner() {
       </div>
       {/* Réserve la place de la bande fixe sous l'en-tête mobile (sauf accueil : bande posée sur la photo) */}
       {visible && hasMobileHeader && !isHomePage && (
-        <div aria-hidden="true" className="h-8 lg:hidden" />
+        <div aria-hidden="true" className="h-11 lg:hidden" />
       )}
     </>
   );

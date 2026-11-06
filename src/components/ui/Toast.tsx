@@ -2,12 +2,11 @@ import { Bell, CheckCircle2, X } from 'lucide-react';
 import { AnimatePresence } from 'motion/react';
 import * as m from 'motion/react-m';
 import { Link } from 'react-router';
-import { cn } from '@/lib/utils/cn';
 import { duration, ease } from '@/motion/tokens';
 import { useToastStore } from '@/stores/toastStore';
 
 const ACTION_TARGET_CLASS =
-  'group inline-flex min-h-11 min-w-11 items-center justify-center px-1 text-xs font-bold text-white';
+  'group inline-flex min-h-11 min-w-11 items-center justify-center px-1 text-caption font-bold text-white';
 const ACTION_PILL_CLASS =
   'rounded-[var(--radius-sm)] bg-ink-2 px-2.5 py-1 underline-offset-2 group-hover:underline';
 
@@ -53,13 +52,9 @@ export function Toaster() {
                 <CheckCircle2 className="h-4 w-4 shrink-0 text-red" aria-hidden="true" />
               )}
               <div className="min-w-0">
-                {/* Message sur deux lignes au plus : jamais coupé après quelques mots sur mobile */}
+                {/* Message et texte secondaire sur deux lignes au plus : jamais coupés après quelques mots sur mobile */}
                 <p className="line-clamp-2 font-medium">{toast.message}</p>
-                {toast.subtitle && (
-                  <p className={cn('text-xs text-silver', toast.wrap ? 'line-clamp-2' : 'truncate')}>
-                    {toast.subtitle}
-                  </p>
-                )}
+                {toast.subtitle && <p className="line-clamp-2 text-caption text-silver">{toast.subtitle}</p>}
               </div>
             </div>
 
@@ -91,7 +86,7 @@ export function Toaster() {
                 type="button"
                 onClick={() => dismiss(toast.id)}
                 aria-label="Fermer la notification"
-                className="inline-flex h-11 w-11 items-center justify-center rounded-[var(--radius-sm)] text-silver hover:text-white"
+                className="inline-flex h-11 w-11 items-center justify-center rounded-[var(--radius-sm)] text-silver transition-colors duration-fast hover:text-white"
               >
                 <X className="h-4 w-4" aria-hidden="true" />
               </button>

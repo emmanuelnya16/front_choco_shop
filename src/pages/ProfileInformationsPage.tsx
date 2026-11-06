@@ -46,7 +46,7 @@ export function ProfileInformationsPage() {
 function FieldError({ id, message }: { id: string; message?: string }) {
   if (!message) return null;
   return (
-    <p id={id} role="alert" className="mt-1.5 flex items-center gap-1.5 text-xs font-semibold text-danger">
+    <p id={id} role="alert" className="mt-1.5 flex items-center gap-1.5 text-caption font-semibold text-danger">
       <AlertCircle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
       <span>{message}</span>
     </p>
@@ -90,7 +90,7 @@ function InformationsForm({ user }: { user: User }) {
 
   const inputClass = (hasError: boolean) =>
     cn(
-      'mt-1.5 h-12 w-full rounded-[var(--radius-md)] border bg-white px-3.5 text-[16px] text-ink placeholder:text-text-2 focus:border-ink focus:outline-none',
+      'mt-1.5 h-12 w-full rounded-[var(--radius-md)] border bg-white px-3.5 text-body text-ink placeholder:text-text-2 focus:border-ink focus:outline-none',
       hasError ? 'border-danger' : 'border-silver',
     );
 
@@ -142,25 +142,25 @@ function InformationsForm({ user }: { user: User }) {
         <label htmlFor="profile-phone" className="block text-label text-ink">
           TÉLÉPHONE
         </label>
-        <div className="relative">
+        <div className="relative mt-1.5">
           <input
             id="profile-phone"
             type="tel"
             readOnly
             value={`+237 ${formatCmPhone(user.phone)}`}
             aria-describedby="profile-phone-help"
-            className="mt-1.5 h-12 w-full rounded-[var(--radius-md)] border border-silver bg-surface px-3.5 pr-10 font-mono text-[16px] text-ink"
+            className="h-12 w-full rounded-[var(--radius-md)] border border-silver bg-surface px-3.5 pr-10 font-mono text-body text-ink"
           />
-          <Lock className="pointer-events-none absolute top-1/2 right-3.5 mt-0.75 h-4 w-4 -translate-y-1/2 text-text-2" aria-hidden="true" />
+          <Lock className="pointer-events-none absolute top-1/2 right-3.5 h-4 w-4 -translate-y-1/2 text-text-2" aria-hidden="true" />
         </div>
-        <p id="profile-phone-help" className="mt-1.5 text-xs text-text-2">
+        <p id="profile-phone-help" className="mt-1.5 text-caption text-text-2">
           Pour changer de numéro, déconnectez-vous et connectez-vous avec le nouveau.
         </p>
       </div>
 
       {updateProfile.isError && (
         <p role="alert" className="text-small text-ink">
-          L’enregistrement a échoué. Vérifiez votre connexion puis réessayez.
+          L’enregistrement n’a pas abouti. Vérifiez votre connexion, puis réessayez.
         </p>
       )}
 

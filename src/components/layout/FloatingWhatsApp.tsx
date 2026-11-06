@@ -1,9 +1,11 @@
+import { useMotionValueEvent, useScroll } from 'motion/react';
 import * as m from 'motion/react-m';
+import { useState } from 'react';
 import { useLocation } from 'react-router';
 import { hasMobileActionBar, isPaymentStepPath } from '@/components/layout/bottomNavVisibility';
-import { usePublicSettings } from '@/features/catalog/api/useCatalogQueries';
+import { useShopWhatsapp } from '@/components/layout/useShopWhatsapp';
 import { cn } from '@/lib/utils/cn';
-import { spring } from '@/motion/tokens';
+import { delay, spring } from '@/motion/tokens';
 import { useReducedMotionPref } from '@/motion/useReducedMotionPref';
 import { selectCartCount, useCartStore } from '@/stores/cartStore';
 
@@ -28,39 +30,49 @@ export function WhatsAppIcon({ className = 'h-6 w-6' }: { className?: string }) 
 export function FloatingWhatsApp() {
   const location = useLocation();
   const reducedMotion = useReducedMotionPref();
-  const { data: settings } = usePublicSettings();
+  const whatsapp = useShopWhatsapp();
   const cartCount = useCartStore(selectCartCount);
+  const isHomePage = location.pathname === '/';
 
+  // Accueil : le bouton attend que le visiteur ait quitté le haut de page, où il recouvrirait
+  // « Comment réserver » (deuxième bouton du titre principal)
+  const { scrollY } = useScroll();
+  const [pastHero, setPastHero] = useState(false);
+  useMotionValueEvent(scrollY, 'change', (latest) => {
+    const next = latest > window.innerHeight * 0.6;
+    if (next !== pastHero) setPastHero(next);
+  });
+
+  // Numéro inconnu : pas de bouton (jamais de faux numéro)
+  if (!whatsapp) return null;
   // Correspondance exacte : la page d'aide « Paiement Mobile Money » garde le bouton
   if (isPaymentStepPath(location.pathname)) return null;
+  // Recherche plein écran : son bouton « Voir les résultats » occupe le bas de l'écran
+  if (location.pathname.startsWith('/recherche')) return null;
+  if (isHomePage && !pastHero) return null;
 
   // Masqué sur mobile quand une barre d'action collante remplace la barre basse (fiche produit §7.1,
   // finalisation de la réservation, panier non vide) : toute la place lui revient
   const hiddenOnMobile = hasMobileActionBar(location.pathname, cartCount);
 
-  const rawNumber = settings?.whatsappNumber ?? '+237690000000';
-  const cleanNumber = rawNumber.replace(/[^0-9]/g, '');
-  const message = encodeURIComponent("Bonjour DR Choco, j'ai une question.");
-  const href = `https://wa.me/${cleanNumber}?text=${message}`;
-
   return (
     <m.a
-      href={href}
+      href={whatsapp.url}
       target="_blank"
       rel="noopener noreferrer"
       aria-label="Nous écrire sur WhatsApp"
-      initial={reducedMotion ? { scale: 1, opacity: 1 } : { scale: 0.6, opacity: 0 }}
+      initial={reducedMotion ? false : { scale: 0.6, opacity: 0 }}
       animate={{ scale: 1, opacity: 1 }}
       whileTap={reducedMotion ? undefined : { scale: 0.94 }}
+      // Arrivée discrète après la page ; sur l'accueil, le visiteur a déjà fait défiler : tout de suite
       transition={
-        reducedMotion
-          ? { duration: 0 }
-          : { ...spring.bounce, delay: 1.5 }
+        reducedMotion ? { duration: 0 } : { ...spring.bounce, delay: isHomePage ? 0 : delay.attention }
       }
       // Pile du bas (index.css) : au-dessus de la barre basse, du bandeau rouge et du bandeau de mise à jour
       data-floating-whatsapp={hiddenOnMobile ? 'desktop' : 'all'}
       className={cn(
-        'fixed right-4 bottom-[calc(var(--bottom-bar-h)+var(--pending-banner-h)+var(--update-banner-h)+16px)] z-30 h-[52px] w-[52px] items-center justify-center rounded-full border border-white/15 bg-ink text-white shadow-[var(--shadow-pop)] transition-colors hover:bg-ink-2 lg:right-6 lg:bottom-6',
+        // Bordure blanche : reste visible posé sur le pied de page sombre
+        'fixed right-4 bottom-[calc(var(--bottom-bar-h)+var(--pending-banner-h)+var(--update-banner-h)+16px)] z-header h-13 w-13 items-center justify-center rounded-full border-2 border-white bg-ink text-white shadow-[var(--shadow-pop)] transition-colors duration-fast hover:bg-ink-2 lg:right-6 lg:bottom-6',
         hiddenOnMobile ? 'hidden lg:flex' : 'flex',
       )}
     >

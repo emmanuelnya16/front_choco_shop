@@ -4,6 +4,10 @@ import { useRef, useState, type MouseEvent } from 'react';
 import { flushSync } from 'react-dom';
 import { useNavigate } from 'react-router';
 import { usePrefetchProduct } from '@/features/catalog/api/useCatalogQueries';
+import {
+  productFallbackImage,
+  productPrimaryImage,
+} from '@/features/catalog/product/productImages';
 import { cn } from '@/lib/utils/cn';
 import { haptic } from '@/lib/utils/haptics';
 import { duration, ease } from '@/motion/tokens';
@@ -68,8 +72,8 @@ export function ProductCard({ product, className }: ProductCardProps) {
   const isLowStock = !isSoldOut && (totalStock <= 3 || product.badges.includes('low-stock'));
   const isNew = !isSoldOut && !isLowStock && (product.isNew || product.badges.includes('new'));
 
-  const primaryImage = product.images[0] ?? product.fallbackImages[0] ?? '/mock/product-tee.svg';
-  const primaryFallback = product.fallbackImages[0] ?? '/mock/product-tee.svg';
+  const primaryImage = productPrimaryImage(product);
+  const primaryFallback = productFallbackImage(product);
   const secondaryImage = product.images[1] ?? product.fallbackImages[1];
   const secondaryFallback = product.fallbackImages[1] ?? primaryFallback;
 
@@ -165,7 +169,8 @@ export function ProductCard({ product, className }: ProductCardProps) {
       aria-label={`${product.name}, ${product.price} FCFA`}
       className={cn(
         // h-full : dans une grille, les boutons de cartes voisines restent alignés malgré des titres sur 1 ou 2 lignes
-        'group/card flex h-full cursor-pointer flex-col justify-between rounded-[var(--radius-md)] select-none',
+        // relative : le texte réservé aux lecteurs d'écran (sr-only) reste dans la carte, même dans un carrousel qui défile
+        'group/card relative flex h-full cursor-pointer flex-col justify-between rounded-[var(--radius-md)] select-none',
         className,
       )}
     >
@@ -182,7 +187,7 @@ export function ProductCard({ product, className }: ProductCardProps) {
         >
           <div
             className={cn(
-              'h-full w-full transition-transform duration-900 ease-[cubic-bezier(0.22,1,0.36,1)] [@media(hover:hover)]:group-hover/card:scale-105',
+              'h-full w-full transition-transform duration-reveal ease-brand-out [@media(hover:hover)]:group-hover/card:scale-105',
               isSoldOut && 'opacity-60',
             )}
           >
@@ -196,11 +201,11 @@ export function ProductCard({ product, className }: ProductCardProps) {
             />
 
             {secondaryImage && !isSoldOut && (
-              <div className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-500 [@media(hover:hover)]:group-hover/card:opacity-100">
+              <div className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-slow [@media(hover:hover)]:group-hover/card:opacity-100">
                 <SmartImage
                   src={secondaryImage}
                   fallback={secondaryFallback}
-                  alt={product.name}
+                  alt=""
                   ratio="4/5"
                   sizes="(max-width: 640px) 48vw, (max-width: 1024px) 32vw, 280px"
                   className="h-full w-full"
@@ -226,7 +231,7 @@ export function ProductCard({ product, className }: ProductCardProps) {
                 key={isFavorite ? `fav-on-${burstKey}` : 'fav-off'}
                 initial={isFavorite ? { scale: 0.8 } : false}
                 animate={isFavorite ? { scale: [0.8, 1.25, 1] } : { scale: 1 }}
-                transition={{ duration: 0.35, ease: ease.out }}
+                transition={{ duration: duration.base, ease: ease.out }}
                 className="inline-flex items-center justify-center"
               >
                 <Heart
@@ -256,7 +261,7 @@ export function ProductCard({ product, className }: ProductCardProps) {
                         opacity: 0,
                         scale: 0.4,
                       }}
-                      transition={{ duration: 0.4, ease: ease.out }}
+                      transition={{ duration: duration.base, ease: ease.out }}
                       className="absolute h-1.5 w-1.5 rounded-[var(--radius-full)] bg-red"
                     />
                   ))}
@@ -284,13 +289,14 @@ export function ProductCard({ product, className }: ProductCardProps) {
           <div className="mt-1 flex items-center gap-2 text-small text-text-2">
             <span>{categoryLabel}</span>
             <span aria-hidden="true">·</span>
-            <span
-              className="inline-flex items-center gap-1"
-              aria-label={`${product.colors.length} couleurs`}
-            >
+            <span className="inline-flex items-center gap-1">
+              <span className="sr-only">
+                {product.colors.length} {product.colors.length > 1 ? 'couleurs' : 'couleur'}
+              </span>
               {visibleColors.map((color) => (
                 <span
                   key={color.code}
+                  aria-hidden="true"
                   title={color.name}
                   className={cn(
                     'inline-block h-2.5 w-2.5 rounded-[var(--radius-full)] border',
@@ -299,7 +305,7 @@ export function ProductCard({ product, className }: ProductCardProps) {
                 />
               ))}
               {extraColorsCount > 0 && (
-                <span className="ml-0.5 text-xs font-semibold text-text-2">
+                <span aria-hidden="true" className="ml-0.5 text-caption font-semibold text-text-2">
                   +{extraColorsCount}
                 </span>
               )}
@@ -307,7 +313,7 @@ export function ProductCard({ product, className }: ProductCardProps) {
           </div>
 
           <div className="mt-1.5">
-            <Price amount={product.price} className="text-[16px] text-ink" />
+            <Price amount={product.price} className="text-body font-bold text-ink" />
           </div>
         </div>
       </div>
@@ -322,7 +328,7 @@ export function ProductCard({ product, className }: ProductCardProps) {
             size="sm"
             fullWidth
             onClick={handleViewClick}
-            className="min-h-[44px]"
+            className="min-h-11"
           >
             Voir l&rsquo;article
           </Button>
@@ -332,7 +338,7 @@ export function ProductCard({ product, className }: ProductCardProps) {
               variant="dark"
               size="sm"
               onClick={handleReserveClick}
-              className="min-h-[44px] min-w-0 flex-1 shrink px-3"
+              className="min-h-11 min-w-0 flex-1 shrink px-3"
             >
               Réserver
             </Button>
@@ -341,7 +347,7 @@ export function ProductCard({ product, className }: ProductCardProps) {
               size="sm"
               onClick={handleAddClick}
               aria-label={`Ajouter ${product.name} au panier`}
-              className="min-h-[44px] min-w-[44px] px-0 @min-[12rem]:px-2.5"
+              className="min-h-11 min-w-11 px-0 @min-[12rem]:px-2.5"
             >
               <span className="inline-flex items-center gap-1.5">
                 <ShoppingBag

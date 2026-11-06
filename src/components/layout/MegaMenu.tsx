@@ -76,7 +76,7 @@ export function MegaMenu({ open, onClose, triggerRef }: MegaMenuProps) {
               : {
                   clipPath: 'inset(0 0 0% 0)',
                   opacity: 1,
-                  transition: { duration: 0.45, ease: ease.inOut },
+                  transition: { duration: duration.slow, ease: ease.inOut },
                 }
           }
           exit={
@@ -88,11 +88,11 @@ export function MegaMenu({ open, onClose, triggerRef }: MegaMenuProps) {
                   transition: { duration: duration.fast, ease: ease.inOut },
                 }
           }
-          className="absolute top-full right-0 left-0 z-50 border-b border-silver bg-white shadow-[var(--shadow-pop)]"
+          className="absolute top-full right-0 left-0 z-overlay border-b border-silver bg-white shadow-[var(--shadow-pop)]"
         >
           <Container className="py-8">
             <m.div
-              variants={staggerContainer(0.05)}
+              variants={staggerContainer()}
               initial={reducedMotion ? 'visible' : 'hidden'}
               animate="visible"
               className="grid grid-cols-4 gap-8"
@@ -106,16 +106,16 @@ export function MegaMenu({ open, onClose, triggerRef }: MegaMenuProps) {
                   <Link
                     to={`/explorer/${category.slug}`}
                     onClick={onClose}
-                    className="group inline-flex items-center justify-between border-b border-silver/60 pb-3 text-h3 text-ink transition-colors hover:text-red"
+                    className="group inline-flex items-center justify-between border-b border-silver/60 pb-3 text-h3 text-ink transition-colors duration-fast hover:text-red"
                   >
                     <span>{category.name}</span>
                     <ArrowRight
-                      className="h-4 w-4 text-text-2 transition-transform group-hover:translate-x-1 group-hover:text-red"
+                      className="h-4 w-4 text-text-2 transition-transform duration-fast group-hover:translate-x-1 group-hover:text-red"
                       aria-hidden="true"
                     />
                   </Link>
 
-                  <p className="mt-2 text-xs text-text-2">
+                  <p className="mt-2 text-caption text-text-2">
                     {category.description}
                   </p>
 
@@ -125,10 +125,10 @@ export function MegaMenu({ open, onClose, triggerRef }: MegaMenuProps) {
                         <Link
                           to={`/explorer/${sub.slug}`}
                           onClick={onClose}
-                          className="inline-flex w-full items-center justify-between text-small font-medium text-ink transition-colors hover:text-red"
+                          className="inline-flex min-h-8 w-full items-center justify-between text-small font-medium text-ink transition-colors duration-fast hover:text-red"
                         >
                           <span>{sub.name}</span>
-                          <span className="font-mono text-xs text-text-2">
+                          <span className="text-caption tabular-nums text-text-2">
                             ({sub.productCount})
                           </span>
                         </Link>
@@ -140,7 +140,7 @@ export function MegaMenu({ open, onClose, triggerRef }: MegaMenuProps) {
                     <Link
                       to={`/explorer/${category.slug}`}
                       onClick={onClose}
-                      className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-red hover:underline"
+                      className="inline-flex min-h-8 items-center gap-1.5 text-label text-red hover:underline"
                     >
                       Voir tout ({category.productCount})
                       <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
@@ -173,15 +173,10 @@ export function MegaMenu({ open, onClose, triggerRef }: MegaMenuProps) {
                 />
                 <div className="absolute inset-0 flex flex-col justify-end p-5">
                   <span className="text-label text-white/80">Arrivages</span>
-                  <p className="mt-1 font-display text-2xl leading-none tracking-wide text-white uppercase">
-                    NOUVEAUTÉS DE LA SEMAINE
-                  </p>
+                  <p className="mt-1 text-h2 text-white">Nouveautés de la semaine</p>
+                  {/* Le clic sur le lien ferme aussi le menu (il remonte jusqu'ici) */}
                   <div className="mt-4" onClick={onClose}>
-                    <Button
-                      variant="light"
-                      size="sm"
-                      href="/explorer?sort=newest"
-                    >
+                    <Button variant="light" size="sm" href="/explorer?sort=newest">
                       Découvrir
                     </Button>
                   </div>

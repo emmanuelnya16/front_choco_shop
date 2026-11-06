@@ -32,10 +32,11 @@ import {
   TIMELINE_ORDER,
   type ReservationStatusCode,
 } from '@/types/reservationStatus';
-import { mockCategories } from './fixtures/categories';
-import { mockLooks } from './fixtures/looks';
-import { findMockContentPage } from './fixtures/pages';
-import { mockProducts } from './fixtures/products';
+import { adminHandlers, resetMockAdminState } from './adminHandlers';
+import { mockCategories, resetMockCategories } from './fixtures/categories';
+import { mockLooks, resetMockLooks } from './fixtures/looks';
+import { findMockContentPage, resetMockContentPages } from './fixtures/pages';
+import { mockProducts, resetMockProducts } from './fixtures/products';
 import {
   buildPackagePhoto,
   computeCancellable,
@@ -48,6 +49,7 @@ import {
   mockDeliveryCities,
   mockJuniorAddresses,
   mockPublicSettings,
+  resetMockSettings,
 } from './fixtures/settings';
 
 const DEFAULT_PAGE_SIZE = 12;
@@ -58,10 +60,10 @@ const PRICE_RANGE_DEFINITIONS: Array<{
   min: number;
   max: number;
 }> = [
-  { value: '0-15000', label: 'Moins de 15 000 FCFA', min: 0, max: 15000 },
-  { value: '15000-30000', label: '15 000 – 30 000 FCFA', min: 15000, max: 30000 },
-  { value: '30000-50000', label: '30 000 – 50 000 FCFA', min: 30000, max: 50000 },
-  { value: '50000+', label: 'Plus de 50 000 FCFA', min: 50001, max: Number.POSITIVE_INFINITY },
+  { value: '0-15000', label: 'Moins de 15\u00A0000\u00A0FCFA', min: 0, max: 15000 },
+  { value: '15000-30000', label: '15\u00A0000 – 30\u00A0000\u00A0FCFA', min: 15000, max: 30000 },
+  { value: '30000-50000', label: '30\u00A0000 – 50\u00A0000\u00A0FCFA', min: 30000, max: 50000 },
+  { value: '50000+', label: 'Plus de 50\u00A0000\u00A0FCFA', min: 50001, max: Number.POSITIVE_INFINITY },
 ];
 
 const ALL_KNOWN_SIZES = [
@@ -353,6 +355,12 @@ export function resetMockM3State(): void {
     mockJuniorAddresses.map((a) => ({ ...a })),
   );
   favoritesByUserId.clear();
+  resetMockAdminState();
+  resetMockProducts();
+  resetMockCategories();
+  resetMockLooks();
+  resetMockSettings();
+  resetMockContentPages();
   // Recrée toutes les réservations de démonstration (supprime aussi celles créées à partir de RES-000124) :
   // RES-000101 redevient « reserved » et RES-000103 « payment_rejected », avec des échéances dans le futur.
   resetMockReservations();
@@ -647,7 +655,7 @@ export const handlers = [
       return HttpResponse.json(
         {
           code: 'SIMULATED_SERVER_ERROR',
-          message: 'Erreur serveur simulée lors du chargement du catalogue.',
+          message: 'Le catalogue n’a pas pu être chargé. Réessayez dans un instant.',
         },
         { status: 500 },
       );
@@ -808,6 +816,20 @@ export const handlers = [
   // GET /settings/public
   http.get(apiUrl('/settings/public'), async () => {
     await delay(randomMobileLatency());
+    // Recette (M7) : simule des réglages indisponibles pour vérifier l'écran « Paiement momentanément
+    // indisponible » (sessionStorage drc_mock_settings_unavailable = '1', navigateur uniquement)
+    if (typeof window !== 'undefined') {
+      try {
+        if (window.sessionStorage.getItem('drc_mock_settings_unavailable') === '1') {
+          return HttpResponse.json(
+            { code: 'SETTINGS_UNAVAILABLE', message: 'Les réglages de la boutique sont momentanément indisponibles.' },
+            { status: 503 },
+          );
+        }
+      } catch {
+        // sessionStorage indisponible : réponse normale
+      }
+    }
     return HttpResponse.json(mockPublicSettings);
   }),
 
@@ -956,7 +978,7 @@ export const handlers = [
       return HttpResponse.json(
         {
           code: 'TOO_MANY_ATTEMPTS',
-          message: `Trop de tentatives. Réessayez dans ${Math.ceil(retryAfter / 60)} min.`,
+          message: `Trop de tentatives. Réessayez dans ${Math.ceil(retryAfter / 60)}\u00A0min.`,
           details: { retryAfter },
         },
         { status: 429 },
@@ -973,7 +995,7 @@ export const handlers = [
       return HttpResponse.json(
         {
           code: 'TOO_MANY_OTP_REQUESTS',
-          message: `Trop de demandes de code. Réessayez dans ${Math.ceil(retryAfter / 60)} min.`,
+          message: `Trop de demandes de code. Réessayez dans ${Math.ceil(retryAfter / 60)}\u00A0min.`,
           details: { retryAfter },
         },
         { status: 429 },
@@ -1009,7 +1031,7 @@ export const handlers = [
       return HttpResponse.json(
         {
           code: 'OTP_LOCKED',
-          message: `Trop de tentatives. Réessayez dans ${Math.ceil(retryAfter / 60)} min.`,
+          message: `Trop de tentatives. Réessayez dans ${Math.ceil(retryAfter / 60)}\u00A0min.`,
           details: { retryAfter },
         },
         { status: 429 },
@@ -1033,7 +1055,7 @@ export const handlers = [
         return HttpResponse.json(
           {
             code: 'OTP_LOCKED',
-            message: 'Trop de tentatives. Réessayez dans 10 min.',
+            message: 'Trop de tentatives. Réessayez dans 10\u00A0min.',
             details: { retryAfter: 600, attemptsLeft: 0 },
           },
           { status: 429 },
@@ -1365,7 +1387,7 @@ export const handlers = [
         {
           code: 'STOCK_CONFLICT',
           message:
-            "Un article n'est plus disponible dans la quantité demandée. Vérifiez votre panier.",
+            "Un article n’est plus disponible dans la quantité demandée. Vérifiez votre panier.",
           details: { items: detailsItems },
         },
         { status: 409 },
@@ -1388,7 +1410,7 @@ export const handlers = [
         productId: product.id,
         slug: product.slug,
         name: product.name,
-        image: product.fallbackImages[0] ?? '/mock/product-tee.svg',
+        image: product.images[0] ?? product.fallbackImages[0] ?? '/mock/product-tee.svg',
         variantId: reqItem.variantId,
         size: variant?.size ?? 'L',
         colorName: colorObj?.name ?? 'Noir Charbon',
@@ -1482,7 +1504,7 @@ export const handlers = [
         {
           status: 'reserved',
           at: serverTime,
-          note: 'Articles mis de côté pendant 24 h.',
+          note: 'Articles mis de côté pendant 24\u00A0h.',
           actor: 'client',
         },
       ],
@@ -1563,7 +1585,7 @@ export const handlers = [
         pushTimelineEvent(
           reservation,
           'expired',
-          'Délai de 24 h dépassé : articles remis en vente.',
+          'Délai de 24\u00A0h dépassé\u00A0: articles remis en vente.',
           'system',
         );
         commitReservation(reservation);
@@ -1572,7 +1594,7 @@ export const handlers = [
         {
           code: 'RESERVATION_EXPIRED',
           message:
-            'Le délai de 24 h est dépassé : cette réservation a expiré.',
+            'Le délai de 24\u00A0h est dépassé\u00A0: cette réservation a expiré.',
         },
         { status: 410 },
       );
@@ -1646,8 +1668,9 @@ export const handlers = [
       );
     }
 
-    // 409 DUPLICATE_PROOF si l'empreinte SHA-256 a déjà été utilisée
-    if (sha256 && seenProofHashes.has(sha256)) {
+    // 409 DUPLICATE_PROOF si l'empreinte SHA-256 a déjà servi pour une AUTRE réservation : la même
+    // capture renvoyée pour la même réservation (après un rejet) est acceptée
+    if (sha256 && seenProofHashes.has(sha256) && seenProofHashes.get(sha256) !== ref) {
       return HttpResponse.json(
         {
           code: 'DUPLICATE_PROOF',
@@ -1708,7 +1731,7 @@ export const handlers = [
         {
           code: 'CANCEL_NOT_ALLOWED',
           message:
-            'Votre commande est déjà en préparation et ne peut plus être annulée ici.',
+            'Votre réservation est déjà en préparation et ne peut plus être annulée ici.',
           details: { status: reservation.status },
         },
         { status: 422 },
@@ -1882,7 +1905,7 @@ export const handlers = [
 
       const now = Date.now();
       if (reservation.status !== 'reserved' && reservation.status !== 'payment_rejected') {
-        pushTimelineEvent(reservation, 'reserved', 'Articles mis de côté pendant 24 h.', 'client');
+        pushTimelineEvent(reservation, 'reserved', 'Articles mis de côté pendant 24\u00A0h.', 'client');
       }
       reservation.serverTime = new Date(now).toISOString();
       reservation.expiresAt = new Date(now + 2 * 60 * 1000).toISOString();
@@ -1909,7 +1932,7 @@ export const handlers = [
     pushTimelineEvent(
       reservation,
       'expired',
-      'Délai de 24 h dépassé : articles remis en vente.',
+      'Délai de 24\u00A0h dépassé\u00A0: articles remis en vente.',
       'system',
     );
     reservation.serverTime = new Date(now).toISOString();
@@ -2062,4 +2085,6 @@ export const handlers = [
     commitReservation(reservation);
     return HttpResponse.json(serializeReservation(reservation));
   }),
+
+  ...adminHandlers,
 ];

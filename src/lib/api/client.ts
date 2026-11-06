@@ -1,6 +1,6 @@
 import { env } from '@/lib/env';
 import { useNetworkStore, useSyncStore } from '@/pwa/networkStore';
-import { OFFLINE_FALLBACK_HEADER } from '@/pwa/swProtocol';
+import { FROM_CACHE_HEADER, OFFLINE_FALLBACK_HEADER } from '@/pwa/swProtocol';
 import { useAuthStore } from '@/stores/authStore';
 import type { ApiErrorPayload, RefreshTokenResponse } from '@/types/api';
 import { endpoints } from './endpoints';
@@ -9,8 +9,9 @@ const DEFAULT_TIMEOUT_MS = 15_000;
 const UPLOAD_TIMEOUT_MS = 30_000;
 
 /**
- * État du réseau (M6 §6.1) : toute réponse reçue prouve que le serveur est joignable ; une coupure
- * ou un délai dépassé compte comme un échec (2 échecs successifs = hors connexion).
+ * État du réseau (M6 §6.1) : toute réponse reçue du serveur prouve qu'il est joignable ; une coupure
+ * ou un délai dépassé compte comme un échec (2 échecs successifs = hors connexion). Une réponse
+ * servie par le service worker depuis ses données enregistrées ne compte pas (voir request()).
  * Renvoie `true` si la réponse vient vraiment du serveur (et non des données enregistrées).
  */
 function reportResponseReceived(): boolean {
@@ -81,19 +82,19 @@ function getDefaultErrorMessage(status: number): { code: string; message: string
   if (status === 401) {
     return {
       code: 'SESSION_EXPIRED',
-      message: 'Votre session a expiré. Veuillez vous reconnecter.',
+      message: 'Votre session a expiré. Reconnectez-vous pour continuer.',
     };
   }
   if (status === 403) {
     return {
       code: 'FORBIDDEN',
-      message: "Vous n'avez pas l'autorisation d'effectuer cette action.",
+      message: 'Vous n’avez pas accès à cette action.',
     };
   }
   if (status === 404) {
     return {
       code: 'NOT_FOUND',
-      message: 'La ressource demandée est introuvable.',
+      message: 'Cette page ou cet élément est introuvable.',
     };
   }
   if (status === 422) {
@@ -105,12 +106,12 @@ function getDefaultErrorMessage(status: number): { code: string; message: string
   if (status >= 500) {
     return {
       code: 'SERVER_ERROR',
-      message: 'Erreur serveur momentanée. Veuillez réessayer dans quelques instants.',
+      message: 'Un problème est survenu. Réessayez dans quelques instants.',
     };
   }
   return {
     code: 'HTTP_ERROR',
-    message: 'Une erreur est survenue lors de la communication avec le serveur.',
+    message: 'Un problème est survenu. Réessayez dans quelques instants.',
   };
 }
 
@@ -232,10 +233,13 @@ async function request<T>(
       signal: controller.signal,
     });
     responseReceived = true;
-    // Copie servie par le service worker faute de réseau : les données s'affichent, mais c'est un
-    // échec réseau (téléphone « en ligne » sans vraie connexion, M6 §6.1)
-    const servedFromCache = response.headers.get(OFFLINE_FALLBACK_HEADER) === '1';
-    if (servedFromCache) reportNetworkFailure();
+    // Copie de secours servie par le service worker faute de réseau : les données s'affichent, mais
+    // c'est un échec réseau (téléphone « en ligne » sans vraie connexion, M6 §6.1)
+    const offlineFallback = response.headers.get(OFFLINE_FALLBACK_HEADER) === '1';
+    if (offlineFallback) reportNetworkFailure();
+    // Copie du catalogue servie avant la réponse du réseau (StaleWhileRevalidate) : ni succès ni échec.
+    // Le service worker signale ensuite l'issue de la mise à jour (message NETWORK_STATUS, M7 D2)
+    const servedFromCache = offlineFallback || response.headers.get(FROM_CACHE_HEADER) === '1';
     const fromServer = !servedFromCache && reportResponseReceived();
     if (fromServer && method === 'GET' && response.ok) {
       // Date affichée hors connexion (« Mis à jour le … ») : seulement pour une vraie réponse du serveur
@@ -257,7 +261,7 @@ async function request<T>(
       throw new ApiError(
         401,
         'SESSION_EXPIRED',
-        'Votre session a expiré. Veuillez vous reconnecter.',
+        'Votre session a expiré. Reconnectez-vous pour continuer.',
       );
     }
 

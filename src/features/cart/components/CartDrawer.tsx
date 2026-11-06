@@ -16,7 +16,7 @@ import {
 } from '@/stores/cartStore';
 import { useToastStore } from '@/stores/toastStore';
 import { useUiStore } from '@/stores/uiStore';
-import { spring } from '@/motion/tokens';
+import { duration, spring } from '@/motion/tokens';
 import { useReducedMotionPref } from '@/motion/useReducedMotionPref';
 import type { CartItem } from '@/types/domain';
 import { AnimatedPriceCounter } from './AnimatedPriceCounter';
@@ -117,7 +117,7 @@ export function CartDrawer() {
     <AnimatePresence>
       {isOpen && (
         <div
-          className="fixed inset-0 z-50 hidden lg:block"
+          className="fixed inset-0 z-overlay hidden lg:block"
           role="dialog"
           aria-modal="true"
           aria-label="Aperçu de mon panier"
@@ -127,7 +127,7 @@ export function CartDrawer() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
+            transition={{ duration: duration.fast }}
             onClick={closeDrawer}
             className="fixed inset-0 bg-[var(--color-scrim-50)] backdrop-blur-[2px]"
           />
@@ -141,7 +141,7 @@ export function CartDrawer() {
             animate={reducedMotion ? { opacity: 1 } : { x: 0 }}
             exit={reducedMotion ? { opacity: 0 } : { x: '100%' }}
             transition={spring.sheet}
-            className="fixed top-0 right-0 bottom-0 z-10 flex w-[420px] max-w-full flex-col border-l border-silver bg-white shadow-[var(--shadow-sheet)]"
+            className="fixed top-0 right-0 bottom-0 z-10 flex w-105 max-w-full flex-col border-l border-silver bg-white shadow-[var(--shadow-sheet)]"
           >
             {/* En-tête du tiroir */}
             <div className="flex items-center justify-between border-b border-silver/70 px-6 py-4">
@@ -149,14 +149,14 @@ export function CartDrawer() {
                 <ShoppingBag className="h-5 w-5 text-ink" aria-hidden="true" />
                 <h2 className="text-h3 text-ink">MON PANIER</h2>
                 <span className="text-small text-text-2">
-                  ({count} article{count > 1 ? 's' : ''})
+                  ({count}&nbsp;article{count > 1 ? 's' : ''})
                 </span>
               </div>
               <button
                 type="button"
                 onClick={closeDrawer}
                 aria-label="Fermer le tiroir du panier"
-                className="inline-flex h-11 w-11 items-center justify-center rounded-[var(--radius-full)] text-text-2 transition-colors hover:bg-surface hover:text-ink"
+                className="inline-flex h-11 w-11 items-center justify-center rounded-[var(--radius-full)] text-text-2 transition-colors duration-fast hover:bg-surface hover:text-ink"
               >
                 <X className="h-5 w-5" aria-hidden="true" />
               </button>
@@ -171,7 +171,7 @@ export function CartDrawer() {
                 />
                 <p className="mt-3 text-h3 text-ink">Votre panier est vide</p>
                 <p className="mt-1 text-small text-text-2">
-                  Ajoutez vos articles préférés pour les réserver 24 h.
+                  Ajoutez vos articles préférés pour les réserver 24&nbsp;h.
                 </p>
                 <div className="mt-5">
                   <Button
@@ -209,7 +209,7 @@ export function CartDrawer() {
                       <span className="text-small font-semibold text-ink">
                         Sous-total
                       </span>
-                      <p className="text-xs text-text-2">
+                      <p className="text-caption text-text-2">
                         Livraison calculée à l&rsquo;étape suivante
                       </p>
                     </div>
@@ -220,13 +220,13 @@ export function CartDrawer() {
                   </div>
 
                   {hasUnavailable && (
-                    <p role="alert" className="text-xs font-bold text-danger">
+                    <p role="alert" className="text-caption font-bold text-danger">
                       Retirez les articles épuisés pour continuer.
                     </p>
                   )}
 
                   {!isOnline && (
-                    <p role="alert" className="text-xs font-bold text-warning">
+                    <p role="alert" className="text-caption font-bold text-warning">
                       Vous êtes hors connexion. Reconnectez-vous pour réserver.
                     </p>
                   )}

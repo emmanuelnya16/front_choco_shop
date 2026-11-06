@@ -1,6 +1,7 @@
 import { useRef, type ReactNode } from 'react';
 import { gsap, ScrollTrigger, useGSAP } from '@/lib/gsap';
 import { cn } from '@/lib/utils/cn';
+import { duration, gsapEase } from '@/motion/tokens';
 import { useReducedMotionPref } from '@/motion/useReducedMotionPref';
 
 export interface MarqueeItem {
@@ -20,7 +21,7 @@ export interface MarqueeProps {
 
 const TONE_CLASSES: Record<NonNullable<MarqueeProps['tone']>, string> = {
   red: 'bg-red text-white h-12',
-  surface: 'bg-surface text-ink h-[72px] border-y border-silver/60',
+  surface: 'bg-surface text-ink h-18 border-y border-silver/60',
   ink: 'bg-ink text-white h-12',
 };
 
@@ -79,13 +80,13 @@ export function Marquee({
 
           gsap.to(loopTween, {
             timeScale: targetScale,
-            duration: 0.2,
+            duration: duration.fast,
             overwrite: true,
             onComplete: () => {
               gsap.to(loopTween, {
                 timeScale: 1,
-                duration: 0.8,
-                ease: 'power2.out',
+                duration: duration.reveal,
+                ease: gsapEase.soft,
               });
             },
           });
@@ -116,7 +117,7 @@ export function Marquee({
         key={`${keyPrefix}-${item.id}`}
         className={cn(
           'inline-flex shrink-0 items-center gap-2.5 whitespace-nowrap',
-          tone === 'surface' ? 'text-[15px] font-bold' : 'text-label',
+          tone === 'surface' ? 'text-body font-bold' : 'text-label',
         )}
       >
         {item.icon && <span className="inline-flex shrink-0 items-center">{item.icon}</span>}

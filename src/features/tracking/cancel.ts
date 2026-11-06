@@ -8,7 +8,7 @@ export const CANCEL_REASONS = [
 ] as const;
 
 export const CANCEL_NOT_ALLOWED_MESSAGE =
-  'Votre commande est déjà en préparation et ne peut plus être annulée ici.';
+  'Votre réservation est déjà en préparation et ne peut plus être annulée ici.';
 
 /**
  * Texte de la feuille d'annulation selon le statut (§3.2 M5). Le bouton n'apparaît que si `cancellable`.
@@ -16,7 +16,7 @@ export const CANCEL_NOT_ALLOWED_MESSAGE =
  */
 export function cancelSheetMessage(status: Reservation['status']): string {
   if (status === 'pending_validation' || status === 'confirmed') {
-    return 'Vous avez déjà payé : la boutique vous contactera pour le remboursement selon la politique d’annulation.';
+    return 'Vous avez déjà payé\u00A0: la boutique vous contactera pour le remboursement selon la politique d’annulation.';
   }
   return 'Vos articles seront remis en vente immédiatement. Vous pourrez réserver à nouveau à tout moment.';
 }

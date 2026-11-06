@@ -203,7 +203,7 @@ describe("Page d'accueil : rendu complet des 11 sections avec les mocks MSW", ()
 
     // 7.1 Hero
     expect(await screen.findByText('NE SE PLIE')).toBeInTheDocument();
-    expect(screen.getAllByText(/L'INCOMPRIS/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/L’INCOMPRIS/i).length).toBeGreaterThan(0);
 
     // 7.3 Catégories
     expect(screen.getByText('Nos univers')).toBeInTheDocument();
@@ -219,7 +219,7 @@ describe("Page d'accueil : rendu complet des 11 sections avec les mocks MSW", ()
     );
 
     // 7.7 Spécial babouches
-    expect(screen.getByText(/L'ART DE LA BABOUCHE/i)).toBeInTheDocument();
+    expect(screen.getByText(/L’ART DE LA BABOUCHE/i)).toBeInTheDocument();
 
     // 7.8 Comment ça marche
     expect(screen.getByText(/RÉSERVEZ EN 3 ÉTAPES/i)).toBeInTheDocument();
@@ -231,7 +231,7 @@ describe("Page d'accueil : rendu complet des 11 sections avec les mocks MSW", ()
 
     // 7.10 Bloc WhatsApp & Application
     expect(
-      screen.getByText(/Ajoutez DR Choco à votre écran d'accueil/i),
+      screen.getByText(/Ajoutez DR Choco à votre écran d’accueil/i),
     ).toBeInTheDocument();
 
     // 7.11 Portés par l'Incompris

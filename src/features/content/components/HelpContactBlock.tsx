@@ -1,16 +1,18 @@
 import { WhatsAppIcon } from '@/components/layout/FloatingWhatsApp';
+import { useShopWhatsapp } from '@/components/layout/useShopWhatsapp';
 import { Button } from '@/components/ui/Button';
-import { usePublicSettings } from '@/features/catalog/api/useCatalogQueries';
 import { buildWhatsAppQuestionUrl } from '@/features/payment/whatsapp';
 import { cn } from '@/lib/utils/cn';
 
-const FALLBACK_WHATSAPP = '+237690000000';
 const TITLE = 'Vous n’avez pas trouvé\u00A0?';
 
-/** Fin des pages d'aide (M7 §3.3) : contact WhatsApp, même lien prérempli que le profil (M5). */
+/**
+ * Fin des pages d'aide (M7 §3.3) : contact WhatsApp, même lien prérempli que le profil (M5).
+ * Numéro de la boutique inconnu (réglages absents) : le bloc ne s'affiche pas.
+ */
 export function HelpContactBlock({ className }: { className?: string }) {
-  const { data: settings } = usePublicSettings();
-  const whatsappUrl = buildWhatsAppQuestionUrl(settings?.whatsappNumber ?? FALLBACK_WHATSAPP);
+  const whatsapp = useShopWhatsapp();
+  if (!whatsapp) return null;
 
   return (
     <section
@@ -26,7 +28,7 @@ export function HelpContactBlock({ className }: { className?: string }) {
       <Button
         variant="dark"
         size="lg"
-        href={whatsappUrl}
+        href={buildWhatsAppQuestionUrl(whatsapp.number)}
         external
         className="mt-4 w-full sm:w-auto"
         iconLeft={<WhatsAppIcon className="h-5 w-5" />}

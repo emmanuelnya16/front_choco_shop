@@ -104,15 +104,16 @@ describe('Carte de réservation : cibles tactiles et hauteur égale', () => {
   it('donne 44 px au bouton d’action sous 1024 px et étire la carte sur la hauteur de la rangée', () => {
     const { container } = renderCard(makeItem({ status: 'payment_rejected' }));
     const action = screen.getByRole('link', { name: /Renvoyer ma preuve/ });
-    expect(action.className).toContain('max-lg:min-h-[44px]');
-    expect(action.className).toContain('min-h-[36px]');
+    expect(action.className).toContain('max-lg:min-h-11');
+    // 36 px sur ordinateur (taille sm du bouton, écrite min-h-9 depuis M7)
+    expect(action.className).toMatch(/(^|\s)min-h-(9|\[36px\])(\s|$)/);
     expect(container.querySelector('article')?.className).toContain('h-full');
   });
 
   it('applique la même cible au bouton « Réserver à nouveau »', () => {
     renderCard(makeItem({ status: 'delivered' }));
     expect(screen.getByRole('button', { name: 'Réserver à nouveau' }).className).toContain(
-      'max-lg:min-h-[44px]',
+      'max-lg:min-h-11',
     );
   });
 });

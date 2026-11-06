@@ -535,21 +535,21 @@ describe('M6 · Installation · 3. Feuilles', () => {
     const { prompt } = fireBeforeInstallPrompt('dismissed');
 
     const first = renderWithProviders(<SuccessHarness reservationRef="RES-000201" />);
-    expect(screen.getByRole('heading', { name: 'Suivez votre commande depuis votre écran d’accueil' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Suivez votre réservation depuis votre écran d’accueil' })).toBeInTheDocument();
     await waitFor(() => expect(useInstallStore.getState().firstProofRef).toBe('RES-000201'));
     expect(useInstallStore.getState().shownCount.success).toBe(1);
     first.unmount();
 
     // Deuxième réservation : plus de carte
     const second = renderWithProviders(<SuccessHarness reservationRef="RES-000202" />);
-    expect(screen.queryByRole('heading', { name: /Suivez votre commande/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: /Suivez votre réservation/ })).not.toBeInTheDocument();
     second.unmount();
 
     // Retour sur la page Merci de la première : la carte est toujours là ; « Installer » ouvre la fenêtre native
     renderWithProviders(<SuccessHarness reservationRef="RES-000201" />);
     fireEvent.click(screen.getByRole('button', { name: 'Installer' }));
     await waitFor(() => expect(prompt).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(screen.queryByRole('heading', { name: /Suivez votre commande/ })).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole('heading', { name: /Suivez votre réservation/ })).not.toBeInTheDocument());
   });
 
   it('page Merci : « Plus tard » masque la carte et suspend les invitations automatiques', () => {
@@ -557,7 +557,7 @@ describe('M6 · Installation · 3. Feuilles', () => {
     fireBeforeInstallPrompt();
     renderWithProviders(<SuccessHarness reservationRef="RES-000201" />);
     fireEvent.click(screen.getByRole('button', { name: 'Plus tard' }));
-    expect(screen.queryByRole('heading', { name: /Suivez votre commande/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: /Suivez votre réservation/ })).not.toBeInTheDocument();
     expect(isInstallSnoozed(useInstallStore.getState(), Date.now())).toBe(true);
   });
 
@@ -566,7 +566,7 @@ describe('M6 · Installation · 3. Feuilles', () => {
     initInstallService();
     renderWithProviders(<SuccessHarness reservationRef="RES-000201" />);
     const card = screen.getByRole('region', { name: 'Installer l’application' });
-    expect(within(card).getByRole('heading', { name: 'Suivez votre commande depuis votre écran d’accueil' })).toBeInTheDocument();
+    expect(within(card).getByRole('heading', { name: 'Suivez votre réservation depuis votre écran d’accueil' })).toBeInTheDocument();
     expect(within(card).getByText(/vous pourrez recevoir ses notifications/)).toBeInTheDocument();
     expect(within(card).queryByRole('button', { name: 'Installer' })).not.toBeInTheDocument();
     expect(tracked).toContainEqual({ event: 'install_prompt_shown', props: { surface: 'success', kind: 'ios-card' } });
@@ -580,14 +580,14 @@ describe('M6 · Installation · 3. Feuilles', () => {
   it('page Merci : rien sur un navigateur qui ne sait pas installer, ni une fois installée', () => {
     initInstallService();
     const view = renderWithProviders(<SuccessHarness reservationRef="RES-000201" />);
-    expect(screen.queryByRole('heading', { name: /Suivez votre commande/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: /Suivez votre réservation/ })).not.toBeInTheDocument();
     view.unmount();
 
     disposeInstallService();
     stubStandaloneDisplay();
     initInstallService();
     renderWithProviders(<SuccessHarness reservationRef="RES-000201" />);
-    expect(screen.queryByRole('heading', { name: /Suivez votre commande/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: /Suivez votre réservation/ })).not.toBeInTheDocument();
   });
 });
 
@@ -630,9 +630,10 @@ describe('M6 · Installation · 4. Accueil et profil', () => {
     stubNavigator('userAgent', UA.iphone17);
     initInstallService();
     renderWithProviders(<app.WhatsAppAppSection />);
-    const card = screen.getByText("Ajoutez DR Choco à votre écran d'accueil").parentElement;
+    // Apostrophe droite ou typographique (passe de finition M7 de l'accueil)
+    const card = screen.getByText(/^Ajoutez DR Choco à votre écran d['’]accueil$/).parentElement;
     expect(card).not.toHaveAttribute('hidden');
-    fireEvent.click(screen.getByRole('button', { name: "Installer l'application" }));
+    fireEvent.click(screen.getByRole('button', { name: /^Installer l['’]application$/ }));
     expect(await screen.findByRole('dialog', { name: 'Installer sur votre iPhone' })).toBeInTheDocument();
     expect(useToastStore.getState().toasts).toHaveLength(0);
   });
@@ -641,7 +642,7 @@ describe('M6 · Installation · 4. Accueil et profil', () => {
     stubStandaloneDisplay();
     initInstallService();
     renderWithProviders(<app.WhatsAppAppSection />);
-    const card = screen.getByText("Ajoutez DR Choco à votre écran d'accueil").parentElement;
+    const card = screen.getByText(/^Ajoutez DR Choco à votre écran d['’]accueil$/).parentElement;
     expect(card).toHaveAttribute('hidden');
   });
 
@@ -693,7 +694,7 @@ describe('M6 · Installation · 4. Accueil et profil', () => {
     // Première preuve : la carte d'installation remplace la carte iPhone des notifications
     const first = renderSuccess('RES-000104');
     // (l'animation d'entrée masque encore les cartes aux requêtes par rôle : recherche par le texte)
-    expect(await screen.findByText('Suivez votre commande depuis votre écran d’accueil')).toBeInTheDocument();
+    expect(await screen.findByText('Suivez votre réservation depuis votre écran d’accueil')).toBeInTheDocument();
     expect(screen.queryByText(iosNotificationsCard)).not.toBeInTheDocument();
     expect(screen.getAllByText('Voir comment installer')).toHaveLength(1);
     expect(useInstallStore.getState().firstProofRef).toBe('RES-000104');
@@ -702,7 +703,7 @@ describe('M6 · Installation · 4. Accueil et profil', () => {
     // Réservation suivante : la carte des notifications revient, et ouvre aussi les instructions
     renderSuccess('RES-000105');
     expect(await screen.findByText(iosNotificationsCard)).toBeInTheDocument();
-    expect(screen.queryByText(/Suivez votre commande/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Suivez votre réservation/)).not.toBeInTheDocument();
     fireEvent.click(screen.getByText('Voir comment installer'));
     expect(await screen.findByRole('dialog', { name: 'Installer sur votre iPhone' })).toBeInTheDocument();
     expect(useToastStore.getState().toasts.map((toast) => toast.message)).not.toContain('Bientôt disponible');

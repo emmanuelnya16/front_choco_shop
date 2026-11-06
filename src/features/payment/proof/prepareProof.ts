@@ -235,14 +235,14 @@ export async function prepareProof(
   if (!isStandardSupported && !isHeic) {
     throw new ProofPreparationError(
       'UNSUPPORTED_FORMAT',
-      "Ce format n'est pas pris en charge. Faites une capture d'écran classique.",
+      "Ce format n’est pas pris en charge. Faites une capture d’écran classique.",
     );
   }
 
   if (file.size > maxBytes) {
     throw new ProofPreparationError(
       'FILE_TOO_LARGE',
-      `Cette image dépasse ${maxSizeMb} Mo. Choisissez une capture d'écran plus légère.`,
+      `Cette image dépasse ${maxSizeMb}\u00A0Mo. Choisissez une capture d’écran plus légère.`,
     );
   }
 
@@ -253,7 +253,7 @@ export async function prepareProof(
     if (isHeic) {
       throw new ProofPreparationError(
         'UNSUPPORTED_FORMAT',
-        "Ce format n'est pas pris en charge. Faites une capture d'écran classique.",
+        "Ce format n’est pas pris en charge. Faites une capture d’écran classique.",
       );
     }
     // En environnement de test JSDOM sans createImageBitmap/Canvas natif, si le fichier est déjà léger (< 400 Ko),
@@ -275,7 +275,7 @@ export async function prepareProof(
     }
     throw new ProofPreparationError(
       'CORRUPT_IMAGE',
-      "Impossible de lire cette image. Choisissez une autre capture d'écran.",
+      "Impossible de lire cette image. Choisissez une autre capture d’écran.",
     );
   }
 
@@ -342,8 +342,8 @@ export function formatFileSizeFr(bytes: number): string {
   }
   const kb = bytes / 1024;
   if (kb < 1024) {
-    return `${Math.max(1, Math.round(kb))} Ko`;
+    return `${Math.max(1, Math.round(kb))}\u00A0Ko`;
   }
   const mb = kb / 1024;
-  return `${mb.toFixed(1).replace('.', ',')} Mo`;
+  return `${mb.toFixed(1).replace('.', ',')}\u00A0Mo`;
 }

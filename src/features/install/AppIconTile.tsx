@@ -24,7 +24,7 @@ export function AppIconTile({ className }: AppIconTileProps) {
       height={72}
       decoding="async"
       onError={() => setSrc((current) => (current === APP_ICON_FALLBACK_SRC ? current : APP_ICON_FALLBACK_SRC))}
-      className={cn('h-[72px] w-[72px] shrink-0 rounded-2xl bg-ink object-cover shadow-[var(--shadow-card-icon)]', className)}
+      className={cn('h-18 w-18 shrink-0 rounded-2xl bg-ink object-cover shadow-[var(--shadow-card-icon)]', className)}
     />
   );
 }

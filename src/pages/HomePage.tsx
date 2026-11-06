@@ -7,24 +7,26 @@ import {
 } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { ErrorBoundary } from '@/components/errors/ErrorBoundary';
-import { Marquee, type MarqueeItem } from '@/components/ui/Marquee';
+import type { MarqueeItem } from '@/components/ui/Marquee';
 import { BabouchesSpotlightSection } from '@/features/catalog/home/BabouchesSpotlightSection';
 import { BestSellersSection } from '@/features/catalog/home/BestSellersSection';
 import { CategoriesSection } from '@/features/catalog/home/CategoriesSection';
 import { EngagementsSection } from '@/features/catalog/home/EngagementsSection';
 import { HeroSection } from '@/features/catalog/home/HeroSection';
+import { HomeMarquee } from '@/features/catalog/home/HomeMarquee';
 import { HowItWorksSection } from '@/features/catalog/home/HowItWorksSection';
 import { LooksSection } from '@/features/catalog/home/LooksSection';
 import { NewArrivalsSection } from '@/features/catalog/home/NewArrivalsSection';
 import { WhatsAppAppSection } from '@/features/catalog/home/WhatsAppAppSection';
 import { InstallAutoPrompt } from '@/features/install/InstallAutoPrompt';
+import { useSeo } from '@/lib/seo/useSeo';
 
 const BENEFITS_MARQUEE_ITEMS: MarqueeItem[] = [
   { id: 'b-1', label: 'LIVRAISON PARTOUT AU CAMEROUN' },
   { id: 'b-2', label: 'PAIEMENT ORANGE MONEY & MTN MOMO' },
   { id: 'b-3', label: 'RETRAIT GRATUIT EN BOUTIQUE' },
-  { id: 'b-4', label: 'ARTICLES MIS DE CÔTÉ 24 H POUR VOUS' },
-  { id: 'b-5', label: "PHOTO DE VOTRE COLIS AVANT L'ENVOI" },
+  { id: 'b-4', label: 'ARTICLES MIS DE CÔTÉ 24\u00A0H POUR VOUS' },
+  { id: 'b-5', label: 'PHOTO DE VOTRE COLIS AVANT L’ENVOI' },
 ];
 
 const TRUST_MARQUEE_ITEMS: MarqueeItem[] = [
@@ -60,6 +62,11 @@ const TRUST_MARQUEE_ITEMS: MarqueeItem[] = [
   },
 ];
 
+/** Titre et description propres à l'accueil (M7 §7), différents de ceux des autres pages. */
+const HOME_TITLE = 'DR Choco L’Incompris — Vêtements, chaussures et babouches à Douala';
+const HOME_DESCRIPTION =
+  'Streetwear pour hommes à Douala\u00A0: vêtements, chaussures et babouches. Réservez en ligne, payez par Orange Money ou MTN MoMo, livraison partout au Cameroun.';
+
 /**
  * Zone d'erreur d'une section (M7 §5.1) : une section en échec n'emporte pas l'accueil.
  * Les bandeaux décoratifs disparaissent ; les autres sections affichent un encart discret.
@@ -80,7 +87,13 @@ function HomeSection({
   );
 }
 
+/**
+ * Accueil (M1 §7, finitions M7). Un seul effet fort : l'entrée du hero. Le reste de la page se
+ * contente d'apparitions discrètes au défilement et des deux bandeaux défilants.
+ */
 export function HomePage() {
+  useSeo({ title: HOME_TITLE, absoluteTitle: true, description: HOME_DESCRIPTION });
+
   return (
     <div className="bg-white text-ink">
       {/* 7.1 Hero */}
@@ -90,12 +103,7 @@ export function HomePage() {
 
       {/* 7.2 Bandeau des avantages */}
       <HomeSection zone="benefits-marquee" decorative>
-        <Marquee
-          tone="red"
-          direction="left"
-          separator="✦"
-          items={BENEFITS_MARQUEE_ITEMS}
-        />
+        <HomeMarquee tone="red" direction="left" separator="✦" items={BENEFITS_MARQUEE_ITEMS} />
       </HomeSection>
 
       {/* 7.3 Catégories */}
@@ -115,12 +123,7 @@ export function HomePage() {
 
       {/* 7.6 Bandeau paiement et livraison */}
       <HomeSection zone="trust-marquee" decorative>
-        <Marquee
-          tone="surface"
-          direction="right"
-          separator="·"
-          items={TRUST_MARQUEE_ITEMS}
-        />
+        <HomeMarquee tone="surface" direction="right" separator="·" items={TRUST_MARQUEE_ITEMS} />
       </HomeSection>
 
       {/* 7.7 Spécial babouches */}
@@ -157,4 +160,3 @@ export function HomePage() {
 }
 
 export default HomePage;
-

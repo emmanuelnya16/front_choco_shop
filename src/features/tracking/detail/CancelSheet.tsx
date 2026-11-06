@@ -18,7 +18,8 @@ export interface CancelSheetProps {
   open: boolean;
   onClose: () => void;
   reservation: Reservation;
-  whatsappNumber: string;
+  /** Numéro WhatsApp de la boutique ; `null` si inconnu (bouton masqué). */
+  whatsappNumber: string | null;
   /** Appelé juste avant l'envoi : le parent sait que le changement vient du client. */
   onConfirm?: () => void;
   onCancelled: () => void;
@@ -59,22 +60,30 @@ export function CancelSheet({
   };
 
   return (
-    <Sheet open={open} onClose={handleClose} title={`Annuler ${reservation.ref} ?`}>
+    <Sheet open={open} onClose={handleClose} title={`Annuler ${reservation.ref}\u00A0?`}>
       {notAllowed ? (
         <div role="alert">
           <p className="text-body text-ink">{CANCEL_NOT_ALLOWED_MESSAGE}</p>
+          {whatsappNumber && (
+            <Button
+              variant="dark"
+              size="lg"
+              fullWidth
+              className="mt-5"
+              href={buildWhatsAppQuestionUrl(whatsappNumber, reservation.ref)}
+              external
+              iconLeft={<MessageCircle className="h-4 w-4" />}
+            >
+              Contacter la boutique sur WhatsApp
+            </Button>
+          )}
           <Button
-            variant="dark"
+            variant="outline"
             size="lg"
             fullWidth
-            className="mt-5"
-            href={buildWhatsAppQuestionUrl(whatsappNumber, reservation.ref)}
-            external
-            iconLeft={<MessageCircle className="h-4 w-4" />}
+            className={whatsappNumber ? 'mt-3' : 'mt-5'}
+            onClick={handleClose}
           >
-            Contacter la boutique sur WhatsApp
-          </Button>
-          <Button variant="outline" size="lg" fullWidth className="mt-3" onClick={handleClose}>
             Fermer
           </Button>
         </div>
@@ -83,8 +92,8 @@ export function CancelSheet({
           <p className="text-body text-text-2">{cancelSheetMessage(reservation.status)}</p>
           {paid && (
             <Link
-              to="/pages/politique-retour"
-              className="mt-2 inline-flex min-h-[44px] items-center text-small font-semibold text-ink underline underline-offset-2"
+              to="/pages/annulation-retours"
+              className="mt-2 inline-flex min-h-11 items-center text-small font-semibold text-ink underline underline-offset-2"
             >
               Lire la politique d’annulation et de retour
             </Link>

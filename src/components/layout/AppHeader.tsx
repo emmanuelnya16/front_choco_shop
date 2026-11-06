@@ -14,7 +14,6 @@ import { Button } from '@/components/ui/Button';
 import { IconButton } from '@/components/ui/IconButton';
 import { Logo } from '@/components/ui/Logo';
 import { Container } from '@/components/ui/Primitives';
-import { addRecentSearch } from '@/features/catalog/search/recentSearches';
 import { AttentionDot } from '@/features/tracking/components/AttentionDot';
 import { useReservationsAttention } from '@/features/tracking/useReservationsAttention';
 import { cn } from '@/lib/utils/cn';
@@ -44,7 +43,7 @@ const DESKTOP_LINKS = [
   { label: 'Vêtements', to: '/explorer/vetements' },
   { label: 'Chaussures', to: '/explorer/chaussures' },
   { label: 'Babouches', to: '/explorer/babouches' },
-  { label: 'Comment réserver', to: '/#comment-reserver', isAnchor: true },
+  { label: 'Comment réserver', to: '/aide/comment-reserver' },
 ];
 
 export function AppHeader() {
@@ -125,7 +124,8 @@ export function AppHeader() {
     const trimmed = searchQuery.trim();
     if (trimmed) {
       setSearchDropdownOpenPath(null);
-      addRecentSearch(trimmed);
+      // Historique des recherches chargé à la demande : hors du JavaScript de démarrage
+      void import('@/features/catalog/search/recentSearches').then((m) => m.addRecentSearch(trimmed));
       navigate(`/explorer?q=${encodeURIComponent(trimmed)}`, {
         viewTransition: true,
       });
@@ -144,18 +144,7 @@ export function AppHeader() {
     });
   };
 
-  const handleHowItWorksClick = (e: MouseEvent<HTMLAnchorElement>) => {
-    if (location.pathname === '/') {
-      e.preventDefault();
-      const target = document.getElementById('comment-reserver');
-      if (target) {
-        target.scrollIntoView({ behavior: reducedMotion ? 'auto' : 'smooth' });
-      }
-    }
-  };
-
-  const isLinkActive = (to: string, matchExact?: boolean, isAnchor?: boolean) => {
-    if (isAnchor) return false;
+  const isLinkActive = (to: string, matchExact?: boolean) => {
     if (matchExact) return location.pathname === to;
     return location.pathname.startsWith(to);
   };
@@ -163,23 +152,26 @@ export function AppHeader() {
   return (
     <>
       {/*
-        Desktop Header (lg and above) : seule la rangée 1 (72 px) occupe la place de l'élément
+        En-tête ordinateur (lg et plus) : seule la rangée 1 (72 px) occupe la place de l'élément
         collant. La rangée 2 (48 px) est superposée juste dessous, hors du flux : repliée, elle
-        libère vraiment la place (contenu, bandeau en lg:top-[72px], panneaux lg:top-24).
+        libère vraiment la place (contenu, bandeau et panneaux sous var(--desktop-shell-top)).
       */}
-      <header className="site-header sticky top-0 z-40 hidden lg:block">
+      <header className="site-header sticky top-0 z-nav hidden lg:block">
         {/* Row 1: 72px */}
-        <div
-          className={cn(
-            'relative z-20 h-[72px] bg-white transition-shadow duration-250',
-            isRow2Folded && 'shadow-[var(--shadow-header)]',
-          )}
-        >
-          <Container className="flex h-full items-center justify-between gap-6">
+        <div className="relative z-sticky h-18 bg-white">
+          {/* Ombre portée quand la rangée 2 est repliée : calque animé en opacité (jamais box-shadow) */}
+          <span
+            aria-hidden="true"
+            className={cn(
+              'pointer-events-none absolute inset-0 shadow-[var(--shadow-header)] transition-opacity duration-quick ease-brand-out',
+              isRow2Folded ? 'opacity-100' : 'opacity-0',
+            )}
+          />
+          <Container className="relative flex h-full items-center justify-between gap-6">
             <Logo variant="dark" size="md" />
 
             {/* Sur /recherche, la page a déjà son champ : celui de l'en-tête s'efface (place gardée) */}
-            <div className={cn('relative w-[360px]', isSearchPage && 'invisible')}>
+            <div className={cn('relative w-90', isSearchPage && 'invisible')}>
               <form
                 onSubmit={handleSearchSubmit}
                 role="search"
@@ -205,7 +197,7 @@ export function AppHeader() {
                   }}
                   placeholder="Rechercher un t-shirt, une babouche…"
                   aria-label="Rechercher un article"
-                  className="h-10 w-full rounded-[var(--radius-md)] border border-transparent bg-surface pr-4 pl-10 text-small text-ink placeholder:text-text-2 transition-colors focus:border-ink focus:bg-white focus:outline-none"
+                  className="h-10 w-full rounded-[var(--radius-md)] border border-transparent bg-surface pr-4 pl-10 text-small text-ink placeholder:text-text-2 transition-colors duration-fast focus:border-ink focus:bg-white focus:outline-none"
                 />
               </form>
 
@@ -237,7 +229,7 @@ export function AppHeader() {
                     ? { scale: [1, 1.25, 1] }
                     : { scale: 1 }
                 }
-                transition={{ duration: 0.35, ease: ease.out }}
+                transition={{ duration: duration.base, ease: ease.out }}
               >
                 <IconButton
                   icon={<ShoppingBag className="h-5 w-5" aria-hidden="true" />}
@@ -273,7 +265,7 @@ export function AppHeader() {
         <div
           data-header-row2=""
           className={cn(
-            'absolute inset-x-0 top-full z-10 h-12 origin-top border-t border-b border-silver/60 bg-white transition-[transform,opacity] duration-250 ease-out',
+            'absolute inset-x-0 top-full z-10 h-12 origin-top border-t border-b border-silver/60 bg-white transition-[transform,opacity] duration-quick ease-brand-out',
             isRow2Folded
               ? 'pointer-events-none -translate-y-full scale-y-0 opacity-0 focus-within:pointer-events-auto focus-within:translate-y-0 focus-within:scale-y-100 focus-within:opacity-100'
               : 'translate-y-0 scale-y-100 opacity-100',
@@ -292,7 +284,7 @@ export function AppHeader() {
                 );
               }}
               className={cn(
-                'inline-flex h-9 items-center gap-2 rounded-[var(--radius-md)] px-3 text-small font-semibold transition-colors',
+                'inline-flex h-9 items-center gap-2 rounded-[var(--radius-md)] px-3 text-small font-semibold transition-colors duration-fast',
                 isMegaMenuOpen
                   ? 'bg-ink text-white'
                   : 'text-ink hover:bg-surface',
@@ -302,7 +294,7 @@ export function AppHeader() {
               <span>Catégories</span>
               <ChevronDown
                 className={cn(
-                  'h-4 w-4 transition-transform duration-200',
+                  'h-4 w-4 transition-transform duration-fast',
                   isMegaMenuOpen && 'rotate-180',
                 )}
                 aria-hidden="true"
@@ -311,15 +303,14 @@ export function AppHeader() {
 
             <nav aria-label="Navigation principale" className="flex h-full items-center gap-7">
               {DESKTOP_LINKS.map((item) => {
-                const active = isLinkActive(item.to, item.matchExact, item.isAnchor);
+                const active = isLinkActive(item.to, item.matchExact);
                 return (
                   <Link
                     key={item.to}
                     to={item.to}
                     viewTransition
-                    onClick={item.isAnchor ? handleHowItWorksClick : undefined}
                     className={cn(
-                      'relative inline-flex h-full items-center text-small font-semibold transition-colors',
+                      'relative inline-flex h-full items-center text-small font-semibold transition-colors duration-fast',
                       active ? 'text-ink' : 'text-text-2 hover:text-ink',
                     )}
                   >
@@ -372,13 +363,19 @@ export function AppHeader() {
             }}
             transition={{ duration: duration.fast, ease: ease.out }}
             className={cn(
-              'site-header fixed top-0 right-0 left-0 z-40 pt-safe transition-[background-color,box-shadow] duration-250 lg:hidden',
-              isMobileTransparent
-                ? 'bg-transparent text-white'
-                : 'bg-white text-ink shadow-[var(--shadow-header)]',
+              'site-header fixed top-0 right-0 left-0 z-nav pt-safe lg:hidden',
+              isMobileTransparent ? 'text-white' : 'text-ink',
             )}
           >
-            <Container className="flex h-[var(--header-h)] items-center justify-between">
+            {/* Fond blanc et ombre : un calque qui apparaît en opacité (accueil transparent en haut de page) */}
+            <span
+              aria-hidden="true"
+              className={cn(
+                'pointer-events-none absolute inset-0 bg-white shadow-[var(--shadow-header)] transition-opacity duration-quick ease-brand-out',
+                isMobileTransparent ? 'opacity-0' : 'opacity-100',
+              )}
+            />
+            <Container className="relative flex h-[var(--header-h)] items-center justify-between">
               <Logo
                 variant={isMobileTransparent ? 'light' : 'dark'}
                 size="sm"
@@ -402,7 +399,7 @@ export function AppHeader() {
                       ? { scale: [1, 1.25, 1] }
                       : { scale: 1 }
                   }
-                  transition={{ duration: 0.35, ease: ease.out }}
+                  transition={{ duration: duration.base, ease: ease.out }}
                 >
                   <IconButton
                     variant={isMobileTransparent ? 'light-ghost' : 'plain'}

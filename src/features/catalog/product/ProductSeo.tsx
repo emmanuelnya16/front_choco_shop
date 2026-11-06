@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { canonicalFor, DEFAULT_DESCRIPTION, normalizeDescription, siteOrigin, SITE_NAME, upsertMeta } from '@/lib/seo/seo';
 import { useSeo } from '@/lib/seo/useSeo';
 import { formatPrice } from '@/lib/utils/price';
+import { productPrimaryImage } from './productImages';
 import type { Product } from '@/types/domain';
 
 const JSON_LD_ID = 'product-jsonld-schema';
@@ -40,7 +41,7 @@ export function ProductSeo({ product }: { product: Product }) {
     const origin = siteOrigin();
     const pageUrl = canonicalFor(canonicalPath, origin);
     const totalStock = product.variants.reduce((sum, v) => sum + v.stock, 0);
-    const rawImg = product.images[0] ?? product.fallbackImages[0] ?? '/mock/product-tee.svg';
+    const rawImg = productPrimaryImage(product);
     const imageUrl = /^https?:\/\//.test(rawImg) ? rawImg : `${origin}${rawImg.startsWith('/') ? '' : '/'}${rawImg}`;
     const description = normalizeDescription(product.description);
 

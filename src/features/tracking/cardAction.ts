@@ -20,8 +20,9 @@ export function getCardAction(
     case 'pending_validation':
       return { kind: 'text', text: 'Vérification en cours' };
     case 'confirmed':
+      return { kind: 'text', text: 'Paiement validé' };
     case 'preparing':
-      return { kind: 'text', text: 'Paiement validé · préparation en cours' };
+      return { kind: 'text', text: 'Préparation en cours' };
     case 'handed_to_agency':
     case 'ready_for_pickup':
       return item.packagePhotoThumb
@@ -33,7 +34,7 @@ export function getCardAction(
     case 'picked_up':
       return { kind: 'rebook', label: 'Réserver à nouveau' };
     case 'expired':
-      return { kind: 'rebook', label: 'Réserver à nouveau', text: 'Délai de 24 h dépassé' };
+      return { kind: 'rebook', label: 'Réserver à nouveau', text: 'Délai de 24\u00A0h dépassé' };
     case 'cancelled':
       return { kind: 'rebook', label: 'Réserver à nouveau', text: 'Réservation annulée' };
   }

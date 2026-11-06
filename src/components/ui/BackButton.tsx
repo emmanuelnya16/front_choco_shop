@@ -22,7 +22,7 @@ export function BackButton({ fallback, label = 'Retour', className, parentOnly }
       type="button"
       onClick={goBack}
       className={cn(
-        '-ml-2 inline-flex min-h-[44px] items-center gap-1.5 px-2 text-small font-semibold text-ink',
+        '-ml-2 inline-flex min-h-11 items-center gap-1.5 px-2 text-small font-semibold text-ink',
         className,
       )}
     >

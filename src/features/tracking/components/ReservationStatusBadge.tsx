@@ -46,7 +46,8 @@ export function ReservationStatusBadge({
     if (previousStatus.current === status) return;
     previousStatus.current = status;
     if (!animated || !scope.current) return;
-    animate(scope.current, { scale: [1, 1.06, 1] }, { duration: 0.45, delay: 0.25, ease: ease.out });
+    // Après l'échange des libellés (duration.fast)
+    animate(scope.current, { scale: [1, 1.06, 1] }, { duration: duration.slow, delay: duration.fast, ease: ease.out });
   }, [status, animated, animate, scope]);
 
   return (
@@ -76,7 +77,9 @@ export function ReservationStatusBadge({
             )}
             aria-hidden="true"
           />
-          <span className={cn('text-label whitespace-nowrap', size === 'sm' && 'text-[11px]')}>
+          {/* 12 px en majuscules dans les deux tailles (un text-[11px] ajouté remplaçait text-label dans cn()
+              et faisait perdre majuscules et graisse aux petites pastilles) */}
+          <span className="text-label whitespace-nowrap">
             {meta.label}
           </span>
         </m.span>

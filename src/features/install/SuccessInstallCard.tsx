@@ -9,7 +9,7 @@ import { InstallSheets } from './InstallSheets';
 import { useInstallController } from './useInstallController';
 
 /**
- * Carte « Suivez votre commande depuis votre écran d'accueil » de la page Merci (M6 §5.2), affichée
+ * Carte « Suivez votre réservation depuis votre écran d’accueil » de la page Merci (M6 §5.2), affichée
  * seulement après la toute première preuve de paiement (voir useSuccessInstallOffer) :
  * - Android et ordinateur : en plus de la carte des notifications, « Installer » ouvre la fenêtre du navigateur ;
  * - iPhone sans l'application : à la place de la carte des notifications, « Voir comment installer »
@@ -60,22 +60,22 @@ export function SuccessInstallCard() {
           className="mt-6 rounded-[var(--radius-md)] border border-silver/60 bg-surface p-4"
         >
           <div className="flex items-start gap-3">
-            <AppIconTile className="h-10 w-10 rounded-[10px] shadow-none" />
+            <AppIconTile className="h-10 w-10 rounded-[var(--radius-md)] shadow-none" />
             <div className="flex-1">
-              <h2 className="text-small font-bold text-ink">Suivez votre commande depuis votre écran d’accueil</h2>
+              <h2 className="text-small font-bold text-ink">Suivez votre réservation depuis votre écran d’accueil</h2>
               <p className="mt-1 text-small text-text-2">
                 {isIos
                   ? supportsPush
-                    ? 'Ajoutez DR Choco à votre écran d’accueil : votre réservation s’ouvre en un appui, et vous pourrez recevoir ses notifications.'
-                    : 'Ajoutez DR Choco à votre écran d’accueil : votre réservation s’ouvre en un appui.'
-                  : 'Installez DR Choco : votre réservation s’ouvre en un appui, même avec peu de réseau.'}
+                    ? 'Ajoutez DR Choco à votre écran d’accueil\u00A0: votre réservation s’ouvre en un appui, et vous pourrez recevoir ses notifications.'
+                    : 'Ajoutez DR Choco à votre écran d’accueil\u00A0: votre réservation s’ouvre en un appui.'
+                  : 'Installez DR Choco\u00A0: votre réservation s’ouvre en un appui, même avec peu de réseau.'}
               </p>
               <div className="mt-3 flex flex-wrap items-center gap-3">
                 {isIos ? (
                   <button
                     type="button"
                     onClick={() => void handleInstall()}
-                    className="text-small font-bold text-ink underline underline-offset-4 hover:text-red"
+                    className="inline-flex min-h-11 items-center text-small font-bold text-ink underline underline-offset-4 hover:text-red"
                   >
                     Voir comment installer
                   </button>
@@ -93,7 +93,7 @@ export function SuccessInstallCard() {
                 <button
                   type="button"
                   onClick={handleLater}
-                  className="min-h-[36px] px-2 text-small font-semibold text-text-2 underline underline-offset-4 hover:text-ink"
+                  className="min-h-11 px-2 text-small font-semibold text-text-2 underline underline-offset-4 hover:text-ink"
                 >
                   Plus tard
                 </button>

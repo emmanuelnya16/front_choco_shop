@@ -23,17 +23,28 @@ import { OfflineScreen } from '@/features/offline/OfflineScreen';
 import { usePaymentSettings } from '@/features/payment/api/usePaymentQueries';
 import { buildWhatsAppPaymentUrl } from '@/features/payment/whatsapp';
 import { useReservation } from '@/features/reservation/api/useReservationQueries';
+import { frenchSpacing } from '@/features/content/markdown/typography';
 import { CheckoutStepper } from '@/features/reservation/components/CheckoutStepper';
 import { gsap, useGSAP } from '@/lib/gsap';
 import { useOnlineStatus } from '@/lib/hooks/useOnlineStatus';
 import { cn } from '@/lib/utils/cn';
-import { formatDate } from '@/lib/utils/date';
 import { haptic } from '@/lib/utils/haptics';
 import { detectCmOperator } from '@/lib/utils/operator';
 import { useDocumentTitle } from '@/lib/utils/useDocumentTitle';
+import { delay, duration, gsapEase, staggerStep } from '@/motion/tokens';
 import { useReducedMotionPref } from '@/motion/useReducedMotionPref';
 import { useToastStore } from '@/stores/toastStore';
 import { STATUS_META } from '@/types/reservationStatus';
+
+/** « 1 nov. à 21 h 56 » : heure au format français, sans coupure possible. */
+function formatProofTime(input: string | undefined): string {
+  const d = input ? new Date(input) : null;
+  if (!d || Number.isNaN(d.getTime())) return '';
+  const dayMonth = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short' })
+    .format(d)
+    .replace(/ /g, '\u00A0');
+  return `${dayMonth} à ${d.getHours()}\u00A0h\u00A0${String(d.getMinutes()).padStart(2, '0')}`;
+}
 
 export function SuccessPage() {
   const { ref = '' } = useParams<{ ref: string }>();
@@ -42,7 +53,7 @@ export function SuccessPage() {
   const showToast = useToastStore((s) => s.show);
   const reducedMotion = useReducedMotionPref();
 
-  useDocumentTitle(`Merci · Réservation ${ref}`);
+  useDocumentTitle(`Merci · Réservation ${ref.toUpperCase()}`);
 
   const reservationQuery = useReservation(ref, { live: true });
   const { payment, whatsappNumber } = usePaymentSettings();
@@ -97,7 +108,7 @@ export function SuccessPage() {
         message:
           reservation.rejection?.reason ??
           reservation.rejectionReason ??
-          'Paiement non validé : veuillez envoyer une nouvelle capture.',
+          'Paiement non validé\u00A0: envoyez une nouvelle preuve de paiement.',
       });
       navigate(`/reservation/${reservation.ref}/preuve`, { replace: true });
       return;
@@ -106,14 +117,14 @@ export function SuccessPage() {
     if (prev && prev === 'pending_validation' && reservation.status === 'confirmed') {
       haptic('success');
       showToast({
-        message: 'Paiement validé !',
+        message: 'Paiement validé\u00A0!',
       });
 
       if (!reducedMotion && titleTextRef.current) {
         gsap.fromTo(
           titleTextRef.current,
           { yPercent: 110 },
-          { yPercent: 0, duration: 0.7, ease: 'power4.out' },
+          { yPercent: 0, duration: duration.reveal, ease: gsapEase.out },
         );
       }
     }
@@ -141,18 +152,22 @@ export function SuccessPage() {
       }
 
       const tl = gsap.timeline();
+      // Positions dans la frise calculées à partir des jetons (M7 §4.4). Un seul effet fort : la coche.
+      const tDisc = duration.base;
+      const tTitle = duration.slow + duration.fast; // 0,65 s
+      const tCascade = duration.slow + delay.short; // 0,55 s : boutons visibles au plus tôt
 
-      // 0 s : L'anneau finit de se refermer et grossit jusqu'à 96 px
+      // 0 s : l'anneau finit de se refermer et grossit jusqu'à 96 px
       if (ringCircleRef.current) {
         tl.fromTo(
           ringCircleRef.current,
           { strokeDashoffset: 70, scale: 0.65, transformOrigin: '50% 50%' },
-          { strokeDashoffset: 0, scale: 1, duration: 0.35, ease: 'power2.out' },
+          { strokeDashoffset: 0, scale: 1, duration: duration.base, ease: gsapEase.soft },
           0,
         );
       }
 
-      // 0,35 s : Disque success + tracé de la coche blanche (DrawSVG 0,4 s) + haptic('success')
+      // Disque success + tracé de la coche blanche + haptic('success')
       if (discRef.current) {
         tl.fromTo(
           discRef.current,
@@ -160,13 +175,13 @@ export function SuccessPage() {
           {
             scale: 1,
             autoAlpha: 1,
-            duration: 0.35,
-            ease: 'back.out(1.6)',
+            duration: duration.base,
+            ease: gsapEase.back,
             onStart: () => {
               haptic('success');
             },
           },
-          0.35,
+          tDisc,
         );
       }
 
@@ -174,42 +189,28 @@ export function SuccessPage() {
         tl.fromTo(
           checkPathRef.current,
           { drawSVG: '0%' },
-          { drawSVG: '100%', duration: 0.4, ease: 'power2.out' },
-          0.38,
+          { drawSVG: '100%', duration: duration.slow, ease: gsapEase.soft },
+          tDisc + staggerStep / 2,
         );
       }
 
-      // 0,7 s : « MERCI ! » monte de derrière son masque (yPercent 110 -> 0, 0,8 s, power4.out)
+      // « MERCI ! » monte de derrière son masque
       if (titleTextRef.current) {
         tl.fromTo(
           titleTextRef.current,
           { yPercent: 110 },
-          { yPercent: 0, duration: 0.8, ease: 'power4.out' },
-          0.7,
+          { yPercent: 0, duration: duration.reveal, ease: gsapEase.out },
+          tTitle,
         );
       }
 
-      // 0,95 s : Texte, badge et frise apparaissent en cascade (autoAlpha + y 12, décalage 0,08 s)
+      // Texte, badge, frise et boutons en cascade. Opacité seule (pas autoAlpha) : les boutons restent
+      // visibles pour le clavier et utilisables pendant l'entrée (aucune animation ne retarde une action).
       tl.fromTo(
-        '[data-gsap="cascade"]',
-        { autoAlpha: 0, y: 12 },
-        { autoAlpha: 1, y: 0, duration: 0.4, stagger: 0.08, ease: 'power3.out' },
-        0.95,
-      );
-
-      // 1,3 s : Les boutons apparaissent ; le bouton WhatsApp fait un léger rebond
-      tl.fromTo(
-        '[data-gsap="actions"]',
-        { autoAlpha: 0, y: 12 },
-        { autoAlpha: 1, y: 0, duration: 0.35, stagger: 0.06, ease: 'power2.out' },
-        1.3,
-      );
-
-      tl.fromTo(
-        '[data-gsap="whatsapp-btn"]',
-        { scale: 0.96 },
-        { scale: 1, duration: 0.45, ease: 'back.out(2.2)' },
-        1.35,
+        '[data-gsap="cascade"], [data-gsap="actions"]',
+        { opacity: 0, y: 12 },
+        { opacity: 1, y: 0, duration: duration.slow, stagger: staggerStep, ease: gsapEase.base },
+        tCascade,
       );
     },
     { scope: containerRef, dependencies: [Boolean(reservation), reducedMotion] },
@@ -229,12 +230,13 @@ export function SuccessPage() {
               : 'orange'
             : 'orange'));
 
-    const found = payment.operators.find((item) => item.id === op);
+    const found = payment?.operators.find((item) => item.id === op);
     return found?.label ?? (op === 'mtn' ? 'MTN MoMo' : 'Orange Money');
-  }, [searchParams, reservation, payment.operators]);
+  }, [searchParams, reservation, payment]);
 
+  // Numéro de la boutique inconnu : le bouton WhatsApp facultatif n'est pas affiché (jamais de faux numéro)
   const whatsappUrl = useMemo(() => {
-    if (!reservation) return '#';
+    if (!reservation || !whatsappNumber) return null;
     return buildWhatsAppPaymentUrl(whatsappNumber, {
       reservation,
       operatorLabel,
@@ -247,7 +249,7 @@ export function SuccessPage() {
     setNotifCardVisible(false);
     if (result === 'subscribed') {
       showToast({
-        message: 'Notifications activées ! Vous serez prévenu dès la validation.',
+        message: 'Notifications activées\u00A0! Vous serez prévenu dès la validation.',
         wrap: true,
       });
     } else if (result === 'denied') {
@@ -271,7 +273,7 @@ export function SuccessPage() {
 
   if (reservationQuery.isLoading) {
     return (
-      <div className="mx-auto max-w-[560px] px-page py-8 space-y-6">
+      <div className="mx-auto max-w-140 space-y-6 px-page py-8" aria-busy="true">
         <div className="mx-auto h-24 w-24 animate-pulse rounded-full bg-surface" />
         <div className="mx-auto h-12 w-48 animate-pulse rounded-[var(--radius-md)] bg-surface" />
         <div className="h-44 w-full animate-pulse rounded-[var(--radius-md)] bg-surface" />
@@ -299,9 +301,18 @@ export function SuccessPage() {
         <p className="mt-2 text-small text-text-2">
           Impossible de retrouver la réservation {ref}.
         </p>
-        <div className="mt-6 flex justify-center">
-          <Button variant="primary" onClick={() => navigate('/')}>
-            Retour à l&apos;accueil
+        <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
+          {reservationQuery.error ? (
+            <Button
+              variant="primary"
+              size="lg"
+              onClick={() => void reservationQuery.refetch()}
+            >
+              Réessayer
+            </Button>
+          ) : null}
+          <Button variant={reservationQuery.error ? 'outline' : 'primary'} size="lg" href="/reservations">
+            Mes réservations
           </Button>
         </div>
       </div>
@@ -312,15 +323,17 @@ export function SuccessPage() {
   const statusMeta = STATUS_META[activeStatusCode];
   const StatusIcon = statusMeta.Icon;
 
-  const proofTimeText = formatDate(reservation.proof?.uploadedAt ?? reservation.createdAt);
-  const validationDelayText =
-    payment.validationDelayText ?? "en général en moins d'une heure, de 8 h à 20 h";
+  const proofTimeText = formatProofTime(reservation.proof?.uploadedAt ?? reservation.createdAt);
+  // Délai saisi dans l'administration : typographie française appliquée
+  const validationDelayText = frenchSpacing(
+    payment?.validationDelayText ?? 'en général en moins d’une heure, de 8\u00A0h à 20\u00A0h',
+  );
 
   return (
     <div ref={containerRef} className="min-h-dvh bg-white pb-24">
-      <CheckoutStepper currentStep={3} />
+      <CheckoutStepper currentStep="done" />
 
-      <div className="mx-auto max-w-[560px] px-page pt-6">
+      <div className="mx-auto max-w-140 px-page pt-6">
         {/* Retour (M6 §8) : toujours vers le suivi, l'écran de paiement renverrait ici aussitôt (HYPOTHÈSE) */}
         <BackButton fallback={`/reservations/${reservation.ref}`} parentOnly className="mb-2" />
         {/* 1. Disque animé 96 px + coche DrawSVG + Titre masqué */}
@@ -365,7 +378,7 @@ export function SuccessPage() {
           {/* Titre text-display avec révélation par masque */}
           <div className="mask-line mt-5">
             <h1 ref={titleTextRef} className="text-display text-ink">
-              {isConfirmed ? "C'EST CONFIRMÉ !" : 'MERCI !'}
+              {isConfirmed ? 'C’EST CONFIRMÉ\u00A0!' : 'MERCI\u00A0!'}
             </h1>
           </div>
 
@@ -379,14 +392,14 @@ export function SuccessPage() {
           </p>
 
           {/* 3. Badge de statut avec transition en direct (7.1) */}
-          <div data-gsap="cascade" className="mt-4 min-h-[36px]" aria-live="polite">
+          <div data-gsap="cascade" className="mt-4 min-h-9" aria-live="polite">
             <AnimatePresence mode="wait">
               <m.div
                 key={activeStatusCode}
                 initial={reducedMotion ? false : { opacity: 0, y: 10, scale: 0.96 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={reducedMotion ? undefined : { opacity: 0, y: -10, scale: 0.96 }}
-                transition={{ duration: 0.25 }}
+                transition={{ duration: duration.quick }}
               >
                 <span
                   className={cn(
@@ -419,7 +432,7 @@ export function SuccessPage() {
                 </span>
                 <span
                   className={cn(
-                    'mt-1 w-0.5 flex-1 transition-colors duration-500',
+                    'mt-1 w-0.5 flex-1 transition-colors duration-slow',
                     isConfirmed ? 'bg-success' : 'bg-silver',
                   )}
                   aria-hidden="true"
@@ -427,7 +440,7 @@ export function SuccessPage() {
               </div>
               <div className="min-w-0 pt-0.5">
                 <p className="text-small font-bold text-ink">Preuve envoyée</p>
-                <p className="mt-0.5 text-xs text-text-2">{proofTimeText}</p>
+                <p className="mt-0.5 text-caption text-text-2">{proofTimeText}</p>
               </div>
             </li>
 
@@ -436,7 +449,7 @@ export function SuccessPage() {
               <div className="flex flex-col items-center">
                 <span
                   className={cn(
-                    'flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition-colors duration-300',
+                    'flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition-colors duration-base',
                     isConfirmed
                       ? 'border-success bg-success text-white'
                       : 'border-warning bg-white text-warning',
@@ -454,9 +467,9 @@ export function SuccessPage() {
                 <p className="text-small font-bold text-ink">
                   {isConfirmed ? 'Paiement validé par la boutique' : 'Vérification par la boutique'}
                 </p>
-                <p className="mt-0.5 text-xs text-text-2">
+                <p className="mt-0.5 text-caption text-text-2">
                   {isConfirmed
-                    ? 'Votre stock est définitivement attribué à votre commande.'
+                    ? 'Vos articles vous sont définitivement réservés.'
                     : validationDelayText}
                 </p>
               </div>
@@ -472,29 +485,39 @@ export function SuccessPage() {
               <div className="min-w-0 pt-0.5">
                 <p className="text-small font-bold text-ink">
                   Confirmation par SMS, puis préparation de votre colis avec photo avant
-                  l&apos;envoi
+                  l&rsquo;envoi
                 </p>
               </div>
             </li>
           </ol>
         </section>
 
-        {/* 5. Prévenir la boutique sur WhatsApp */}
-        <div data-gsap="actions" className="mt-6 space-y-2 text-center">
-          <div data-gsap="whatsapp-btn">
-            <Button
-              variant="dark"
-              size="lg"
-              fullWidth
-              href={whatsappUrl}
-              external
-              iconLeft={<MessageCircle className="h-5 w-5" />}
-              onClick={() => haptic('light')}
-            >
-              Prévenir la boutique sur WhatsApp
-            </Button>
-          </div>
-          <p className="text-xs text-text-2">Facultatif : la boutique est déjà prévenue.</p>
+        {/* 5. Action principale, puis « Prévenir la boutique sur WhatsApp » (facultatif, en contour) */}
+        <div data-gsap="actions" className="mt-6 space-y-3 text-center">
+          <Button
+            variant="primary"
+            size="lg"
+            fullWidth
+            onClick={() => navigate(`/reservations/${reservation.ref}`)}
+          >
+            Suivre ma réservation
+          </Button>
+          {whatsappUrl && (
+            <div className="space-y-1.5">
+              <Button
+                variant="outline"
+                size="lg"
+                fullWidth
+                href={whatsappUrl}
+                external
+                iconLeft={<MessageCircle className="h-5 w-5" aria-hidden="true" />}
+                onClick={() => haptic('light')}
+              >
+                Prévenir la boutique sur WhatsApp
+              </Button>
+              <p className="text-caption text-text-2">Facultatif&nbsp;: la boutique est déjà prévenue.</p>
+            </div>
+          )}
         </div>
 
         {/* 6. Carte « Être prévenu » (notifications 6.4) */}
@@ -511,20 +534,20 @@ export function SuccessPage() {
                 </div>
                 <div className="flex-1">
                   <h2 className="text-small font-bold text-ink">
-                    Ajoutez l&apos;app à votre écran d&apos;accueil pour recevoir les notifications
+                    Ajoutez l&rsquo;app à votre écran d&rsquo;accueil pour recevoir les notifications
                   </h2>
                   <div className="mt-3 flex flex-wrap items-center gap-3">
                     <button
                       type="button"
                       onClick={iosInstall.open}
-                      className="text-small font-bold text-ink underline underline-offset-4 hover:text-red"
+                      className="inline-flex min-h-11 items-center text-small font-bold text-ink underline underline-offset-4 transition-colors duration-fast hover:text-red"
                     >
                       Voir comment installer
                     </button>
                     <button
                       type="button"
                       onClick={handleDismissNotifications}
-                      className="text-small font-semibold text-text-2 hover:text-ink"
+                      className="inline-flex min-h-11 items-center px-2 text-small font-semibold text-text-2 transition-colors duration-fast hover:text-ink"
                     >
                       Non merci
                     </button>
@@ -544,8 +567,8 @@ export function SuccessPage() {
                   </p>
                   <div className="mt-3 flex flex-wrap items-center gap-3">
                     <Button
-                      variant="primary"
-                      size="sm"
+                      variant="dark"
+                      size="md"
                       onClick={() => void handleActivateNotifications()}
                     >
                       Activer
@@ -553,7 +576,7 @@ export function SuccessPage() {
                     <button
                       type="button"
                       onClick={handleDismissNotifications}
-                      className="min-h-[36px] px-2 text-small font-semibold text-text-2 underline underline-offset-4 hover:text-ink"
+                      className="inline-flex min-h-11 items-center px-2 text-small font-semibold text-text-2 underline underline-offset-4 transition-colors duration-fast hover:text-ink"
                     >
                       Non merci
                     </button>
@@ -568,22 +591,13 @@ export function SuccessPage() {
         {showInstallCard && <SuccessInstallCard />}
         <InstallSheets controller={iosInstall} />
 
-        {/* 7. Boutons de navigation */}
-        <div data-gsap="actions" className="mt-6 space-y-3">
+        {/* 7. Continuer les achats */}
+        <div data-gsap="actions" className="mt-6">
           <Button
-            variant="primary"
-            size="lg"
-            fullWidth
-            onClick={() => navigate(`/reservations/${reservation.ref}`)}
-          >
-            Suivre ma réservation
-          </Button>
-
-          <Button
-            variant="outline"
+            variant="ghost"
             size="md"
             fullWidth
-            iconLeft={<ShoppingBag className="h-4 w-4" />}
+            iconLeft={<ShoppingBag className="h-4 w-4" aria-hidden="true" />}
             onClick={() => navigate('/explorer')}
           >
             Continuer mes achats

@@ -1,7 +1,5 @@
-import { useScroll, useTransform } from 'motion/react';
 import * as m from 'motion/react-m';
 import { Camera, MapPin, PackageCheck, Smartphone } from 'lucide-react';
-import { useRef } from 'react';
 import { Container, Section } from '@/components/ui/Primitives';
 import { SmartImage } from '@/components/ui/SmartImage';
 import { cn } from '@/lib/utils/cn';
@@ -14,21 +12,21 @@ const ENGAGEMENT_CARDS = [
     icon: PackageCheck,
     title: 'Vos articles mis de côté',
     description:
-      'Dès que vous réservez, votre taille est bloquée pour vous pendant 24 h. Personne ne peut vous la prendre.',
+      'Dès que vous réservez, votre taille est bloquée pour vous pendant 24\u00A0h. Personne ne peut vous la prendre.',
   },
   {
     id: 'momo',
     icon: Smartphone,
     title: 'Paiement Mobile Money',
     description:
-      "Payez avec Orange Money ou MTN MoMo, comme d'habitude. Chaque paiement est vérifié par la boutique.",
+      'Payez avec Orange Money ou MTN MoMo, comme d’habitude. Chaque paiement est vérifié par la boutique.',
   },
   {
     id: 'photo',
     icon: Camera,
     title: 'La photo de votre colis',
     description:
-      "Avant l'envoi, vous recevez la photo de votre commande emballée. Vous savez exactement ce qui arrive.",
+      'Avant l’envoi, vous recevez la photo de votre colis emballé. Vous savez exactement ce qui arrive.',
   },
   {
     id: 'cameroun',
@@ -102,10 +100,7 @@ function EngagementPhoto({
       initial={reducedMotion ? 'visible' : 'hidden'}
       whileInView="visible"
       viewport={{ once: true, amount: 0.25 }}
-      className={cn(
-        'overflow-hidden rounded-[var(--radius-md)]',
-        fillCell && 'md:relative md:min-h-[12rem]',
-      )}
+      className={cn('overflow-hidden rounded-[var(--radius-md)]', fillCell && 'md:relative md:min-h-48')}
     >
       <SmartImage
         src={photo.src}
@@ -120,114 +115,54 @@ function EngagementPhoto({
   );
 }
 
+/**
+ * « Pourquoi nous faire confiance » : mosaïque décalée sur ordinateur, alternance carte / photo sur
+ * téléphone. Apparitions discrètes au défilement seulement : la parallaxe des colonnes a été retirée
+ * (un seul effet fort par écran, celui du hero).
+ */
 export function EngagementsSection() {
-  const sectionRef = useRef<HTMLElement>(null);
   const reducedMotion = useReducedMotionPref();
 
-  const { scrollYProgress } = useScroll({
-    target: sectionRef,
-    offset: ['start end', 'end start'],
-  });
-
-  const colLeftY = useTransform(
-    scrollYProgress,
-    [0, 1],
-    reducedMotion ? [0, 0] : [20, -20],
-  );
-  const colCenterY = useTransform(
-    scrollYProgress,
-    [0, 1],
-    reducedMotion ? [0, 0] : [-24, 24],
-  );
-  const colRightY = useTransform(
-    scrollYProgress,
-    [0, 1],
-    reducedMotion ? [0, 0] : [16, -16],
-  );
-
   return (
-    <Section ref={sectionRef} className="bg-surface/40">
+    <Section className="bg-surface/40">
       <Container>
         <div className="mx-auto max-w-2xl text-center">
           <span className="text-label text-red">Transparence &amp; service</span>
-          <h2 className="mt-2 text-h2 text-ink">
-            POURQUOI NOUS FAIRE CONFIANCE
-          </h2>
+          <h2 className="mt-2 text-h2 text-ink">POURQUOI NOUS FAIRE CONFIANCE</h2>
         </div>
 
-        {/* Desktop 3-column staggered mosaic with subtle parallax */}
+        {/* Ordinateur : mosaïque à 3 colonnes décalées */}
         <div className="mt-10 hidden grid-cols-3 items-start gap-6 lg:grid">
-          {/* Column 1: Card 0 + Photo 0 */}
-          <m.div style={{ y: colLeftY }} className="space-y-6">
-            <EngagementCard
-              card={ENGAGEMENT_CARDS[0]}
-              reducedMotion={reducedMotion}
-            />
-            <EngagementPhoto
-              photo={ENGAGEMENT_PHOTOS[0]}
-              reducedMotion={reducedMotion}
-            />
-          </m.div>
+          {/* Colonne 1 : carte 1 et photo 1 */}
+          <div className="space-y-6">
+            <EngagementCard card={ENGAGEMENT_CARDS[0]} reducedMotion={reducedMotion} />
+            <EngagementPhoto photo={ENGAGEMENT_PHOTOS[0]} reducedMotion={reducedMotion} />
+          </div>
 
-          {/* Column 2 (offset 48px downward): Photo 1 + Card 1 + Card 2 */}
-          <m.div style={{ y: colCenterY }} className="mt-12 space-y-6">
-            <EngagementPhoto
-              photo={ENGAGEMENT_PHOTOS[1]}
-              reducedMotion={reducedMotion}
-            />
-            <EngagementCard
-              card={ENGAGEMENT_CARDS[1]}
-              reducedMotion={reducedMotion}
-            />
-            <EngagementCard
-              card={ENGAGEMENT_CARDS[2]}
-              reducedMotion={reducedMotion}
-            />
-          </m.div>
+          {/* Colonne 2 (décalée de 48 px vers le bas) : photo 2, cartes 2 et 3 */}
+          <div className="mt-12 space-y-6">
+            <EngagementPhoto photo={ENGAGEMENT_PHOTOS[1]} reducedMotion={reducedMotion} />
+            <EngagementCard card={ENGAGEMENT_CARDS[1]} reducedMotion={reducedMotion} />
+            <EngagementCard card={ENGAGEMENT_CARDS[2]} reducedMotion={reducedMotion} />
+          </div>
 
-          {/* Column 3: Photo 2 + Card 3 */}
-          <m.div style={{ y: colRightY }} className="space-y-6">
-            <EngagementPhoto
-              photo={ENGAGEMENT_PHOTOS[2]}
-              reducedMotion={reducedMotion}
-            />
-            <EngagementCard
-              card={ENGAGEMENT_CARDS[3]}
-              reducedMotion={reducedMotion}
-            />
-          </m.div>
+          {/* Colonne 3 : photo 3 et carte 4 */}
+          <div className="space-y-6">
+            <EngagementPhoto photo={ENGAGEMENT_PHOTOS[2]} reducedMotion={reducedMotion} />
+            <EngagementCard card={ENGAGEMENT_CARDS[3]} reducedMotion={reducedMotion} />
+          </div>
         </div>
 
-        {/* Mobile single column alternating: card, photo, card, card, photo, card.
+        {/* Téléphone : une colonne, carte, photo, carte, carte, photo, carte.
             Tablette (md) : grille 2 colonnes (carte + photo, carte + carte, photo + carte) au lieu de
             photos pleine largeur de 700 à 900 px de haut. */}
         <div className="mt-8 space-y-4 md:grid md:grid-cols-2 md:gap-4 md:space-y-0 lg:hidden">
-          <EngagementCard
-            card={ENGAGEMENT_CARDS[0]}
-            reducedMotion={reducedMotion}
-          />
-          <EngagementPhoto
-            photo={ENGAGEMENT_PHOTOS[0]}
-            reducedMotion={reducedMotion}
-            fillCell
-          />
-          <EngagementCard
-            card={ENGAGEMENT_CARDS[1]}
-            reducedMotion={reducedMotion}
-          />
-          <EngagementCard
-            card={ENGAGEMENT_CARDS[2]}
-            reducedMotion={reducedMotion}
-          />
-          <EngagementPhoto
-            photo={ENGAGEMENT_PHOTOS[1]}
-            reducedMotion={reducedMotion}
-            fillCell
-          />
-          <EngagementCard
-            card={ENGAGEMENT_CARDS[3]}
-            reducedMotion={reducedMotion}
-          />
+          <EngagementCard card={ENGAGEMENT_CARDS[0]} reducedMotion={reducedMotion} />
+          <EngagementPhoto photo={ENGAGEMENT_PHOTOS[0]} reducedMotion={reducedMotion} fillCell />
+          <EngagementCard card={ENGAGEMENT_CARDS[1]} reducedMotion={reducedMotion} />
+          <EngagementCard card={ENGAGEMENT_CARDS[2]} reducedMotion={reducedMotion} />
+          <EngagementPhoto photo={ENGAGEMENT_PHOTOS[1]} reducedMotion={reducedMotion} fillCell />
+          <EngagementCard card={ENGAGEMENT_CARDS[3]} reducedMotion={reducedMotion} />
         </div>
       </Container>
     </Section>

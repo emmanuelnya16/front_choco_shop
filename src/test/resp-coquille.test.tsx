@@ -10,6 +10,8 @@ import {
   isReservationPath,
 } from '@/components/layout/bottomNavVisibility';
 import { FloatingWhatsApp } from '@/components/layout/FloatingWhatsApp';
+import { formatOpeningHours } from '@/lib/utils/date';
+import { formatCmPhoneInternational, resolveShopWhatsapp } from '@/lib/utils/phone';
 import { Toaster } from '@/components/ui/Toast';
 import { PendingReservationBanner } from '@/features/reservation/components/PendingReservationBanner';
 import { createAppQueryClient } from '@/lib/api/queryClient';
@@ -42,8 +44,8 @@ const CART_ITEM: CartItem = {
 
 describe('Coquille responsive · correspondances exactes des routes', () => {
   it('ne confond pas la page d’aide « Paiement Mobile Money » avec le paiement', () => {
-    expect(isPaymentStepPath('/pages/paiement-mobile-money')).toBe(false);
-    expect(isReservationPath('/pages/paiement-mobile-money')).toBe(false);
+    expect(isPaymentStepPath('/aide/paiement-mobile-money')).toBe(false);
+    expect(isReservationPath('/aide/paiement-mobile-money')).toBe(false);
     expect(isPaymentStepPath('/reservation/RES-000103/paiement')).toBe(true);
     expect(isPaymentStepPath('/reservation/RES-000103/preuve')).toBe(true);
     expect(isPaymentStepPath('/reservation/RES-000103/merci')).toBe(false);
@@ -70,12 +72,39 @@ describe('Coquille responsive · bouton WhatsApp flottant', () => {
   beforeEach(() => useCartStore.getState().clear());
 
   it('reste sur la page d’aide « Paiement Mobile Money », disparaît sur le paiement', async () => {
-    const { unmount } = renderAt('/pages/paiement-mobile-money', <FloatingWhatsApp />);
+    const { unmount } = renderAt('/aide/paiement-mobile-money', <FloatingWhatsApp />);
     expect(await screen.findByRole('link', { name: 'Nous écrire sur WhatsApp' })).toBeInTheDocument();
     unmount();
     renderAt('/reservation/RES-000103/paiement', <FloatingWhatsApp />);
     await act(async () => undefined);
     expect(screen.queryByRole('link', { name: 'Nous écrire sur WhatsApp' })).not.toBeInTheDocument();
+  });
+
+  it('attend la fin du titre principal sur l’accueil et laisse la place à la recherche plein écran', async () => {
+    // Témoin : sur une autre page, le bouton apparaît une fois les réglages chargés
+    const witness = renderAt('/explorer', <FloatingWhatsApp />);
+    expect(await screen.findByRole('link', { name: 'Nous écrire sur WhatsApp' })).toBeInTheDocument();
+    witness.unmount();
+    for (const path of ['/', '/recherche']) {
+      const { unmount } = renderAt(path, <FloatingWhatsApp />);
+      await act(async () => undefined);
+      expect(screen.queryByRole('link', { name: 'Nous écrire sur WhatsApp' })).not.toBeInTheDocument();
+      unmount();
+    }
+  });
+
+  it('un seul numéro : réglages publics, sinon la variable ; aucun numéro valide = pas de bouton', () => {
+    expect(resolveShopWhatsapp('+237 6 77 88 99 00', '+237690000000')).toBe('+237677889900');
+    expect(resolveShopWhatsapp(undefined, '690 00 00 00')).toBe('+237690000000');
+    expect(resolveShopWhatsapp(undefined, '')).toBeNull();
+    expect(resolveShopWhatsapp('inconnu', undefined)).toBeNull();
+    // Horaires du pied de page au format « 9 h – 19 h 30 »
+    const plain = (value: string) => value.replace(/\u00A0/g, ' ');
+    expect(plain(formatOpeningHours('Lun – Sam : 09h00 – 19h30'))).toBe('Lun – Sam : 9 h – 19 h 30');
+    expect(plain(formatOpeningHours('Lun – Sam · 9 h 30 à 19 h 30'))).toBe('Lun – Sam · 9 h 30 – 19 h 30');
+    expect(plain(formatOpeningHours('Tous les jours · 6 h à 22 h'))).toBe('Tous les jours · 6 h – 22 h');
+    // Affichage du pied de page : « +237 6 90 00 00 00 », espaces insécables
+    expect(formatCmPhoneInternational('+237690000000')).toBe('+237\u00A06\u00A090\u00A000\u00A000\u00A000');
   });
 
   it('se place dans la pile du bas et s’efface sur mobile au-dessus d’une barre d’action', async () => {
@@ -112,7 +141,7 @@ describe('Coquille responsive · bandeau de réservation en attente', () => {
   });
 
   it('reste affiché sur la page d’aide au paiement et sur le panier, au-dessus de la barre du bas', async () => {
-    for (const path of ['/pages/paiement-mobile-money', '/panier']) {
+    for (const path of ['/aide/paiement-mobile-money', '/panier']) {
       const { unmount } = renderAt(path, <PendingReservationBanner />);
       const region = await screen.findByRole('region', { name: 'Paiement de réservation non validé' });
       expect(region).toHaveAttribute('data-pending-banner', 'all');

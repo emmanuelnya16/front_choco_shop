@@ -9,11 +9,14 @@ import {
 import { Badge } from '@/components/ui/Badge';
 import { SmartImage } from '@/components/ui/SmartImage';
 import { cn } from '@/lib/utils/cn';
+import { duration, gsapEase } from '@/motion/tokens';
 import { useReducedMotionPref } from '@/motion/useReducedMotionPref';
 import type { ProductImageEntry } from '@/types/domain';
 
 export interface ProductGalleryProps {
   slug: string;
+  /** Nom de l'article : texte de remplacement des photos qui n'en ont pas. */
+  productName?: string;
   images: ProductImageEntry[];
   activeIndex: number;
   onActiveIndexChange: (index: number) => void;
@@ -29,11 +32,13 @@ export interface ProductGalleryProps {
  * Galerie photo produit (§7.2) :
  * - Mobile (`< lg`) : Carrousel horizontal plein bord `4:5` avec `scroll-snap-type: x mandatory`,
  *   pastilles de pagination (`20×6 px` rouge pour l'image active) et badge compteur (`1 / 4`).
+ *   Chaque photo est un bouton qui ouvre la visionneuse (accessible au clavier).
  * - Ordinateur (`lg:`) : Colonne verticale de miniatures `72 px` à gauche + grande image principale `4:5`
  *   avec loupe fluide au survol (`1.8x` piloté par `gsap.quickTo`) et ouverture de la visionneuse au clic.
  */
 export function ProductGallery({
   slug,
+  productName,
   images,
   activeIndex,
   onActiveIndexChange,
@@ -53,6 +58,8 @@ export function ProductGallery({
 
   const safeIndex = Math.min(Math.max(0, activeIndex), Math.max(0, images.length - 1));
   const activeImage = images[safeIndex] ?? images[0];
+  const altFor = (img: ProductImageEntry | undefined, idx: number) =>
+    img?.alt ?? `${productName ?? slug} — vue ${idx + 1}`;
 
   // Synchronise la position du carrousel mobile lorsque `activeIndex` change (ex. sélection d'une couleur)
   useEffect(() => {
@@ -68,9 +75,10 @@ export function ProductGallery({
         left: targetLeft,
         behavior: reducedMotion ? 'auto' : 'smooth',
       });
+      // Fin du défilement doux : les évènements de défilement reprennent la main
       const timer = window.setTimeout(() => {
         isProgrammaticScrollRef.current = false;
-      }, 350);
+      }, duration.base * 1000);
       return () => window.clearTimeout(timer);
     }
   }, [reducedMotion, safeIndex]);
@@ -98,14 +106,14 @@ export function ProductGallery({
     void import('@/lib/gsap').then(({ gsap }) => {
       const node = desktopZoomImgRef.current;
       if (!node) return;
-      gsap.to(node, { scale: 1.8, duration: 0.25, ease: 'power2.out' });
+      gsap.to(node, { scale: 1.8, duration: duration.quick, ease: gsapEase.soft });
       quickXRef.current = gsap.quickTo(node, 'xPercent', {
-        duration: 0.25,
-        ease: 'power2.out',
+        duration: duration.quick,
+        ease: gsapEase.soft,
       });
       quickYRef.current = gsap.quickTo(node, 'yPercent', {
-        duration: 0.25,
-        ease: 'power2.out',
+        duration: duration.quick,
+        ease: gsapEase.soft,
       });
     });
   };
@@ -128,8 +136,8 @@ export function ProductGallery({
         scale: 1,
         xPercent: 0,
         yPercent: 0,
-        duration: 0.28,
-        ease: 'power2.out',
+        duration: duration.quick,
+        ease: gsapEase.soft,
       });
     });
   };
@@ -148,38 +156,40 @@ export function ProductGallery({
           className="no-scrollbar flex aspect-[4/5] w-full snap-x snap-mandatory overflow-x-auto md:aspect-auto md:h-[min(60svh,600px)]"
         >
           {images.map((img, idx) => (
-            <div
+            <button
               key={`${img.url}-${idx}`}
+              type="button"
               style={
                 idx === 0 ? { viewTransitionName: `product-${slug}` } : undefined
               }
               onClick={() => onOpenLightbox(idx)}
-              className="relative aspect-[4/5] w-full shrink-0 snap-center cursor-zoom-in overflow-hidden md:aspect-auto md:h-full"
+              aria-label={`Agrandir la photo ${idx + 1} sur ${images.length}`}
+              className="relative block aspect-[4/5] w-full shrink-0 snap-center cursor-zoom-in overflow-hidden focus-visible:-outline-offset-4 md:aspect-auto md:h-full"
             >
               <SmartImage
                 src={img.url}
                 fallback={img.fallbackUrl}
-                alt={img.alt ?? slug}
+                alt={altFor(img, idx)}
                 ratio="4/5"
                 priority={idx === 0}
                 sizes="100vw"
                 className="h-full w-full md:aspect-auto"
                 imgClassName="md:object-contain"
               />
-            </div>
+            </button>
           ))}
         </div>
 
         {/* Pastilles de pagination en bas au centre + compteur 1 / N en bas à droite (§7.2).
-            Chaque pastille est un bouton de 44 px de haut ; le fond arrondi reste celui d'origine (18 px). */}
+            Chaque pastille est un bouton de 44 × 44 px ; la pastille active (20 px) s'étire en scaleX. */}
         <div className="pointer-events-none absolute right-4 bottom-6 left-4 z-10 flex items-center justify-between">
           <div className="w-12" aria-hidden="true" />
 
           {images.length > 1 && (
-            <div className="pointer-events-auto relative flex items-center px-1">
+            <div className="pointer-events-auto relative flex items-center">
               <span
                 aria-hidden="true"
-                className="absolute inset-x-0 top-1/2 h-[18px] -translate-y-1/2 rounded-[var(--radius-full)] bg-[var(--color-scrim-40)] backdrop-blur-xs"
+                className="absolute inset-x-3 top-1/2 h-5 -translate-y-1/2 rounded-[var(--radius-full)] bg-[var(--color-scrim-40)] backdrop-blur-xs"
               />
               {images.map((_, idx) => {
                 const isActive = idx === safeIndex;
@@ -188,13 +198,20 @@ export function ProductGallery({
                     key={idx}
                     type="button"
                     aria-label={`Voir la photo ${idx + 1}`}
+                    aria-current={isActive ? 'true' : undefined}
                     onClick={() => onActiveIndexChange(idx)}
-                    className="relative flex h-11 items-center justify-center px-[7px]"
+                    className={cn(
+                      'relative flex h-11 items-center justify-center',
+                      // Au-delà de 5 photos, la rangée tient encore à 360 px
+                      images.length > 5 ? 'w-7' : 'w-11',
+                    )}
                   >
+                    <span aria-hidden="true" className="block h-1.5 w-1.5 rounded-[var(--radius-full)] bg-silver" />
                     <span
+                      aria-hidden="true"
                       className={cn(
-                        'block h-1.5 rounded-[var(--radius-full)] transition-all duration-200',
-                        isActive ? 'w-5 bg-red' : 'w-1.5 bg-silver',
+                        'absolute inset-0 m-auto block h-1.5 w-5 origin-center rounded-[var(--radius-full)] bg-red transition-[transform,opacity] duration-fast ease-brand-out',
+                        isActive ? 'scale-x-100 opacity-100' : 'scale-x-30 opacity-0',
                       )}
                     />
                   </button>
@@ -203,8 +220,8 @@ export function ProductGallery({
             </div>
           )}
 
-          <span className="rounded-[var(--radius-full)] bg-[var(--color-scrim-55)] px-2.5 py-1 text-[11px] font-bold text-white tabular-nums">
-            {safeIndex + 1} / {images.length}
+          <span className="rounded-[var(--radius-full)] bg-[var(--color-scrim-85)] px-2.5 py-1 text-caption font-bold whitespace-nowrap text-white tabular-nums">
+            {safeIndex + 1}&nbsp;/&nbsp;{images.length}
           </span>
         </div>
       </div>
@@ -214,7 +231,7 @@ export function ProductGallery({
        * ===================================================================== */}
       <div className="hidden gap-4 lg:flex">
         {/* Colonne de miniatures verticales (72 px de large) */}
-        <div className="flex w-[72px] shrink-0 flex-col gap-3">
+        <div className="flex w-18 shrink-0 flex-col gap-3">
           {images.map((img, idx) => {
             const isActive = idx === safeIndex;
             return (
@@ -225,7 +242,7 @@ export function ProductGallery({
                 aria-label={`Afficher la photo ${idx + 1}`}
                 aria-current={isActive ? 'true' : undefined}
                 className={cn(
-                  'aspect-[4/5] w-full overflow-hidden rounded-[var(--radius-sm)] border-2 bg-surface transition-all',
+                  'aspect-[4/5] w-full overflow-hidden rounded-[var(--radius-sm)] border-2 bg-surface transition-[border-color,opacity] duration-fast',
                   isActive
                     ? 'border-ink opacity-100'
                     : 'border-transparent opacity-70 hover:opacity-100',
@@ -234,7 +251,7 @@ export function ProductGallery({
                 <SmartImage
                   src={img.url}
                   fallback={img.fallbackUrl}
-                  alt={img.alt ?? slug}
+                  alt=""
                   ratio="4/5"
                   sizes="72px"
                   className="h-full w-full"
@@ -259,15 +276,16 @@ export function ProductGallery({
               onOpenLightbox(safeIndex);
             }
           }}
-          aria-label={`Agrandir la photo de ${activeImage?.alt ?? ''}`}
-          className="group relative aspect-[4/5] max-h-[760px] flex-1 cursor-zoom-in overflow-hidden rounded-[var(--radius-md)] bg-surface"
+          // Le nom accessible reprend le texte visible « Plein écran »
+          aria-label={`Agrandir en plein écran : ${altFor(activeImage, safeIndex)}`}
+          className="group relative aspect-[4/5] max-h-190 flex-1 cursor-zoom-in overflow-hidden rounded-[var(--radius-md)] bg-surface"
         >
           <div ref={desktopZoomImgRef} className="h-full w-full will-change-transform">
             {activeImage && (
               <SmartImage
                 src={activeImage.url}
                 fallback={activeImage.fallbackUrl}
-                alt={activeImage.alt ?? slug}
+                alt={altFor(activeImage, safeIndex)}
                 ratio="4/5"
                 priority
                 sizes="(max-width: 1280px) 52vw, 680px"
@@ -288,7 +306,7 @@ export function ProductGallery({
           </div>
 
           {/* Bouton discret d'ouverture plein écran en bas à droite */}
-          <span className="pointer-events-none absolute right-4 bottom-4 inline-flex items-center gap-1.5 rounded-[var(--radius-full)] bg-white/90 px-3 py-1.5 text-xs font-bold text-ink shadow-[var(--shadow-card-icon)] transition-transform group-hover:scale-105">
+          <span className="pointer-events-none absolute right-4 bottom-4 inline-flex items-center gap-1.5 rounded-[var(--radius-full)] bg-white/90 px-3 py-1.5 text-caption font-bold text-ink shadow-[var(--shadow-card-icon)] transition-transform duration-fast group-hover:scale-105">
             <Expand className="h-3.5 w-3.5" aria-hidden="true" />
             <span>Plein écran</span>
           </span>

@@ -43,7 +43,7 @@ export function IconButton({
   const innerCircle = (
     <span
       className={cn(
-        'relative flex h-10 w-10 items-center justify-center rounded-[var(--radius-full)] transition-colors',
+        'relative flex h-10 w-10 items-center justify-center rounded-[var(--radius-full)] transition-colors duration-fast',
         VARIANT_CLASSES[variant],
         className,
       )}
@@ -55,7 +55,7 @@ export function IconButton({
           initial={{ scale: 0.5 }}
           animate={{ scale: 1 }}
           transition={spring.bounce}
-          className="absolute -top-0.5 -right-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-[var(--radius-full)] bg-red px-1 text-[11px] font-bold leading-none tabular-nums text-white"
+          className="absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-[var(--radius-full)] bg-red px-1 text-caption leading-none font-bold tabular-nums text-white"
         >
           {badge > 99 ? '99+' : badge}
         </m.span>
@@ -68,7 +68,7 @@ export function IconButton({
       <Link
         to={href}
         aria-label={showBadge ? `${label} (${badge})` : label}
-        className="inline-flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-[var(--radius-full)]"
+        className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-[var(--radius-full)]"
       >
         {innerCircle}
       </Link>
@@ -80,7 +80,7 @@ export function IconButton({
       type={type}
       disabled={disabled}
       aria-label={showBadge ? `${label} (${badge})` : label}
-      className="inline-flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-[var(--radius-full)] disabled:pointer-events-none disabled:opacity-35"
+      className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-[var(--radius-full)] disabled:pointer-events-none disabled:opacity-35"
       {...(disabled ? {} : pressable)}
       {...(props as Record<string, unknown>)}
     >

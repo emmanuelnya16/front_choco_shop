@@ -2,13 +2,16 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { safeStorage } from '@/lib/utils/storage';
 import { useAuthStore } from '@/stores/authStore';
+import { SW_MESSAGES } from './swProtocol';
 
 /**
  * État du réseau de l'app (M6 §6.1), source unique pour tous les écrans.
  *
  * - `navigator.onLine` et les évènements `online` / `offline` du navigateur ;
  * - complétés par l'échec réel des requêtes de l'app (client HTTP) : 2 échecs réseau successifs
- *   (coupure ou délai dépassé) font passer hors connexion, la première réponse reçue fait revenir en ligne.
+ *   (coupure ou délai dépassé) font passer hors connexion, la première réponse reçue fait revenir en ligne ;
+ * - et par le service worker, pour les réponses qu'il sert depuis ses données enregistrées (message
+ *   NETWORK_STATUS : issue de la mise à jour en arrière-plan du catalogue).
  */
 
 /** Nombre d'échecs réseau successifs qui font passer l'app hors connexion. */
@@ -107,8 +110,28 @@ export function isAppOnline(): boolean {
   return useNetworkStore.getState().online;
 }
 
+/**
+ * Message NETWORK_STATUS du service worker (M7, défaut D2) : les réponses du catalogue servies depuis
+ * ses données enregistrées sont neutres pour le client HTTP ; c'est leur mise à jour en arrière-plan
+ * qui dit si le serveur répond. Renvoie false si le message n'est pas un état du réseau.
+ */
+export function handleNetworkStatusMessage(data: unknown): boolean {
+  if (!data || typeof data !== 'object') return false;
+  const message = data as { type?: unknown; reachable?: unknown };
+  if (message.type !== SW_MESSAGES.networkStatus || typeof message.reachable !== 'boolean') return false;
+  const store = useNetworkStore.getState();
+  if (message.reachable) store.reportSuccess();
+  else store.reportFailure();
+  return true;
+}
+
 // Évènements du navigateur, écoutés une seule fois pour toute l'app
 if (typeof window !== 'undefined') {
+  // Écouté dès le démarrage (pas avec le pont des notifications, chargé plus tard) ; les messages
+  // reçus avant la fin du chargement de la page sont remis à DOMContentLoaded.
+  navigator.serviceWorker?.addEventListener('message', (event: MessageEvent) => {
+    handleNetworkStatusMessage(event.data);
+  });
   window.addEventListener('online', () => useNetworkStore.getState().setBrowserOnline(true));
   window.addEventListener('offline', () => useNetworkStore.getState().setBrowserOnline(false));
   // Retour sur l'app : navigator.onLine a pu changer pendant la mise en veille sans évènement

@@ -89,7 +89,7 @@ export function HelpCenterPage() {
   return (
     <div className="mx-auto w-full max-w-content px-page pt-4 pb-16 lg:pt-10">
       <BackButton fallback="/" className="mb-2 lg:hidden" />
-      <div className="mx-auto max-w-[680px]">
+      <div className="mx-auto max-w-170">
         <header>
           <h1 className="text-h1 text-ink">{HELP_CENTER_TITLE}</h1>
           <p className="mt-3 text-body leading-[1.65] text-text-2">{DESCRIPTION}</p>

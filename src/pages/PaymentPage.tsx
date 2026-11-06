@@ -9,16 +9,19 @@ import {
   ChevronDown,
   Copy,
   Download,
+  MessageCircle,
   Phone,
   QrCode,
+  RefreshCw,
 } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { BackButton } from '@/components/ui/BackButton';
 import { Button } from '@/components/ui/Button';
 import { Container, Price } from '@/components/ui/Primitives';
 import { Sheet } from '@/components/ui/Sheet';
 import { SmartImage } from '@/components/ui/SmartImage';
+import { frenchSpacing } from '@/features/content/markdown/typography';
 import { isNetworkError } from '@/features/offline/networkErrors';
 import { OfflineScreen } from '@/features/offline/OfflineScreen';
 import {
@@ -26,6 +29,7 @@ import {
   usePaymentSettings,
 } from '@/features/payment/api/usePaymentQueries';
 import { ReservationExpiredOverlay } from '@/features/payment/components/ReservationExpiredOverlay';
+import { buildWhatsAppQuestionUrl } from '@/features/payment/whatsapp';
 import {
   buildUssdCode,
   buildUssdTelHref,
@@ -35,18 +39,22 @@ import {
 import { useReservation } from '@/features/reservation/api/useReservationQueries';
 import { CheckoutStepper } from '@/features/reservation/components/CheckoutStepper';
 import { HoldCountdown } from '@/features/reservation/components/HoldCountdown';
+import { ApiError } from '@/lib/api/client';
 import { useOnlineStatus } from '@/lib/hooks/useOnlineStatus';
 import { cn } from '@/lib/utils/cn';
 import { haptic } from '@/lib/utils/haptics';
 import { detectCmOperator } from '@/lib/utils/operator';
 import { formatPrice } from '@/lib/utils/price';
-import { ease, spring } from '@/motion/tokens';
+import { useDocumentTitle } from '@/lib/utils/useDocumentTitle';
+import { delay, duration, ease, spring, staggerSlow, staggerStep } from '@/motion/tokens';
 import { useReducedMotionPref } from '@/motion/useReducedMotionPref';
 import { useAuthStore } from '@/stores/authStore';
 import { useToastStore } from '@/stores/toastStore';
 import { useUiStore } from '@/stores/uiStore';
 
 const FIFTEEN_MINUTES_MS = 15 * 60 * 1000;
+/** Durée d'affichage de la coche « Copié » après une copie (retour d'information, pas une animation). */
+const COPIED_FEEDBACK_MS = 1500;
 
 function formatPayBeforeLabel(expiresAtIso: string): string {
   const d = new Date(expiresAtIso);
@@ -56,10 +64,12 @@ function formatPayBeforeLabel(expiresAtIso: string): string {
   const dayMonth = new Intl.DateTimeFormat('fr-FR', {
     day: 'numeric',
     month: 'short',
-  }).format(d);
-  const hours = String(d.getHours()).padStart(2, '0');
+  })
+    .format(d)
+    .replace(/ /g, '\u00A0');
   const mins = String(d.getMinutes()).padStart(2, '0');
-  return `le ${dayMonth} à ${hours} h ${mins}`;
+  // « le 1 nov. à 5 h 33 » : aucune coupure à l'intérieur de la date ni de l'heure
+  return `le ${dayMonth} à ${d.getHours()}\u00A0h\u00A0${mins}`;
 }
 
 /**
@@ -77,6 +87,12 @@ function UssdCodeSegments({ code }: { code: string }) {
       </span>
     );
   });
+}
+
+/** Nom du fichier enregistré pour le QR code : extension reprise de l'adresse de l'image. */
+function qrDownloadName(operatorId: string, url: string, ref: string): string {
+  const extension = /\.(svg|png|jpe?g|webp)(?:[?#]|$)/i.exec(url)?.[1]?.toLowerCase() ?? 'png';
+  return `qr-${operatorId}-${ref.toLowerCase()}.${extension}`;
 }
 
 async function copyTextToClipboard(text: string): Promise<boolean> {
@@ -121,12 +137,20 @@ export function PaymentPage() {
     live: true,
   });
   const isOnline = useOnlineStatus();
-  const { payment, whatsappNumber } = usePaymentSettings();
+  const {
+    payment,
+    settingsStatus,
+    whatsappNumber,
+    refetch: refetchSettings,
+    isFetching: isFetchingSettings,
+    data: publicSettings,
+  } = usePaymentSettings();
   const cancelMutation = useCancelReservation(ref);
 
+  // Aucun opérateur tant que les vrais paramètres de paiement ne sont pas reçus ou mémorisés (M7)
   const enabledOperators = useMemo(
-    () => payment.operators.filter((op) => op.enabled),
-    [payment.operators],
+    () => (payment?.operators ?? []).filter((op) => op.enabled),
+    [payment],
   );
 
   // Opérateur présélectionné selon le numéro du client (§4.1)
@@ -156,7 +180,8 @@ export function PaymentPage() {
   const currentOperator =
     enabledOperators.find((op) => op.id === selectedOperatorId) ??
     enabledOperators[0] ??
-    payment.operators[0]!;
+    null;
+  const proofOperatorId = currentOperator?.id ?? selectedOperatorId;
 
   const [refCopied, setRefCopied] = useState(false);
   const [amountCopied, setAmountCopied] = useState(false);
@@ -169,7 +194,7 @@ export function PaymentPage() {
   const [expiredLocally, setExpiredLocally] = useState(false);
   const [mountNowMs] = useState<number>(() => Date.now());
 
-  // Compteur animé de 0 au montant en 0,8 s à l'arrivée (§4.4)
+  // Compteur animé de 0 au montant à l'arrivée (§4.4, durée duration.reveal)
   const totalAmount = reservation?.amount?.total ?? reservation?.total ?? 0;
   const subtotalAmount =
     reservation?.amount?.subtotal ?? reservation?.subtotal ?? 0;
@@ -189,7 +214,7 @@ export function PaymentPage() {
     }
 
     hasAnimatedAmountRef.current = true;
-    const durationMs = 800;
+    const durationMs = duration.reveal * 1000;
     const start = performance.now();
     let rafId = 0;
 
@@ -210,11 +235,8 @@ export function PaymentPage() {
   const dialTimestampRef = useRef<number | null>(null);
   const isIos = useMemo(() => isIosDevice(), []);
 
-  useEffect(() => {
-    document.title = ref
-      ? `Paiement ${ref.toUpperCase()} · DR Choco L'Incompris`
-      : "Paiement · DR Choco L'Incompris";
-  }, [ref]);
+  // Titre unique et « noindex » (page privée) par l'API de référencement (M7 §7)
+  useDocumentTitle(ref ? `Paiement ${ref.toUpperCase()}` : 'Paiement');
 
   // Authentification requise (§8 M3)
   useEffect(() => {
@@ -304,6 +326,8 @@ export function PaymentPage() {
   }
 
   if (!reservation && !isLoading) {
+    // 404 : réservation introuvable ; autre erreur : message humain et « Réessayer » (M7 §4.5)
+    const isNotFound = !error || (error instanceof ApiError && error.status === 404);
     return (
       <div>
         <CheckoutStepper currentStep={2} />
@@ -313,13 +337,31 @@ export function PaymentPage() {
               className="mx-auto h-10 w-10 text-danger"
               aria-hidden="true"
             />
-            <h1 className="mt-3 text-h2 text-ink">Réservation introuvable</h1>
+            <h1 className="mt-3 text-h2 text-ink">
+              {isNotFound ? 'Réservation introuvable' : 'Paiement momentanément indisponible'}
+            </h1>
             <p className="mt-2 text-small text-text-2">
-              Aucune réservation ne correspond à la référence{' '}
-              <span className="font-mono font-bold text-ink">{ref}</span>.
+              {isNotFound ? (
+                <>
+                  Aucune réservation ne correspond à la référence{' '}
+                  <span className="whitespace-nowrap font-mono font-bold text-ink">{ref}</span>.
+                </>
+              ) : (
+                'Votre réservation n’a pas pu être affichée. Réessayez dans un instant.'
+              )}
             </p>
-            <div className="mt-6">
-              <Button variant="dark" size="lg" href="/reservations">
+            <div className="mt-6 flex flex-col items-center gap-3">
+              {!isNotFound && (
+                <Button
+                  variant="primary"
+                  size="lg"
+                  iconLeft={<RefreshCw className="h-4 w-4" aria-hidden="true" />}
+                  onClick={() => void refetch()}
+                >
+                  Réessayer
+                </Button>
+              )}
+              <Button variant={isNotFound ? 'dark' : 'outline'} size="lg" href="/reservations">
                 Mes réservations
               </Button>
             </div>
@@ -353,7 +395,7 @@ export function PaymentPage() {
     await copyTextToClipboard(reservation.ref);
     setRefCopied(true);
     showToast({ message: 'Référence copiée' });
-    window.setTimeout(() => setRefCopied(false), 1500);
+    window.setTimeout(() => setRefCopied(false), COPIED_FEEDBACK_MS);
   };
 
   const handleCopyAmount = async () => {
@@ -361,7 +403,7 @@ export function PaymentPage() {
     await copyTextToClipboard(formatRawAmountForClipboard(totalAmount));
     setAmountCopied(true);
     showToast({ message: 'Montant copié' });
-    window.setTimeout(() => setAmountCopied(false), 1500);
+    window.setTimeout(() => setAmountCopied(false), COPIED_FEEDBACK_MS);
   };
 
   const handleCopyUssd = async () => {
@@ -370,7 +412,7 @@ export function PaymentPage() {
     await copyTextToClipboard(ussdCode);
     setUssdCopied(true);
     showToast({ message: 'Code de paiement copié' });
-    window.setTimeout(() => setUssdCopied(false), 1500);
+    window.setTimeout(() => setUssdCopied(false), COPIED_FEEDBACK_MS);
   };
 
   const handleDialClick = () => {
@@ -382,24 +424,37 @@ export function PaymentPage() {
   const handleConfirmCancel = async () => {
     haptic('light');
     try {
-      await cancelMutation.mutateAsync(reservation);
+      const { restored } = await cancelMutation.mutateAsync(reservation);
       setIsCancelSheetOpen(false);
       showToast({
-        message: 'Réservation annulée. Vos articles ont été remis dans votre panier.',
+        message:
+          restored.unavailable === 0
+            ? 'Réservation annulée. Vos articles ont été remis dans votre panier.'
+            : restored.added > 0
+              ? 'Réservation annulée. Les articles encore disponibles ont été remis dans votre panier.'
+              : 'Réservation annulée. Ces articles ne sont plus disponibles.',
+        wrap: true,
       });
       navigate('/panier', { replace: true });
     } catch {
       showToast({
-        message: "Impossible d'annuler la réservation pour le moment. Réessayez.",
+        message: "Impossible d’annuler la réservation pour le moment. Réessayez.",
       });
     }
   };
 
-  const operatorSteps = [
-    ...(currentOperator?.steps ?? []),
-    "Faites une capture d'écran du message de confirmation.",
-    `Si on vous demande un motif, indiquez ${reservation.ref}.`,
+  // Consignes de l'opérateur (texte saisi dans l'administration) : typographie française appliquée
+  const operatorSteps: ReactNode[] = [
+    ...(currentOperator?.steps ?? []).map((step) => frenchSpacing(step)),
+    'Faites une capture d’écran du message de confirmation.',
+    <>
+      Si on vous demande un motif, indiquez{' '}
+      <span className="whitespace-nowrap font-mono font-bold">{reservation.ref}</span>.
+    </>,
   ];
+  const whatsappHelpUrl = whatsappNumber
+    ? buildWhatsAppQuestionUrl(whatsappNumber, reservation.ref)
+    : null;
 
   return (
     <div className="pb-28 lg:pb-16">
@@ -408,7 +463,7 @@ export function PaymentPage() {
       <div className="border-b border-silver/70 bg-white">
         <Container className="flex items-center justify-between py-2.5">
           <BackButton fallback={`/reservations/${reservation.ref}`} />
-          <span className="font-mono text-xs font-bold text-text-2">
+          <span className="font-mono text-caption font-bold text-text-2">
             {reservation.ref}
           </span>
         </Container>
@@ -416,6 +471,8 @@ export function PaymentPage() {
       <CheckoutStepper currentStep={2} />
 
       <Container className="py-6 lg:py-10">
+        {/* Titre de la page pour les lecteurs d'écran (la carte de référence en tient lieu visuellement) */}
+        <h1 className="sr-only">Paiement de votre réservation {reservation.ref}</h1>
         {/* Grille 2 colonnes sur ordinateur (§4.3) */}
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-12 lg:items-start">
           {/* Colonne principale (gauche sur ordinateur) */}
@@ -424,7 +481,7 @@ export function PaymentPage() {
             <m.div
               initial={reducedMotion ? false : { opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.35, ease: ease.out }}
+              transition={{ duration: duration.base, ease: ease.out }}
               className="rounded-[var(--radius-md)] bg-ink p-5 text-white"
             >
               <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-center">
@@ -437,8 +494,9 @@ export function PaymentPage() {
                     data-testid="copy-ref-button"
                     onClick={() => void handleCopyReference()}
                     aria-label={`Référence ${reservation.ref}. Appuyez pour copier la référence`}
-                    className="mt-1 inline-flex min-h-[44px] items-center gap-3 text-left transition-opacity hover:opacity-90"
+                    className="mt-1 inline-flex min-h-11 items-center gap-3 text-left transition-opacity duration-fast hover:opacity-90"
                   >
+                    {/* 32 px condensé : choix graphique de la référence (plus grand que text-h1 sur téléphone) */}
                     <span
                       className="font-mono text-[32px] font-extrabold leading-none tracking-tight text-white"
                       style={{
@@ -469,8 +527,8 @@ export function PaymentPage() {
                     expiresAt={reservation.expiresAt}
                     serverTime={reservation.serverTime}
                     variant="ring"
+                    surface="dark"
                     onExpire={() => setExpiredLocally(true)}
-                    className="text-white [&_span]:text-white"
                   />
                 </div>
               </div>
@@ -481,7 +539,7 @@ export function PaymentPage() {
               aria-labelledby="payment-amount-label"
               initial={reducedMotion ? false : { opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.35, delay: 0.06, ease: ease.out }}
+              transition={{ duration: duration.base, delay: staggerStep, ease: ease.out }}
               className="rounded-[var(--radius-md)] border border-silver bg-white p-5"
             >
               <div className="flex items-start justify-between gap-3">
@@ -497,14 +555,14 @@ export function PaymentPage() {
                     type="button"
                     data-testid="copy-amount-button"
                     onClick={() => void handleCopyAmount()}
-                    aria-label={`${totalAmount} francs CFA. Appuyez pour copier le montant sans espaces`}
-                    className="mt-1 inline-flex min-h-[48px] flex-wrap items-center gap-x-3 gap-y-2 text-left transition-opacity hover:opacity-85"
+                    className="mt-1 inline-flex min-h-12 flex-wrap items-center gap-x-3 gap-y-2 text-left transition-opacity duration-fast hover:opacity-85"
                   >
-                    {/* Montant jamais coupé avant « FCFA » : à 360 px, c'est « Copier » qui passe dessous */}
+                    {/* Montant jamais coupé avant « FCFA » : à 360 px, c'est « Copier » qui passe dessous.
+                        36 à 40 px : choix graphique (montant à recopier, plus grand que text-h1). */}
                     <span className="whitespace-nowrap text-[36px] sm:text-[40px] font-extrabold leading-none tabular-nums text-ink">
                       {formatPrice(animatedAmount || totalAmount)}
                     </span>
-                    <span className="inline-flex h-8 items-center gap-1 rounded-[var(--radius-sm)] border border-silver bg-surface px-2.5 text-xs font-bold text-ink">
+                    <span className="inline-flex h-8 items-center gap-1 rounded-[var(--radius-sm)] border border-silver bg-surface px-2.5 text-caption font-bold text-ink">
                       {amountCopied ? (
                         <>
                           <Check
@@ -520,6 +578,8 @@ export function PaymentPage() {
                         </>
                       )}
                     </span>
+                    {/* Nom accessible = texte visible + précision (pas d'aria-label divergent du texte affiché) */}
+                    <span className="sr-only"> le montant sans espaces</span>
                   </button>
                 </div>
               </div>
@@ -530,12 +590,12 @@ export function PaymentPage() {
                   type="button"
                   aria-expanded={isAmountDetailsOpen}
                   onClick={() => setIsAmountDetailsOpen((prev) => !prev)}
-                  className="inline-flex min-h-[40px] items-center gap-1.5 text-xs font-bold text-text-2 hover:text-ink"
+                  className="inline-flex min-h-11 items-center gap-1.5 text-caption font-bold text-text-2 transition-colors duration-fast hover:text-ink"
                 >
                   <span>Voir le détail du montant</span>
                   <ChevronDown
                     className={cn(
-                      'h-4 w-4 transition-transform duration-200',
+                      'h-4 w-4 transition-transform duration-fast',
                       isAmountDetailsOpen && 'rotate-180',
                     )}
                     aria-hidden="true"
@@ -548,8 +608,8 @@ export function PaymentPage() {
                       initial={reducedMotion ? false : { opacity: 0, y: -4 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -4 }}
-                      transition={{ duration: 0.2 }}
-                      className="mt-2 space-y-1.5 rounded-[var(--radius-sm)] bg-surface p-3 text-xs"
+                      transition={{ duration: duration.fast }}
+                      className="mt-2 space-y-1.5 rounded-[var(--radius-sm)] bg-surface p-3 text-caption"
                     >
                       <div className="flex justify-between">
                         <dt className="text-text-2">Sous-total articles</dt>
@@ -583,7 +643,7 @@ export function PaymentPage() {
               {/* Avertissement warning (§4.1.3) */}
               <div
                 role="note"
-                className="mt-4 flex items-start gap-2.5 rounded-[var(--radius-sm)] border border-warning/50 bg-surface p-3 text-xs font-semibold text-ink"
+                className="mt-4 flex items-start gap-2.5 rounded-[var(--radius-sm)] border border-warning/50 bg-surface p-3 text-caption font-semibold text-ink"
               >
                 <AlertTriangle
                   className="mt-0.5 h-4 w-4 shrink-0 text-warning"
@@ -601,9 +661,79 @@ export function PaymentPage() {
               aria-label="Mode de paiement Mobile Money"
               initial={reducedMotion ? false : { opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.35, delay: 0.12, ease: ease.out }}
+              transition={{ duration: duration.base, delay: staggerStep * 2, ease: ease.out }}
               className="rounded-[var(--radius-md)] border border-silver bg-white p-5"
             >
+              {/* Paramètres de paiement absents (jamais de valeurs fictives, M7) : chargement puis indisponibilité */}
+              {!currentOperator ? (
+                settingsStatus === 'loading' ? (
+                  <div className="space-y-5" aria-busy="true">
+                    <p className="sr-only" role="status">
+                      Chargement des informations de paiement…
+                    </p>
+                    <div className="h-12 w-full animate-pulse rounded-[var(--radius-md)] bg-surface" />
+                    <div className="space-y-2 border-b border-silver/60 pb-3">
+                      <div className="h-3 w-40 animate-pulse rounded-[var(--radius-sm)] bg-surface" />
+                      <div className="h-5 w-56 animate-pulse rounded-[var(--radius-sm)] bg-surface" />
+                    </div>
+                    {/* « Composer le code » reste inactif tant que les vrais paramètres ne sont pas reçus */}
+                    <Button
+                      type="button"
+                      variant="primary"
+                      size="lg"
+                      fullWidth
+                      disabled
+                      className="lg:hidden"
+                      iconLeft={<Phone className="h-5 w-5" aria-hidden="true" />}
+                    >
+                      Composer le code de paiement
+                    </Button>
+                    <div className="space-y-2.5">
+                      {[0, 1, 2].map((idx) => (
+                        <div key={idx} className="h-4 w-full animate-pulse rounded-[var(--radius-sm)] bg-surface" />
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div role="alert" className="flex flex-col items-center py-2 text-center">
+                    <span className="flex h-12 w-12 items-center justify-center rounded-full bg-surface text-warning">
+                      <AlertTriangle className="h-6 w-6" aria-hidden="true" />
+                    </span>
+                    <h2 className="mt-3 text-h3 font-bold text-ink">
+                      Paiement momentanément indisponible
+                    </h2>
+                    <p className="mt-1.5 max-w-sm text-small text-text-2">
+                      {isOnline
+                        ? 'Les informations de paiement n’ont pas pu être chargées. Réessayez dans un instant : votre réservation reste mise de côté.'
+                        : 'Reconnectez-vous pour afficher les informations de paiement : votre réservation reste mise de côté.'}
+                    </p>
+                    <div className="mt-4 flex w-full flex-col gap-2.5 sm:w-auto sm:flex-row">
+                      <Button
+                        type="button"
+                        variant="primary"
+                        size="lg"
+                        loading={isFetchingSettings}
+                        iconLeft={<RefreshCw className="h-4 w-4" aria-hidden="true" />}
+                        onClick={() => void refetchSettings()}
+                      >
+                        Réessayer
+                      </Button>
+                      {whatsappHelpUrl && (
+                        <Button
+                          variant="outline"
+                          size="lg"
+                          href={whatsappHelpUrl}
+                          external
+                          iconLeft={<MessageCircle className="h-4 w-4" aria-hidden="true" />}
+                        >
+                          Contacter la boutique
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                )
+              ) : (
+              <>
               {/* Deux onglets larges si > 1 opérateur activé (§4.1.4) */}
               {enabledOperators.length > 1 && (
                 <div
@@ -624,7 +754,7 @@ export function PaymentPage() {
                           setUserSelectedOperatorId(op.id);
                         }}
                         className={cn(
-                          'relative flex min-h-[48px] items-center justify-center rounded-[var(--radius-sm)] px-3 py-2 text-small font-extrabold transition-colors',
+                          'relative flex min-h-12 items-center justify-center rounded-[var(--radius-sm)] px-3 py-2 text-small font-extrabold transition-colors duration-fast',
                           isSelected
                             ? 'text-white'
                             : 'text-ink hover:text-red',
@@ -637,7 +767,7 @@ export function PaymentPage() {
                             className="absolute inset-0 rounded-[var(--radius-sm)] bg-ink"
                           />
                         )}
-                        <span className="relative z-10">{op.label}</span>
+                        <span className="relative">{op.label}</span>
                       </button>
                     );
                   })}
@@ -650,20 +780,20 @@ export function PaymentPage() {
                   initial={reducedMotion ? false : { opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  transition={{ duration: 0.18 }}
+                  transition={{ duration: duration.fast }}
                   className="space-y-5"
                 >
                   <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-silver/60 pb-3">
                     <div>
-                      <span className="block text-xs font-semibold uppercase tracking-wider text-text-2">
+                      <span className="block text-label text-text-2">
                         Destinataire officiel {currentOperator.label}
                       </span>
                       <span className="mt-0.5 block text-h3 font-extrabold text-ink">
                         {currentOperator.merchantName}
                       </span>
                     </div>
-                    <span className="font-mono text-small font-bold text-ink">
-                      Code marchand : {currentOperator.merchantCode}
+                    <span className="whitespace-nowrap font-mono text-small font-bold text-ink">
+                      Code marchand&nbsp;: {currentOperator.merchantCode}
                     </span>
                   </div>
 
@@ -687,14 +817,14 @@ export function PaymentPage() {
                             >
                               Copier le code de paiement
                             </Button>
-                            <p className="text-center text-xs font-semibold text-text-2">
+                            <p className="text-center text-caption font-semibold text-text-2">
                               Ouvrez l&rsquo;application Téléphone, collez le code
                               puis appelez.
                             </p>
                           </div>
                         ) : (
                           <div className="relative">
-                            {/* Halo discret qui pulse toutes les 3 s avant le 1er appui (§4.4) */}
+                            {/* Halo discret qui pulse avant le 1er appui (§4.4) ; absent en mouvement réduit */}
                             {!hasDialedOnce && !reducedMotion && (
                               <m.span
                                 aria-hidden="true"
@@ -703,18 +833,19 @@ export function PaymentPage() {
                                   opacity: [0, 0.35, 0],
                                 }}
                                 transition={{
-                                  duration: 1.4,
+                                  duration: duration.ambient,
                                   repeat: Number.POSITIVE_INFINITY,
-                                  repeatDelay: 1.6,
+                                  repeatDelay: delay.attention,
                                 }}
                                 className="pointer-events-none absolute inset-0 rounded-[var(--radius-md)] border-2 border-red"
                               />
                             )}
+                            {/* Mêmes dimensions que Button lg (52 px, 15 px) : lien tel: avec suivi du retour */}
                             <a
                               href={ussdTelHref ?? '#'}
                               data-testid="ussd-dial-link"
                               onClick={handleDialClick}
-                              className="relative inline-flex min-h-[52px] w-full items-center justify-center gap-2.5 rounded-[var(--radius-md)] bg-red px-6 py-3 text-[15px] font-semibold text-white transition-all hover:brightness-92"
+                              className="relative inline-flex min-h-13 w-full items-center justify-center gap-2.5 rounded-[var(--radius-md)] bg-red px-6 py-3 text-[15px] font-semibold text-white transition-opacity duration-fast [@media(hover:hover)]:hover:opacity-90"
                             >
                               <Phone className="h-5 w-5" aria-hidden="true" />
                               <span>Composer le code de paiement</span>
@@ -723,9 +854,9 @@ export function PaymentPage() {
                         )}
                         {/* Le code USSD passe par le réseau téléphonique : le paiement reste possible sans Internet */}
                         {!isOnline && (
-                          <p className="mt-2 text-center text-xs font-semibold text-text-2">
-                            Pas besoin d&rsquo;Internet pour payer : le code passe par le réseau
-                            téléphonique. Vous enverrez la capture au retour du réseau.
+                          <p className="mt-2 text-center text-caption font-semibold text-text-2">
+                            Pas besoin d&rsquo;Internet pour payer&nbsp;: le code passe par le réseau
+                            téléphonique. Vous enverrez votre preuve de paiement au retour du réseau.
                           </p>
                         )}
                       </div>
@@ -733,7 +864,7 @@ export function PaymentPage() {
                       {/* Code USSD en clair + bouton Copier (affiché partout) */}
                       <div className="flex items-center justify-between gap-3 rounded-[var(--radius-md)] border border-silver bg-surface px-4 py-3">
                         <div className="min-w-0">
-                          <span className="block text-[11px] font-semibold uppercase tracking-wider text-text-2">
+                          <span className="block text-label text-text-2">
                             Code USSD complet
                           </span>
                           {/* Jamais tronqué : c'est le code que le client vérifie avant de payer */}
@@ -748,7 +879,7 @@ export function PaymentPage() {
                           type="button"
                           data-testid="copy-ussd-btn"
                           onClick={() => void handleCopyUssd()}
-                          className="inline-flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-[var(--radius-sm)] border border-silver bg-white px-3 py-1.5 text-xs font-bold text-ink transition-colors hover:border-ink"
+                          className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-[var(--radius-sm)] border border-silver bg-white px-3 py-1.5 text-caption font-bold text-ink transition-colors duration-fast hover:border-ink"
                         >
                           {ussdCopied ? (
                             <>
@@ -772,7 +903,7 @@ export function PaymentPage() {
                     </div>
                   )}
 
-                  {/* 4.1.6 Étapes numérotées révélées en cascade 0,08 s */}
+                  {/* 4.1.6 Étapes numérotées révélées en cascade */}
                   <div>
                     <h2 className="text-label text-ink">
                       INSTRUCTIONS PAS À PAS ({currentOperator.label})
@@ -786,13 +917,13 @@ export function PaymentPage() {
                           }
                           animate={{ opacity: 1, y: 0 }}
                           transition={{
-                            duration: 0.25,
-                            delay: reducedMotion ? 0 : idx * 0.08,
+                            duration: duration.quick,
+                            delay: reducedMotion ? 0 : idx * staggerSlow,
                             ease: ease.out,
                           }}
                           className="flex items-start gap-3 text-small text-ink"
                         >
-                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-surface font-mono text-xs font-extrabold text-ink">
+                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-surface font-mono text-caption font-extrabold text-ink">
                             {idx + 1}
                           </span>
                           <span className="pt-0.5 leading-relaxed">
@@ -810,7 +941,7 @@ export function PaymentPage() {
                         type="button"
                         aria-expanded={isMobileQrOpen}
                         onClick={() => setIsMobileQrOpen((prev) => !prev)}
-                        className="flex min-h-[44px] w-full items-center justify-between text-left text-small font-bold text-ink"
+                        className="flex min-h-11 w-full items-center justify-between text-left text-small font-bold text-ink"
                       >
                         <span className="inline-flex items-center gap-2">
                           <QrCode className="h-4 w-4" aria-hidden="true" />
@@ -818,7 +949,7 @@ export function PaymentPage() {
                         </span>
                         <ChevronDown
                           className={cn(
-                            'h-4 w-4 text-text-2 transition-transform duration-200',
+                            'h-4 w-4 text-text-2 transition-transform duration-fast',
                             isMobileQrOpen && 'rotate-180',
                           )}
                           aria-hidden="true"
@@ -833,7 +964,7 @@ export function PaymentPage() {
                             }
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -6 }}
-                            transition={{ duration: 0.2 }}
+                            transition={{ duration: duration.fast }}
                             className="mt-3 flex flex-col items-center rounded-[var(--radius-md)] border border-silver bg-surface p-5 text-center"
                           >
                             <div className="rounded-[var(--radius-md)] bg-white p-3">
@@ -842,7 +973,7 @@ export function PaymentPage() {
                                 alt={`QR code ${currentOperator.label} ${currentOperator.merchantName}`}
                                 width={200}
                                 height={200}
-                                className="h-[200px] w-[200px] object-contain"
+                                className="size-50 object-contain"
                               />
                             </div>
                             <p className="mt-2.5 text-small font-extrabold text-ink">
@@ -850,8 +981,8 @@ export function PaymentPage() {
                             </p>
                             <a
                               href={currentOperator.qrImageUrl}
-                              download={`qr-${currentOperator.id}-${reservation.ref.toLowerCase()}.svg`}
-                              className="mt-3 inline-flex min-h-[44px] items-center gap-2 rounded-[var(--radius-md)] border border-silver bg-white px-4 py-2 text-xs font-bold text-ink transition-colors hover:border-ink"
+                              download={qrDownloadName(currentOperator.id, currentOperator.qrImageUrl, reservation.ref)}
+                              className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-[var(--radius-md)] border border-silver bg-white px-4 py-2 text-caption font-bold text-ink transition-colors duration-fast hover:border-ink"
                             >
                               <Download
                                 className="h-4 w-4"
@@ -866,6 +997,8 @@ export function PaymentPage() {
                   )}
                 </m.div>
               </AnimatePresence>
+              </>
+              )}
 
               {/* Bouton principal sur ordinateur dans la colonne de gauche (§4.3) */}
               <div className="mt-6 hidden lg:block">
@@ -873,7 +1006,7 @@ export function PaymentPage() {
                   variant="primary"
                   size="lg"
                   fullWidth
-                  href={`/reservation/${reservation.ref}/preuve?operator=${currentOperator.id}`}
+                  href={`/reservation/${reservation.ref}/preuve?operator=${proofOperatorId}`}
                   iconRight={
                     <ArrowRight className="h-4 w-4" aria-hidden="true" />
                   }
@@ -887,7 +1020,7 @@ export function PaymentPage() {
             <div className="flex flex-wrap items-center justify-between gap-4 px-1 pt-1">
               <Link
                 to="/"
-                className="inline-flex min-h-[44px] items-center text-small font-bold text-ink underline hover:text-red"
+                className="inline-flex min-h-11 items-center text-small font-bold text-ink underline transition-colors duration-fast hover:text-red"
               >
                 Payer plus tard
               </Link>
@@ -896,7 +1029,7 @@ export function PaymentPage() {
                 type="button"
                 data-testid="open-cancel-sheet-btn"
                 onClick={() => setIsCancelSheetOpen(true)}
-                className="inline-flex min-h-[44px] items-center text-small font-bold text-danger underline hover:opacity-80"
+                className="inline-flex min-h-11 items-center text-small font-bold text-danger underline transition-opacity duration-fast hover:opacity-80"
               >
                 Annuler la réservation
               </button>
@@ -919,22 +1052,22 @@ export function PaymentPage() {
                     alt={`QR code ${currentOperator.label} ${currentOperator.merchantName}`}
                     width={240}
                     height={240}
-                    className="h-[240px] w-[240px] object-contain"
+                    className="size-60 object-contain"
                   />
                 </div>
                 <p className="mt-3 text-body font-extrabold text-ink">
                   {currentOperator.merchantName}
                 </p>
-                <p className="mt-0.5 font-mono text-xs font-bold text-text-2">
-                  Code marchand {currentOperator.label} :{' '}
+                <p className="mt-0.5 font-mono text-caption font-bold text-text-2">
+                  Code marchand {currentOperator.label}&nbsp;:{' '}
                   {currentOperator.merchantCode}
                 </p>
 
                 <div className="mt-4">
                   <a
                     href={currentOperator.qrImageUrl}
-                    download={`qr-${currentOperator.id}-${reservation.ref.toLowerCase()}.svg`}
-                    className="inline-flex min-h-[44px] items-center gap-2 rounded-[var(--radius-md)] border border-silver bg-white px-4 py-2 text-xs font-bold text-ink transition-colors hover:border-ink"
+                    download={qrDownloadName(currentOperator.id, currentOperator.qrImageUrl, reservation.ref)}
+                    className="inline-flex min-h-11 items-center gap-2 rounded-[var(--radius-md)] border border-silver bg-white px-4 py-2 text-caption font-bold text-ink transition-colors duration-fast hover:border-ink"
                   >
                     <Download className="h-4 w-4" aria-hidden="true" />
                     <span>Enregistrer l&rsquo;image</span>
@@ -967,7 +1100,7 @@ export function PaymentPage() {
                       <p className="truncate text-small font-bold text-ink">
                         {item.name}
                       </p>
-                      <p className="text-xs text-text-2">
+                      <p className="text-caption text-text-2">
                         {item.colorName} · Taille {item.size} · Qté{' '}
                         {item.quantity}
                       </p>
@@ -980,16 +1113,19 @@ export function PaymentPage() {
                 ))}
               </ul>
 
-              <div className="mt-4 border-t border-silver/60 pt-4 text-xs text-text-2">
-                <span className="font-bold text-ink">Mode de réception : </span>
+              <div className="mt-4 border-t border-silver/60 pt-4 text-caption text-text-2">
+                <span className="font-bold text-ink">Mode de réception&nbsp;: </span>
                 {reservation.receptionMode === 'pickup' ? (
-                  <span>Retrait en boutique (Douala Akwa)</span>
+                  <span>
+                    Retrait en boutique
+                    {publicSettings?.shop?.city ? ` (${publicSettings.shop.city})` : ''}
+                  </span>
                 ) : (
                   <span>
-                    Livraison —{' '}
-                    {reservation.city ??
-                      reservation.deliveryAddress?.city ??
-                      'Douala'}
+                    Livraison
+                    {(reservation.city ?? reservation.deliveryAddress?.city)
+                      ? ` — ${reservation.city ?? reservation.deliveryAddress?.city}`
+                      : ''}
                     {reservation.agency?.name ||
                     reservation.deliveryAddress?.agencyName
                       ? ` (${reservation.agency?.name ?? reservation.deliveryAddress?.agencyName})`
@@ -1002,13 +1138,14 @@ export function PaymentPage() {
         </div>
       </Container>
 
-      {/* Barre d'action collée en bas sur mobile (§4.1) */}
-      <div className="fixed right-0 bottom-0 left-0 z-40 border-t border-silver/70 bg-white px-4 pt-3 pb-[calc(12px+env(safe-area-inset-bottom))] shadow-[var(--shadow-nav)] lg:hidden">
+      {/* Barre d'action collée en bas sur mobile (§4.1) : en ink tant que le client n'a pas composé le
+          code (ou si le paiement est indisponible), pour ne pas concurrencer le bouton rouge principal */}
+      <div className="fixed right-0 bottom-0 left-0 z-nav border-t border-silver/70 bg-white px-page pt-3 pb-[calc(12px+env(safe-area-inset-bottom))] shadow-[var(--shadow-nav)] lg:hidden">
         <Button
-          variant="primary"
+          variant={!currentOperator || (ussdCode && !hasDialedOnce && !isIos) ? 'dark' : 'primary'}
           size="lg"
           fullWidth
-          href={`/reservation/${reservation.ref}/preuve?operator=${currentOperator.id}`}
+          href={`/reservation/${reservation.ref}/preuve?operator=${proofOperatorId}`}
           iconRight={<ArrowRight className="h-4 w-4" aria-hidden="true" />}
         >
           J&rsquo;ai payé, envoyer ma preuve
@@ -1019,7 +1156,7 @@ export function PaymentPage() {
       <Sheet
         open={isReturnSheetOpen}
         onClose={() => setIsReturnSheetOpen(false)}
-        title="Paiement effectué ?"
+        title="Paiement effectué&nbsp;?"
       >
         <div className="space-y-4 text-center">
           <m.div
@@ -1032,9 +1169,9 @@ export function PaymentPage() {
           </m.div>
 
           <div>
-            <h3 className="text-h2 text-ink">Paiement effectué ?</h3>
+            <h3 className="text-h2 text-ink">Paiement effectué&nbsp;?</h3>
             <p className="mt-1.5 text-small text-text-2">
-              Envoyez maintenant la capture de votre confirmation.
+              Envoyez maintenant votre preuve de paiement&nbsp;: la capture d’écran du message de confirmation.
             </p>
           </div>
 
@@ -1043,16 +1180,16 @@ export function PaymentPage() {
               variant="primary"
               size="lg"
               fullWidth
-              href={`/reservation/${reservation.ref}/preuve?operator=${currentOperator.id}&openPicker=1`}
+              href={`/reservation/${reservation.ref}/preuve?operator=${proofOperatorId}&openPicker=1`}
               onClick={() => setIsReturnSheetOpen(false)}
             >
-              Envoyer ma capture
+              Envoyer ma preuve
             </Button>
 
             <button
               type="button"
               onClick={() => setIsReturnSheetOpen(false)}
-              className="inline-flex min-h-[44px] w-full items-center justify-center text-small font-bold text-text-2 underline hover:text-ink"
+              className="inline-flex min-h-11 w-full items-center justify-center text-small font-bold text-text-2 underline transition-colors duration-fast hover:text-ink"
             >
               Pas encore
             </button>
@@ -1064,12 +1201,12 @@ export function PaymentPage() {
       <Sheet
         open={isCancelSheetOpen}
         onClose={() => setIsCancelSheetOpen(false)}
-        title="Annuler la réservation ?"
+        title="Annuler la réservation&nbsp;?"
       >
         <div className="space-y-4">
           <p className="text-small text-text-2">
-            Vos articles seront remis en vente. Nous les replacerons dans votre
-            panier si vous souhaitez modifier votre commande.
+            Vos articles seront remis en vente. Ceux encore disponibles reviennent dans votre
+            panier, pour modifier votre réservation si vous le souhaitez.
           </p>
 
           <div className="flex flex-col gap-2.5 pt-2 sm:flex-row">

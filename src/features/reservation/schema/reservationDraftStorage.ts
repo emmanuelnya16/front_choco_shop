@@ -1,4 +1,4 @@
-import type { ReservationFormValues } from './reservationSchema';
+import type { ReservationFormValues } from './reservationRules';
 
 const DRAFT_STORAGE_KEY = 'drc_reservation_draft_v1';
 

@@ -118,29 +118,32 @@ export function CityPickerField({
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder="Rechercher une ville (Douala, Yaoundé, Bafoussam…)"
           aria-label="Rechercher une ville"
-          className="h-11 w-full rounded-[var(--radius-md)] border border-silver bg-surface pr-3.5 pl-10 text-[16px] text-ink placeholder:text-text-2 focus:border-ink focus:bg-white focus:outline-none"
+          className="h-11 w-full rounded-[var(--radius-md)] border border-silver bg-surface pr-3.5 pl-10 text-body text-ink placeholder:text-text-2 focus:border-ink focus:bg-white focus:outline-none"
         />
       </div>
 
       <ul
         role="listbox"
         aria-label="Villes de livraison au Cameroun"
-        className="max-h-[300px] divide-y divide-silver/50 overflow-y-auto rounded-[var(--radius-md)] border border-silver/70 bg-white"
+        className="max-h-75 divide-y divide-silver/50 overflow-y-auto rounded-[var(--radius-md)] border border-silver/70 bg-white"
       >
         {filteredCities.length === 0 ? (
           <li className="px-4 py-6 text-center text-small text-text-2">
-            Aucune ville ne correspond à « {searchQuery} ».
+            Aucune ville ne correspond à «&nbsp;{searchQuery}&nbsp;».
           </li>
         ) : (
           filteredCities.map((city) => {
             const isSelected = selectedCity?.id === city.id;
             return (
-              <li key={city.id} role="option" aria-selected={isSelected}>
+              // Le bouton porte le rôle d'option (pas d'élément interactif dans une option)
+              <li key={city.id} role="presentation">
                 <button
                   type="button"
+                  role="option"
+                  aria-selected={isSelected}
                   onClick={() => handleSelectCity(city)}
                   className={cn(
-                    'flex min-h-[52px] w-full items-center justify-between gap-3 px-4 py-2.5 text-left transition-colors',
+                    'flex min-h-13 w-full items-center justify-between gap-3 px-4 py-2.5 text-left transition-colors duration-fast',
                     isSelected
                       ? 'bg-surface font-bold text-ink'
                       : 'text-ink hover:bg-surface/70',
@@ -152,12 +155,12 @@ export function CityPickerField({
                         {city.name}
                       </span>
                       {city.isLocal && (
-                        <span className="rounded-[var(--radius-sm)] bg-ink px-2 py-0.5 text-[11px] font-bold text-white">
+                        <span className="rounded-[var(--radius-sm)] bg-ink px-2 py-0.5 text-caption font-bold text-white">
                           Domicile
                         </span>
                       )}
                     </div>
-                    <p className="mt-0.5 text-xs text-text-2">
+                    <p className="mt-0.5 text-caption text-text-2">
                       {formatPrice(city.fee)} · {city.estimatedDelay}
                     </p>
                   </div>
@@ -187,7 +190,7 @@ export function CityPickerField({
         aria-expanded={isMobileSheetOpen || isDesktopDropdownOpen}
         aria-invalid={Boolean(error)}
         className={cn(
-          'flex min-h-[48px] w-full items-center justify-between gap-3 rounded-[var(--radius-md)] border bg-white px-3.5 py-2.5 text-left transition-colors focus:border-ink focus:outline-none',
+          'flex min-h-12 w-full items-center justify-between gap-3 rounded-[var(--radius-md)] border bg-white px-3.5 py-2.5 text-left transition-colors duration-fast focus:border-ink focus:outline-none',
           error ? 'border-danger' : 'border-silver hover:border-ink',
           disabled && 'cursor-not-allowed opacity-60',
         )}
@@ -200,7 +203,7 @@ export function CityPickerField({
           {selectedCity ? (
             <div className="min-w-0 truncate">
               <span className="font-bold text-ink">{selectedCity.name}</span>
-              <span className="ml-2 text-xs text-text-2">
+              <span className="ml-2 text-caption text-text-2">
                 · {formatPrice(selectedCity.fee)} · {selectedCity.estimatedDelay}
               </span>
             </div>
@@ -216,7 +219,7 @@ export function CityPickerField({
 
       {/* Liste déroulante sur ordinateur */}
       {isDesktopDropdownOpen && (
-        <div className="absolute right-0 left-0 z-30 mt-2 hidden rounded-[var(--radius-md)] border border-silver bg-white p-3 shadow-[var(--shadow-pop)] lg:block">
+        <div className="absolute right-0 left-0 z-overlay mt-2 hidden rounded-[var(--radius-md)] border border-silver bg-white p-3 shadow-[var(--shadow-pop)] lg:block">
           {renderCityList()}
         </div>
       )}

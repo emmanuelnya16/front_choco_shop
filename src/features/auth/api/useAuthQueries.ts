@@ -1,11 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback } from 'react';
 import { clearAppBadge } from '@/features/notifications/appBadge';
-import { unsubscribeOnLogout } from '@/features/notifications/pushService';
 import { api } from '@/lib/api/client';
 import { endpoints } from '@/lib/api/endpoints';
 import { qk } from '@/lib/api/queryKeys';
-import { clearUserDataCache } from '@/pwa/registerSW';
 import { useAuthStore } from '@/stores/authStore';
 import { useFavoritesStore } from '@/stores/favoritesStore';
 import { useReservationStore } from '@/stores/reservationStore';
@@ -106,7 +104,10 @@ export function useLogout() {
       // Plus de notifications pour ce compte sur ce téléphone (M6 §7.1) : au mieux, 3 s au plus.
       // HYPOTHÈSE: POST /push/unsubscribe exige la session du client ; il part donc AVANT
       // /auth/logout (et non dans onSettled, où la session est déjà vidée).
-      await unsubscribeOnLogout();
+      // Module des notifications chargé à la demande : il ne pèse pas sur les pages Panier et Réservation (M7)
+      await import('@/features/notifications/pushService')
+        .then((mod) => mod.unsubscribeOnLogout())
+        .catch(() => undefined);
       try {
         await api.post<void>(endpoints.auth.logout, undefined, {
           skipAuthRefresh: true,
@@ -125,7 +126,9 @@ export function useLogout() {
       queryClient.removeQueries({ queryKey: qk.pendingReservations() });
       // Pastille de l'icône effacée, données personnelles enregistrées pour le hors connexion vidées (M6)
       clearAppBadge();
-      void clearUserDataCache();
+      void import('@/pwa/registerSW')
+        .then((mod) => mod.clearUserDataCache())
+        .catch(() => undefined);
     },
   });
 }

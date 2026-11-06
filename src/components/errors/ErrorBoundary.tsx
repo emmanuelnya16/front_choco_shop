@@ -63,7 +63,7 @@ class LoadGuard extends Component<{ failureText?: string; children: ReactNode },
     return (
       <p role="alert" className="px-page py-16 text-center text-body text-ink">
         {failureText}{' '}
-        <button type="button" className="min-h-[44px] font-semibold underline" onClick={() => pageReload.reload()}>
+        <button type="button" className="min-h-11 font-semibold underline" onClick={() => pageReload.reload()}>
           Recharger
         </button>
       </p>

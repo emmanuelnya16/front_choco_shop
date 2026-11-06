@@ -75,7 +75,7 @@ export const STATUS_META: Record<ReservationStatusCode, ReservationStatusMeta> =
   },
   handed_to_agency: {
     code: 'handed_to_agency',
-    label: "Remise à l'agence",
+    label: 'Remise à l’agence',
     tone: 'neutral',
     iconName: 'Truck',
     Icon: Truck,

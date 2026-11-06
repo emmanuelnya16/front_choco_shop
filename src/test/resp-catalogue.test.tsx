@@ -49,8 +49,8 @@ describe('Responsive catalogue — carte produit', () => {
     // « Réserver » peut rétrécir (la base du bouton est shrink-0 whitespace-nowrap)
     expect(reserve).toHaveClass('min-w-0', 'flex-1', 'shrink');
     expect(reserve).not.toHaveClass('shrink-0');
-    expect(reserve).toHaveClass('min-h-[44px]');
-    expect(add).toHaveClass('min-h-[44px]', 'min-w-[44px]');
+    expect(reserve).toHaveClass('min-h-11');
+    expect(add).toHaveClass('min-h-11', 'min-w-11');
   });
 });
 

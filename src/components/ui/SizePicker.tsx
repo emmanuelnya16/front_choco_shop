@@ -1,6 +1,10 @@
 import { Check, ShoppingBag } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
+import {
+  productFallbackImage,
+  productPrimaryImage,
+} from '@/features/catalog/product/productImages';
 import { cn } from '@/lib/utils/cn';
 import { haptic } from '@/lib/utils/haptics';
 import { useCartStore } from '@/stores/cartStore';
@@ -18,6 +22,12 @@ const COLOR_SWATCH_CLASSES: Record<string, string> = {
   rouge: 'bg-red border-red',
   gris: 'bg-grey border-grey',
 };
+
+/** La seule taille en stock dans cette couleur, ou null s'il y en a plusieurs (ou aucune). */
+function onlyAvailableSize(product: Product, colorCode: string): string | null {
+  const available = product.variants.filter((v) => v.colorCode === colorCode && v.stock > 0);
+  return available.length === 1 ? available[0].size : null;
+}
 
 export interface SizePickerProps {
   product: Product | null;
@@ -37,7 +47,7 @@ export function SizePicker({ product, intent = 'add', open, onClose }: SizePicke
   }
 
   return (
-    <Sheet open={open} onClose={onClose} title="Choisir votre taille">
+    <Sheet open={open} onClose={onClose} title="Choisissez votre taille">
       <SizePickerContent
         key={product.id}
         product={product}
@@ -76,19 +86,11 @@ function SizePickerContent({
     return colorWithStock?.code ?? product.colors[0]?.code ?? 'noir';
   });
 
-  // Pré-sélectionne la première taille en stock pour la couleur active
-  const [selectedSize, setSelectedSize] = useState<string | null>(() => {
-    const initialColor =
-      product.colors.find((c) =>
-        product.variants.some((v) => v.colorCode === c.code && v.stock > 0),
-      )?.code ??
-      product.colors[0]?.code ??
-      'noir';
-    const firstAvailable = product.variants.find(
-      (v) => v.colorCode === initialColor && v.stock > 0,
-    );
-    return firstAvailable?.size ?? null;
-  });
+  // Aucune taille choisie d'office, comme sur la fiche (§7.5) : le client choisit la sienne. Seule
+  // exception : une seule taille possible dans la couleur (taille unique ou dernière taille en stock).
+  const [selectedSize, setSelectedSize] = useState<string | null>(() =>
+    onlyAvailableSize(product, selectedColorCode),
+  );
 
   const activeColor: ProductColor =
     product.colors.find((c) => c.code === selectedColorCode) ??
@@ -106,10 +108,7 @@ function SizePickerContent({
       (v) => v.colorCode === colorCode && v.size === selectedSize && v.stock > 0,
     );
     if (!currentSizeVariant) {
-      const firstAvail = product.variants.find(
-        (v) => v.colorCode === colorCode && v.stock > 0,
-      );
-      setSelectedSize(firstAvail?.size ?? null);
+      setSelectedSize(onlyAvailableSize(product, colorCode));
     }
   };
 
@@ -118,9 +117,8 @@ function SizePickerContent({
       return;
     }
 
-    const imageSrc =
-      product.images[0] ?? product.fallbackImages[0] ?? '/mock/product-tee.svg';
-    const fallbackSrc = product.fallbackImages[0] ?? '/mock/product-tee.svg';
+    const imageSrc = productPrimaryImage(product);
+    const fallbackSrc = productFallbackImage(product);
 
     // Capture la position source pour l'animation d'envol vers le panier (§7.9)
     let sourceRect = sizePickerSourceRect;
@@ -168,7 +166,8 @@ function SizePickerContent({
     } else {
       showToast({
         message: `${product.name} ajouté au panier`,
-        subtitle: `${activeColor.name} · Taille ${selectedVariant.size}`,
+        // La taille d'abord, comme sur la fiche : à 360 px, la fin du sous-titre du toast est coupée
+        subtitle: `Taille ${selectedVariant.size} · ${activeColor.name}`,
         thumbnail: fallbackSrc,
         actionLabel: 'Voir le panier',
         actionHref: '/panier',
@@ -185,8 +184,8 @@ function SizePickerContent({
           className="h-20 w-16 shrink-0 overflow-hidden rounded-[var(--radius-sm)] bg-surface"
         >
           <SmartImage
-            src={product.images[0] ?? '/mock/product-tee.svg'}
-            fallback={product.fallbackImages[0] ?? '/mock/product-tee.svg'}
+            src={productPrimaryImage(product)}
+            fallback={productFallbackImage(product)}
             alt={product.name}
             ratio="4/5"
             className="h-full w-full"
@@ -194,9 +193,9 @@ function SizePickerContent({
         </div>
         <div className="min-w-0">
           <h3 className="truncate text-h3 text-ink">{product.name}</h3>
-          <Price amount={product.price} className="mt-1 block text-body text-ink" />
-          <p className="mt-0.5 text-xs text-text-2">
-            Stock bloqué 24 h dès validation de votre réservation
+          <Price amount={product.price} className="mt-1 block text-body font-bold text-ink" />
+          <p className="mt-0.5 text-caption text-text-2">
+            Article bloqué 24&nbsp;h dès votre réservation
           </p>
         </div>
       </div>
@@ -205,7 +204,7 @@ function SizePickerContent({
       {product.colors.length > 0 && (
         <div>
           <p className="text-label text-text-2">
-            COULEUR : <span className="text-ink">{activeColor.name}</span>
+            COULEUR&nbsp;: <span className="text-ink">{activeColor.name}</span>
           </p>
           <div className="mt-2 flex flex-wrap items-center gap-2.5">
             {product.colors.map((color) => {
@@ -217,9 +216,10 @@ function SizePickerContent({
                 <button
                   key={color.code}
                   type="button"
+                  aria-pressed={isSelected}
                   onClick={() => handleSelectColor(color.code)}
                   className={cn(
-                    'inline-flex min-h-[44px] items-center gap-2 rounded-[var(--radius-md)] border px-3 py-1.5 text-small font-semibold transition-colors',
+                    'inline-flex min-h-11 items-center gap-2 rounded-[var(--radius-md)] border px-3 py-1.5 text-small font-semibold transition-colors',
                     isSelected
                       ? 'border-ink bg-ink text-white'
                       : 'border-silver bg-white text-ink hover:bg-surface',
@@ -235,13 +235,14 @@ function SizePickerContent({
                     {isColorSoldOut && (
                       <span
                         aria-hidden="true"
-                        className="absolute inset-x-[-2px] top-1/2 h-[1.5px] -translate-y-1/2 -rotate-45 bg-red"
+                        className="absolute -inset-x-0.5 top-1/2 h-[1.5px] -translate-y-1/2 -rotate-45 bg-red"
                       />
                     )}
                   </span>
                   <span className={cn(isColorSoldOut && 'line-through')}>
                     {color.name}
                   </span>
+                  {isColorSoldOut && <span className="sr-only"> (épuisée)</span>}
                 </button>
               );
             })}
@@ -256,7 +257,7 @@ function SizePickerContent({
           {selectedVariant &&
             selectedVariant.stock > 0 &&
             selectedVariant.stock <= 2 && (
-              <span className="text-xs font-semibold text-warning">
+              <span className="text-caption font-semibold text-warning">
                 Plus que {selectedVariant.stock} en taille {selectedVariant.size}
               </span>
             )}
@@ -283,8 +284,9 @@ function SizePickerContent({
                 aria-pressed={isSelected}
                 className={cn(
                   'relative flex h-12 items-center justify-center rounded-[var(--radius-md)] border text-small font-bold transition-colors',
+                  size === 'Unique' && 'col-span-full',
                   outOfStock
-                    ? 'cursor-not-allowed border-silver bg-surface text-silver line-through opacity-60'
+                    ? 'cursor-not-allowed border-silver bg-surface text-text-2 line-through'
                     : isSelected
                       ? 'border-ink bg-ink text-white'
                       : 'border-silver bg-white text-ink hover:border-ink',
@@ -312,7 +314,11 @@ function SizePickerContent({
         }
         onClick={handleConfirm}
       >
-        {intent === 'reserve' ? 'Continuer vers la réservation' : 'Ajouter au panier'}
+        {!selectedVariant
+          ? 'Choisissez une taille'
+          : intent === 'reserve'
+            ? 'Continuer vers la réservation'
+            : 'Ajouter au panier'}
       </Button>
     </div>
   );

@@ -4,55 +4,33 @@ import { usePublicSettings } from '@/features/catalog/api/useCatalogQueries';
 import { api, ApiError } from '@/lib/api/client';
 import { endpoints } from '@/lib/api/endpoints';
 import { qk } from '@/lib/api/queryKeys';
-import { useCartStore } from '@/stores/cartStore';
 import { useReservationStore } from '@/stores/reservationStore';
 import type {
   CancelReservationResponse,
   UploadProofResponse,
 } from '@/types/api';
 import type { PaymentSettings, Reservation } from '@/types/domain';
+import {
+  addReservationItemsWithoutCheck,
+  restoreReservationItemsToCart,
+  type RestoreReservationResult,
+} from '@/features/cart/restoreReservationItems';
+import { resolveShopWhatsapp } from '@/features/payment/whatsapp';
 import { loadStoredPaymentSettings, saveStoredPaymentSettings } from './paymentSettingsStorage';
 
-const DEFAULT_PAYMENT_SETTINGS: PaymentSettings = {
-  operators: [
-    {
-      id: 'orange',
-      label: 'Orange Money',
-      merchantName: 'ETS DR CHOCO LINCOMPRIS',
-      merchantCode: '000111', // FICTIF
-      ussdTemplate: '#000*1*{code}*{amount}#', // FICTIF
-      qrImageUrl: '/mock/qr-orange.svg',
-      steps: [
-        'Appuyez sur « Composer le code de paiement » ou ouvrez Orange Money.',
-        'Vérifiez que le destinataire affiché est bien « ETS DR CHOCO LINCOMPRIS » (code 000111).',
-        'Confirmez le montant exact avec votre code secret Orange Money.',
-      ],
-      enabled: true,
-    },
-    {
-      id: 'mtn',
-      label: 'MTN MoMo',
-      merchantName: 'DR CHOCO BOUTIQUE SARL',
-      merchantCode: '000222', // FICTIF
-      ussdTemplate: '*000*2*{code}*{amount}#', // FICTIF
-      qrImageUrl: '/mock/qr-mtn.svg',
-      steps: [
-        'Appuyez sur « Composer le code de paiement » ou ouvrez l’application MTN MoMo.',
-        'Vérifiez que le nom du marchand est « DR CHOCO BOUTIQUE SARL » (code 000222).',
-        'Validez le montant exact avec votre code PIN MTN Mobile Money.',
-      ],
-      enabled: true,
-    },
-  ],
-  exactAmountRequired: true,
-  validationDelayText: "en général en moins d'une heure, de 8 h à 20 h",
-  proofMaxSizeMb: 10,
-};
+/**
+ * État des paramètres de paiement affichables :
+ * - `ready` : paramètres réels (reçus de l'API ou mémorisés sur le téléphone) ;
+ * - `loading` : premier chargement en cours, rien de mémorisé ;
+ * - `unavailable` : échec ou hors connexion sans paramètres mémorisés.
+ */
+export type PaymentSettingsStatus = 'ready' | 'loading' | 'unavailable';
 
 /**
  * Paramètres de paiement issus de `GET /settings/public` (§3.1 & §3.4).
- * Hors connexion, les derniers paramètres reçus (conservés sur le téléphone) passent avant les
- * valeurs fictives par défaut (M6 §6.3).
+ * Hors connexion, les derniers paramètres reçus (conservés sur le téléphone) sont utilisés (M6 §6.3).
+ * Aucune valeur fictive côté app (M7) : sans paramètres reçus ni mémorisés, `payment` vaut `null`
+ * et l'écran de paiement affiche un état de chargement puis « Paiement momentanément indisponible ».
  */
 export function usePaymentSettings() {
   const query = usePublicSettings();
@@ -64,13 +42,19 @@ export function usePaymentSettings() {
     if (freshPayment) saveStoredPaymentSettings(freshPayment, freshWhatsapp);
   }, [freshPayment, freshWhatsapp]);
 
-  const payment: PaymentSettings =
-    freshPayment ?? stored?.payment ?? DEFAULT_PAYMENT_SETTINGS;
+  const payment: PaymentSettings | null = freshPayment ?? stored?.payment ?? null;
+  const settingsStatus: PaymentSettingsStatus = payment
+    ? 'ready'
+    : query.isLoading
+      ? 'loading'
+      : 'unavailable';
 
   return {
     ...query,
     payment,
-    whatsappNumber: freshWhatsapp ?? stored?.whatsappNumber ?? '+237690000000',
+    settingsStatus,
+    /** Numéro WhatsApp de la boutique, ou `undefined` s'il est inconnu (boutons masqués). */
+    whatsappNumber: resolveShopWhatsapp(freshWhatsapp, stored?.whatsappNumber),
   };
 }
 
@@ -203,33 +187,19 @@ export function useCancelReservation(ref: string | undefined) {
       const res = await api.post<CancelReservationResponse>(
         endpoints.reservations.cancel(normalizedRef),
       );
-      return {
-        response: res,
-        itemsToRestore:
-          reservationToRestore?.items ?? res.reservation?.items ?? [],
-      };
-    },
-    onSuccess: ({ response, itemsToRestore }) => {
-      const cartStore = useCartStore.getState();
-      for (const item of itemsToRestore) {
-        cartStore.add({
-          productId: item.productId,
-          slug: item.slug,
-          name: item.name,
-          image: item.image,
-          variantId: item.variantId,
-          size: item.size,
-          color: {
-            code: item.colorName.toLowerCase().replace(/\s+/g, '-'),
-            name: item.colorName,
-            hex: '#0A0A0A',
-          },
-          unitPrice: item.unitPrice,
-          quantity: item.quantity,
-          maxQuantity: Math.max(5, item.quantity),
-        });
+      const itemsToRestore = reservationToRestore?.items ?? res.reservation?.items ?? [];
+      // Remise au panier commune (« Refaire ma réservation », « Réserver à nouveau ») : stock vérifié,
+      // couleur réelle (colorCode / colorHex) ; hors connexion, tout est remis et le panier revérifiera.
+      let restored: RestoreReservationResult;
+      try {
+        restored = await restoreReservationItemsToCart(itemsToRestore);
+      } catch {
+        addReservationItemsWithoutCheck(itemsToRestore);
+        restored = { added: itemsToRestore.length, unavailable: 0 };
       }
-
+      return { response: res, restored };
+    },
+    onSuccess: ({ response }) => {
       clearActiveReservation();
       if (response.reservation) {
         queryClient.setQueryData(

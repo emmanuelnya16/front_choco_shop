@@ -14,4 +14,11 @@ describe('cn() : fusion des classes Tailwind', () => {
     expect(cn('text-ink', 'text-white')).toBe('text-white');
     expect(cn('text-body', 'text-xs')).toBe('text-xs');
   });
+
+  it('reconnaît text-caption, les durées et les courbes nommées', () => {
+    expect(cn('text-caption', 'text-text-2')).toBe('text-caption text-text-2');
+    expect(cn('text-caption', 'text-small')).toBe('text-small');
+    expect(cn('duration-fast', 'duration-slow')).toBe('duration-slow');
+    expect(cn('ease-brand-out', 'ease-brand-in-out')).toBe('ease-brand-in-out');
+  });
 });

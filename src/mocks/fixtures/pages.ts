@@ -574,19 +574,30 @@ Non. Vous vous connectez avec votre numéro de téléphone et un code reçu par 
 `,
 );
 
-export const mockContentPages: Readonly<Record<string, ContentPageResponse>> = Object.fromEntries(
-  [
-    conditionsGenerales,
-    annulationRetours,
-    confidentialite,
-    mentionsLegales,
-    commentReserver,
-    paiementMobileMoney,
-    livraisonRetrait,
-    suivreMaReservation,
-    questionsFrequentes,
-  ].map((item) => [item.slug, item]),
+const INITIAL_CONTENT_PAGES: ContentPageResponse[] = [
+  conditionsGenerales,
+  annulationRetours,
+  confidentialite,
+  mentionsLegales,
+  commentReserver,
+  paiementMobileMoney,
+  livraisonRetrait,
+  suivreMaReservation,
+  questionsFrequentes,
+];
+
+export const mockContentPages: Record<string, ContentPageResponse> = Object.fromEntries(
+  INITIAL_CONTENT_PAGES.map((item) => [item.slug, { ...item }]),
 );
+
+export function resetMockContentPages(): void {
+  for (const key of Object.keys(mockContentPages)) {
+    delete mockContentPages[key];
+  }
+  for (const item of INITIAL_CONTENT_PAGES) {
+    mockContentPages[item.slug] = { ...item };
+  }
+}
 
 export function findMockContentPage(slug: string): ContentPageResponse | undefined {
   return Object.prototype.hasOwnProperty.call(mockContentPages, slug) ? mockContentPages[slug] : undefined;

@@ -258,8 +258,8 @@ describe('Client API : ApiError, 401 -> refresh -> retry, et délai dépassé', 
   });
 });
 
-describe('Routeur : rendu de la page provisoire /panier', () => {
-  it('affiche la page provisoire de /panier avec son titre et son numéro de section', async () => {
+describe('Routeur : rendu de la page /panier', () => {
+  it('affiche la page /panier avec son titre, son texte d’accueil et le titre de l’onglet', async () => {
     const testRouter = createTestRouter(['/panier']);
     const testQueryClient = createAppQueryClient();
 
@@ -269,12 +269,13 @@ describe('Routeur : rendu de la page provisoire /panier', () => {
       </AppProviders>,
     );
 
-    const heading = await screen.findByRole('heading', { level: 1, name: /Panier/i });
+    // Page chargée à la demande : délai généreux quand toute la suite tourne en parallèle
+    const heading = await screen.findByRole('heading', { level: 1, name: /Panier/i }, { timeout: 8000 });
     expect(heading).toBeInTheDocument();
     expect(screen.getByText(/Parcourez la collection/i)).toBeInTheDocument();
 
     await waitFor(() => {
       expect(document.title).toContain('Panier · DR Choco');
     });
-  });
+  }, 15_000);
 });

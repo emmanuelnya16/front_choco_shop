@@ -18,7 +18,7 @@ const ONE_SIZE = ['Unique'];
 const CLOTHING_SIZE_GUIDE: SizeGuideTable = {
   type: 'clothing',
   title: 'Guide des tailles — Vêtements (coupe ample)',
-  tip: 'Entre deux tailles ? Prenez la plus grande pour un rendu oversize assumé, ou la plus petite pour un tombé plus ajusté.',
+  tip: 'Entre deux tailles\u00A0? Prenez la plus grande pour un rendu oversize assumé, ou la plus petite pour un tombé plus ajusté.',
   headers: ['Taille', 'Tour de poitrine (cm)', 'Longueur dos (cm)', 'Épaules (cm)'],
   rows: [
     ['S', '104 – 108', '69', '52'],
@@ -93,7 +93,7 @@ const SEEDS: RawProductSeed[] = [
     name: 'Hoodie Barbelé Noir',
     description:
       'Molleton lourd 480 g/m² à la coupe boxy et aux épaules tombantes. Sa broderie poitrine haute densité et sa capuche doublée sans cordon signent l’allure brute de L’Incompris. Conçu pour garder son volume lavage après lavage.',
-    composition: '100 % coton peigné lourd, 480 g/m²',
+    composition: '100\u00A0% coton peigné lourd, 480 g/m²',
     categorySlug: 'vetements',
     subCategorySlug: 'hoodies',
     price: 45000,
@@ -116,7 +116,7 @@ const SEEDS: RawProductSeed[] = [
     name: "T-shirt L'Incompris Oversize",
     description:
       'Coton peigné 280 g/m² au tombé lourd et respirant, idéal sous le climat de Douala et Yaoundé. Son col côtelé épais de 3 cm ne se détend jamais. La sérigraphie dorsale grand format est cuite en atelier pour une tenue irréprochable.',
-    composition: '100 % coton peigné, 280 g/m²',
+    composition: '100\u00A0% coton peigné, 280 g/m²',
     categorySlug: 'vetements',
     subCategorySlug: 't-shirts',
     price: 18000,
@@ -140,7 +140,7 @@ const SEEDS: RawProductSeed[] = [
     name: 'Babouche Royale Akwa Cuir',
     description:
       'Façonnée à la main dans un cuir de veau pleine fleur souple et résistant. Sa semelle intérieure ergonomique à mémoire de forme assure un maintien parfait du matin au soir. Elle accompagne aussi bien un ensemble traditionnel qu’un pantalon large contemporain.',
-    composition: '100 % cuir de veau pleine fleur, semelle cuir et gomme antidérapante',
+    composition: '100\u00A0% cuir de veau pleine fleur, semelle cuir et gomme antidérapante',
     careInstructions: DEFAULT_LEATHER_CARE,
     categorySlug: 'babouches',
     subCategorySlug: 'cuir-lisse',
@@ -163,7 +163,7 @@ const SEEDS: RawProductSeed[] = [
     name: 'Sneaker Monolithe V1',
     description:
       'Architecture urbaine massive associant cuir mat pleine fleur et empiècements en nubuck. Sa semelle sculptée de 4,5 cm offre un amorti franc et une adhérence tout-terrain. Une pièce signature produite en série très limitée.',
-    composition: 'Tige 80 % cuir pleine fleur, 20 % nubuck · Semelle caoutchouc haute densité',
+    composition: 'Tige 80\u00A0% cuir pleine fleur, 20\u00A0% nubuck · Semelle caoutchouc haute densité',
     careInstructions: DEFAULT_LEATHER_CARE,
     categorySlug: 'chaussures',
     subCategorySlug: 'sneakers',
@@ -187,7 +187,7 @@ const SEEDS: RawProductSeed[] = [
     name: 'Cargo Tactique Bitume',
     description:
       'Taillé dans une toile ripstop de coton armuré indéchirable. Il dispose de six poches à soufflet sécurisées et de sangles de serrage aux chevilles pour ajuster le tombé sur vos sneakers ou vos boots. Pensé pour un usage quotidien intensif.',
-    composition: '100 % coton ripstop armuré, 340 g/m²',
+    composition: '100\u00A0% coton ripstop armuré, 340 g/m²',
     categorySlug: 'vetements',
     subCategorySlug: 'pantalons',
     price: 38000,
@@ -205,7 +205,7 @@ const SEEDS: RawProductSeed[] = [
     name: 'Babouche Croco Nocturne',
     description:
       'Cuir embossé motif écailles de crocodile au relief franc et lumineux. Sa bride large est entièrement doublée de peau souple pour éviter tout frottement sur le cou-de-pied. Talon renforcé par une double surpiqûre sellier.',
-    composition: '100 % cuir de bovin embossé croco, doublure chèvre souple',
+    composition: '100\u00A0% cuir de bovin embossé croco, doublure chèvre souple',
     careInstructions: DEFAULT_LEATHER_CARE,
     categorySlug: 'babouches',
     subCategorySlug: 'croco-embosse',
@@ -225,7 +225,7 @@ const SEEDS: RawProductSeed[] = [
     name: 'T-shirt Manifeste 237',
     description:
       'Hommage graphique à l’indicatif 237 avec une typographie condensée sur la poitrine. Sa coupe ample à manches descendues assure une silhouette nette et confortable. Le jersey de coton peigné résiste aux lavages répétés sans vriller.',
-    composition: '100 % coton biologique peigné, 260 g/m²',
+    composition: '100\u00A0% coton biologique peigné, 260 g/m²',
     categorySlug: 'vetements',
     subCategorySlug: 't-shirts',
     price: 15000,
@@ -243,7 +243,7 @@ const SEEDS: RawProductSeed[] = [
     name: 'Derby Commando Douala',
     description:
       'L’alliance d’une derby habillée en cuir glacé épais et d’une semelle commando crantée. La trépointe surpiquée protège de l’humidité tout en affirmant un caractère résolument urbain. Parfaite avec un pantalon à plis ou un cargo.',
-    composition: '100 % cuir glacé pleine fleur, semelle gomme crantée cousue Blake',
+    composition: '100\u00A0% cuir glacé pleine fleur, semelle gomme crantée cousue Blake',
     careInstructions: DEFAULT_LEATHER_CARE,
     categorySlug: 'chaussures',
     subCategorySlug: 'derbies',
@@ -262,7 +262,7 @@ const SEEDS: RawProductSeed[] = [
     name: 'Hoodie Sans Manches Forge',
     description:
       'Pièce de superposition taillée dans un french terry de 420 g/m² aux emmanchures à bords francs. Sa capuche structurée et sa poche kangourou profonde dessinent une carrure athlétique. Se porte seul par temps chaud ou sur un t-shirt manches longues.',
-    composition: '100 % coton French Terry non gratté, 420 g/m²',
+    composition: '100\u00A0% coton French Terry non gratté, 420 g/m²',
     categorySlug: 'vetements',
     subCategorySlug: 'hoodies',
     price: 32000,
@@ -300,7 +300,7 @@ const SEEDS: RawProductSeed[] = [
     name: 'Pantalon Large Atelier',
     description:
       'Sergé de coton lourd 360 g/m² doté de doubles plis profonds à la taille. Sa jambe large tombe avec aplomb sur la chaussure sans casser la silhouette. Équipé de poches italiennes profondes et d’une boucle de serrage au dos.',
-    composition: '100 % sergé de coton lourd, 360 g/m²',
+    composition: '100\u00A0% sergé de coton lourd, 360 g/m²',
     categorySlug: 'vetements',
     subCategorySlug: 'pantalons',
     price: 36000,
@@ -318,7 +318,7 @@ const SEEDS: RawProductSeed[] = [
     name: 'T-shirt Essentiel Lourd',
     description:
       'Le pilier du vestiaire quotidien en jersey lourd indéformable. Finition minimaliste avec une étiquette tissée ton sur ton au bas du vêtement et des coutures épaules renforcées. Une coupe droite équilibrée qui traverse les saisons.',
-    composition: '100 % coton cardé sec, 270 g/m²',
+    composition: '100\u00A0% coton cardé sec, 270 g/m²',
     categorySlug: 'vetements',
     subCategorySlug: 't-shirts',
     price: 12000,
@@ -336,7 +336,7 @@ const SEEDS: RawProductSeed[] = [
     name: 'Sneaker Basse Asphalte',
     description:
       'Inspirée des chaussures de skate des années 90, revisitée en cuir grainé pleine fleur. Sa languette généreusement matelassée et son col doublé maintiennent la cheville tout en douceur. Semelle cuvette cousue sur tout le pourtour.',
-    composition: 'Tige 100 % cuir grainé · Doublure textile respirant · Semelle gomme cousue',
+    composition: 'Tige 100\u00A0% cuir grainé · Doublure textile respirant · Semelle gomme cousue',
     careInstructions: DEFAULT_LEATHER_CARE,
     categorySlug: 'chaussures',
     subCategorySlug: 'sneakers',
@@ -355,7 +355,7 @@ const SEEDS: RawProductSeed[] = [
     name: 'Hoodie Zippé Armure',
     description:
       'Équipé d’une fermeture métallique lourde à double curseur permettant d’ajuster l’ouverture par le haut ou par le bas. Ses poches plaquées à rivets métalliques et son molleton dense en font une véritable veste d’extérieur.',
-    composition: '100 % coton lourd brossé, 490 g/m² · Zip métallique YKK',
+    composition: '100\u00A0% coton lourd brossé, 490 g/m² · Zip métallique YKK',
     categorySlug: 'vetements',
     subCategorySlug: 'hoodies',
     price: 49000,
@@ -374,7 +374,7 @@ const SEEDS: RawProductSeed[] = [
     name: 'Babouche Sultan Brodée',
     description:
       'Empeigne à bout légèrement relevé, soulignée d’une broderie géométrique en fil rouge contrasté. La doublure intégrale en cuir naturel régule la température du pied. Une création artisanale qui signe chaque tenue de cérémonie ou de sortie.',
-    composition: '100 % cuir de veau lisse, broderie fil polyester haute ténacité',
+    composition: '100\u00A0% cuir de veau lisse, broderie fil polyester haute ténacité',
     careInstructions: DEFAULT_LEATHER_CARE,
     categorySlug: 'babouches',
     subCategorySlug: 'cuir-lisse',
@@ -394,7 +394,7 @@ const SEEDS: RawProductSeed[] = [
     name: 'Short Cargo Béton',
     description:
       'Coupe ample s’arrêtant juste sous le genou pour une allure streetwear maîtrisée. Deux larges poches latérales à rabat aimanté et une taille élastiquée à cordon tressé. Toile de coton lavée aux enzymes pour un toucher doux immédiat.',
-    composition: '100 % sergé de coton lavé, 310 g/m²',
+    composition: '100\u00A0% sergé de coton lavé, 310 g/m²',
     categorySlug: 'vetements',
     subCategorySlug: 'pantalons',
     price: 24000,
@@ -412,7 +412,7 @@ const SEEDS: RawProductSeed[] = [
     name: 'T-shirt Archive N°01',
     description:
       'Réédition collector de la toute première série imprimée par DR Choco L’Incompris. Le lavage enzymatique confère au coton un aspect patiné unique et un toucher peau de pêche. Numéroté à l’intérieur de l’ourlet.',
-    composition: '100 % coton peigné lavé aux enzymes, 290 g/m²',
+    composition: '100\u00A0% coton peigné lavé aux enzymes, 290 g/m²',
     categorySlug: 'vetements',
     subCategorySlug: 't-shirts',
     price: 20000,
@@ -431,7 +431,7 @@ const SEEDS: RawProductSeed[] = [
     name: 'Boots Montantes Kotto',
     description:
       'Tige montante à 7 œillets métalliques pensée pour affronter toutes les routes et la saison des pluies. Le cuir traité hydrofuge repousse l’eau tout en laissant le pied respirer. Zip latéral intérieur discret pour un chaussage rapide.',
-    composition: '100 % cuir gras hydrofuge, semelle crantée caoutchouc vulcanisé',
+    composition: '100\u00A0% cuir gras hydrofuge, semelle crantée caoutchouc vulcanisé',
     careInstructions: DEFAULT_LEATHER_CARE,
     categorySlug: 'chaussures',
     subCategorySlug: 'derbies',
@@ -450,7 +450,7 @@ const SEEDS: RawProductSeed[] = [
     name: 'Babouche Croco Impériale',
     description:
       'Édition prestige en cuir embossé profond montée sur une semelle double épaisseur cousue main. Le contraste entre la texture croco brillante et le passepoil mat souligne la finesse de la découpe. Livrée dans sa housse de protection en coton.',
-    composition: '100 % cuir véritable embossé croco, semelle double cuir',
+    composition: '100\u00A0% cuir véritable embossé croco, semelle double cuir',
     careInstructions: DEFAULT_LEATHER_CARE,
     categorySlug: 'babouches',
     subCategorySlug: 'croco-embosse',
@@ -469,7 +469,7 @@ const SEEDS: RawProductSeed[] = [
     name: 'Jogger Lourd Incompris',
     description:
       'Molleton 460 g/m² assorti au Hoodie Barbelé avec une coupe droite à ourlet ouvert en bas de jambe. Les coutures nervurées sur le devant allongent la ligne et maintiennent la tenue du vêtement. Poche arrière zippée invisible.',
-    composition: '100 % coton peigné molletonné, 460 g/m²',
+    composition: '100\u00A0% coton peigné molletonné, 460 g/m²',
     categorySlug: 'vetements',
     subCategorySlug: 'pantalons',
     price: 34000,
@@ -487,7 +487,7 @@ const SEEDS: RawProductSeed[] = [
     name: 'Manches Longues Brut',
     description:
       'T-shirt à manches longues doté de poignets en bords-côtes serrés et d’une sérigraphie graphique le long des avant-bras. Le coton de 280 g/m² offre une tenue intermédiaire idéale entre le t-shirt et le sweatshirt léger.',
-    composition: '100 % coton peigné, 280 g/m²',
+    composition: '100\u00A0% coton peigné, 280 g/m²',
     categorySlug: 'vetements',
     subCategorySlug: 't-shirts',
     price: 22000,
@@ -505,7 +505,7 @@ const SEEDS: RawProductSeed[] = [
     name: 'Runner Bonapriso',
     description:
       'Association dynamique de mesh alvéolé ultra-respirant et d’empiècements en suède anthracite. Sa semelle intermédiaire profilée absorbe les chocs pour un confort de marche exceptionnel toute la journée. Détails réfléchissants au talon.',
-    composition: 'Tige 55 % cuir suède, 45 % mesh technique · Semelle EVA et caoutchouc',
+    composition: 'Tige 55\u00A0% cuir suède, 45\u00A0% mesh technique · Semelle EVA et caoutchouc',
     careInstructions: DEFAULT_LEATHER_CARE,
     categorySlug: 'chaussures',
     subCategorySlug: 'sneakers',
@@ -524,7 +524,7 @@ const SEEDS: RawProductSeed[] = [
     name: 'Babouche Souple Studio',
     description:
       'Modèle quotidien en cuir lisse léger au chaussant immédiat. Sa souplesse permet de la glisser facilement dans un sac de voyage sans jamais déformer l’empeigne. Un classique accessible façonné avec le même soin artisanal.',
-    composition: '100 % cuir de chèvre souple, semelle élastomère cousue',
+    composition: '100\u00A0% cuir de chèvre souple, semelle élastomère cousue',
     careInstructions: DEFAULT_LEATHER_CARE,
     categorySlug: 'babouches',
     subCategorySlug: 'cuir-lisse',
@@ -543,7 +543,7 @@ const SEEDS: RawProductSeed[] = [
     name: 'Pack T-shirt & Foulard Signature',
     description:
       'Coffret découverte associant un t-shirt coupe ample universelle et un grand foulard en coton imprimé au motif barbelé DR Choco. Idéal pour offrir ou compléter sa silhouette avec une touche graphique.',
-    composition: '100 % coton peigné (t-shirt 270 g/m² + foulard popeline 120 g/m²)',
+    composition: '100\u00A0% coton peigné (t-shirt 270 g/m² + foulard popeline 120 g/m²)',
     categorySlug: 'vetements',
     subCategorySlug: 't-shirts',
     price: 8000,
@@ -558,81 +558,96 @@ const SEEDS: RawProductSeed[] = [
   },
 ];
 
-export const mockProducts: Product[] = SEEDS.map((seed) => {
-  const variants = seed.colors.flatMap((color) => {
-    const patternForColor = seed.colorStockOverrides?.[color.code] ?? seed.stockPattern;
-    return seed.sizes.map((size, sizeIndex) => ({
-      id: `${seed.id}-${color.code}-${size.toLowerCase()}`,
-      size,
-      colorCode: color.code,
-      stock: patternForColor[sizeIndex] ?? 0,
-    }));
-  });
-
-  const totalStock = variants.reduce((sum, v) => sum + v.stock, 0);
+export function computeProductBadges(totalStock: number, isNew: boolean): ProductBadgeType[] {
   const badges: ProductBadgeType[] = [];
   if (totalStock === 0) {
     badges.push('sold-out');
   } else if (totalStock >= 1 && totalStock <= 3) {
     badges.push('low-stock');
   }
-  if (seed.isNew) {
+  if (isNew) {
     badges.push('new');
   }
+  return badges;
+}
 
-  // HYPOTHÈSE: Chaque couleur possède au moins une vue associée dans `mediaGallery` via `colorCode`.
-  const mediaGallery: ProductImageEntry[] = [];
-  seed.colors.forEach((color, colorIdx) => {
-    const fallback = seed.fallbackImages[colorIdx % seed.fallbackImages.length] ?? '/mock/product-tee.svg';
-    mediaGallery.push({
-      url: `/images/products/${seed.slug}-${colorIdx + 1}.webp`,
-      fallbackUrl: fallback,
-      colorCode: color.code,
-      alt: `${seed.name} — ${color.name}`,
+export function createSeedProducts(): Product[] {
+  return SEEDS.map((seed) => {
+    const variants = seed.colors.flatMap((color) => {
+      const patternForColor = seed.colorStockOverrides?.[color.code] ?? seed.stockPattern;
+      return seed.sizes.map((size, sizeIndex) => ({
+        id: `${seed.id}-${color.code}-${size.toLowerCase()}`,
+        size,
+        colorCode: color.code,
+        stock: patternForColor[sizeIndex] ?? 0,
+      }));
     });
+
+    const totalStock = variants.reduce((sum, v) => sum + v.stock, 0);
+    const badges = computeProductBadges(totalStock, seed.isNew);
+
+    // HYPOTHÈSE: Chaque couleur possède au moins une vue associée dans `mediaGallery` via `colorCode`.
+    const mediaGallery: ProductImageEntry[] = [];
+    seed.colors.forEach((color, colorIdx) => {
+      const fallback =
+        seed.fallbackImages[colorIdx % seed.fallbackImages.length] ?? '/mock/product-tee.svg';
+      mediaGallery.push({
+        url: `/images/products/${seed.slug}-${colorIdx + 1}.webp`,
+        fallbackUrl: fallback,
+        colorCode: color.code,
+        alt: `${seed.name} — ${color.name}`,
+      });
+    });
+    // Ajout de vues de détail supplémentaires pour la galerie (minimum 3 vues par produit)
+    while (mediaGallery.length < 3) {
+      const idx = mediaGallery.length;
+      const fallback =
+        seed.fallbackImages[idx % seed.fallbackImages.length] ?? '/mock/product-tee.svg';
+      mediaGallery.push({
+        url: `/images/products/${seed.slug}-${idx + 1}.webp`,
+        fallbackUrl: fallback,
+        colorCode: seed.colors[0]?.code,
+        alt: `${seed.name} — Vue ${idx + 1}`,
+      });
+    }
+
+    const images = mediaGallery.map((entry) => entry.url);
+    const fallbackImages = mediaGallery.map((entry) => entry.fallbackUrl);
+
+    const sizeGuide =
+      seed.sizes.length === 1 && seed.sizes[0] === 'Unique'
+        ? { ...ONE_SIZE_GUIDE, headers: [...ONE_SIZE_GUIDE.headers], rows: ONE_SIZE_GUIDE.rows.map((r) => [...r]) }
+        : seed.categorySlug === 'vetements'
+          ? { ...CLOTHING_SIZE_GUIDE, headers: [...CLOTHING_SIZE_GUIDE.headers], rows: CLOTHING_SIZE_GUIDE.rows.map((r) => [...r]) }
+          : { ...FOOTWEAR_SIZE_GUIDE, headers: [...FOOTWEAR_SIZE_GUIDE.headers], rows: FOOTWEAR_SIZE_GUIDE.rows.map((r) => [...r]) };
+
+    return {
+      id: seed.id,
+      slug: seed.slug,
+      name: seed.name,
+      description: seed.description,
+      composition: seed.composition,
+      careInstructions: [...(seed.careInstructions ?? DEFAULT_CLOTHING_CARE)],
+      sizeGuide,
+      categorySlug: seed.categorySlug,
+      subCategorySlug: seed.subCategorySlug,
+      price: seed.price,
+      images,
+      fallbackImages,
+      mediaGallery,
+      colors: seed.colors.map((c) => ({ ...c })),
+      sizes: [...seed.sizes],
+      variants,
+      isNew: seed.isNew,
+      reservationsCount: seed.reservationsCount,
+      badges,
+      createdAt: seed.createdAt,
+    };
   });
-  // Ajout de vues de détail supplémentaires pour la galerie (minimum 3 vues par produit)
-  while (mediaGallery.length < 3) {
-    const idx = mediaGallery.length;
-    const fallback = seed.fallbackImages[idx % seed.fallbackImages.length] ?? '/mock/product-tee.svg';
-    mediaGallery.push({
-      url: `/images/products/${seed.slug}-${idx + 1}.webp`,
-      fallbackUrl: fallback,
-      colorCode: seed.colors[0]?.code,
-      alt: `${seed.name} — Vue ${idx + 1}`,
-    });
-  }
+}
 
-  const images = mediaGallery.map((entry) => entry.url);
-  const fallbackImages = mediaGallery.map((entry) => entry.fallbackUrl);
+export const mockProducts: Product[] = createSeedProducts();
 
-  const sizeGuide =
-    seed.sizes.length === 1 && seed.sizes[0] === 'Unique'
-      ? ONE_SIZE_GUIDE
-      : seed.categorySlug === 'vetements'
-        ? CLOTHING_SIZE_GUIDE
-        : FOOTWEAR_SIZE_GUIDE;
-
-  return {
-    id: seed.id,
-    slug: seed.slug,
-    name: seed.name,
-    description: seed.description,
-    composition: seed.composition,
-    careInstructions: seed.careInstructions ?? DEFAULT_CLOTHING_CARE,
-    sizeGuide,
-    categorySlug: seed.categorySlug,
-    subCategorySlug: seed.subCategorySlug,
-    price: seed.price,
-    images,
-    fallbackImages,
-    mediaGallery,
-    colors: seed.colors,
-    sizes: seed.sizes,
-    variants,
-    isNew: seed.isNew,
-    reservationsCount: seed.reservationsCount,
-    badges,
-    createdAt: seed.createdAt,
-  };
-});
+export function resetMockProducts(): void {
+  mockProducts.splice(0, mockProducts.length, ...createSeedProducts());
+}
